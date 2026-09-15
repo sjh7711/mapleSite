@@ -1,0 +1,342 @@
+{
+  "schema": "maplestarforce.skill-alias-overrides.v1",
+  "reviewedAt": "2026-09-09",
+  "description": "연무장 파생 타격명을 같은 직업의 NEXON Open API 부모 스킬에 연결한 검토본",
+  "classes": {
+    "다크나이트": {
+      "비홀더스 퍼니시먼트": {
+        "canonical": "비홀더스 리벤지 VI",
+        "evidence": "official-parent-effect"
+      }
+    },
+    "데몬슬레이어": {
+      "데모닉 스피어": {
+        "canonical": "데몬 슬래시 VI",
+        "evidence": "official-parent-description-effect"
+      },
+      "데몬 임팩트 VI : 데몬 체인": {
+        "canonical": "데몬 임팩트 VI",
+        "evidence": "official-parent-description"
+      },
+      "서버러스 VI : 타테리안 서버러스": {
+        "canonical": "서버러스 VI",
+        "evidence": "official-parent-description-effect"
+      },
+      "이계의 공허": {
+        "canonical": "이계 여신의 축복",
+        "evidence": "official-parent-effect"
+      }
+    },
+    "데몬어벤져": {
+      "분노의 가시": {
+        "canonical": "레버넌트",
+        "evidence": "official-parent-description-effect"
+      },
+      "이계의 공허": {
+        "canonical": "이계 여신의 축복",
+        "evidence": "official-parent-effect"
+      }
+    },
+    "듀얼블레이더": {
+      "헌티드 엣지-나찰": {
+        "canonical": "헌티드 엣지",
+        "evidence": "official-parent-description-effect"
+      }
+    },
+    "렌": {
+      "창룡파천검 : 일매낙화 천비인적-천강": {
+        "canonical": "창룡파천검 : 일매낙화 천비인적",
+        "evidence": "official-parent-effect"
+      },
+      "창룡파천검 : 일매낙화 천비인적-진천": {
+        "canonical": "창룡파천검 : 일매낙화 천비인적",
+        "evidence": "official-parent-effect"
+      },
+      "창룡파천검 : 일매낙화 천비인적-낙화": {
+        "canonical": "창룡파천검 : 일매낙화 천비인적",
+        "evidence": "official-parent-effect"
+      },
+      "매화검 3초식 : 일격예인 VI": {
+        "canonical": "매화검 3초식 : 예인 VI",
+        "evidence": "official-parent-description"
+      }
+    },
+    "메르세데스": {
+      "이슈타르의 링 VI : 이슈타르의 낙인": {
+        "canonical": "이슈타르의 링 VI",
+        "evidence": "official-parent-description-effect"
+      },
+      "베리안 서지 : 글로리": {
+        "canonical": "베리안 서지",
+        "evidence": "official-parent-description",
+        "note": "엘리멘탈 고스트 지속 중 강화되는 동일 연계기"
+      }
+    },
+    "메카닉": {
+      "매시브 파이어 : IRON-B VI": {
+        "canonical": "매시브 파이어 : SPLASH-F VI",
+        "evidence": "manual-reviewed-mode-pair",
+        "note": "동일 6차 마스터리 스킬의 탱크 모드 타격명"
+      },
+      "인텐스 디스토션 필드": {
+        "canonical": "디스토션 필드 VI",
+        "evidence": "official-parent-description-effect"
+      }
+    },
+    "미하일": {
+      "샤이닝 크로스-어썰트 VI": {
+        "canonical": "샤이닝 크로스 VI",
+        "evidence": "official-parent-description"
+      },
+      "소울 라이트 슬래시": {
+        "canonical": "소드 오브 소울 라이트",
+        "evidence": "official-parent-description-effect"
+      },
+      "라이트 포스레이": {
+        "canonical": "소드 오브 소울 라이트",
+        "evidence": "official-parent-description-effect"
+      }
+    },
+    "바이퍼": {
+      "슈퍼 피스트 인레이지": {
+        "canonical": "피스트 인레이지 VI",
+        "evidence": "official-parent-description-effect"
+      },
+      "씨 서펜트 인레이지 VI": {
+        "canonical": "씨 서펜트 VI",
+        "evidence": "official-parent-description-effect"
+      },
+      "서펜트 어썰트 인레이지 VI": {
+        "canonical": "서펜트 스톤 VI",
+        "evidence": "official-parent-description-effect"
+      }
+    },
+    "보우마스터": {
+      "폭풍의 시 VI : 난사 모드": {
+        "canonical": "폭풍의 시 VI",
+        "evidence": "official-parent-description-effect"
+      },
+      "엑스트라 퀴버 카트리지 (흡혈 화살)": {
+        "canonical": "엑스트라 퀴버 카트리지",
+        "evidence": "official-parent-effect"
+      },
+      "엑스트라 퀴버 카트리지 (마법 화살)": {
+        "canonical": "엑스트라 퀴버 카트리지",
+        "evidence": "official-parent-effect"
+      }
+    },
+    "비숍": {
+      "홀리 어드밴트 : 대천사": {
+        "canonical": "홀리 어드밴트",
+        "evidence": "official-parent-description-effect"
+      }
+    },
+    "섀도어": {
+      "쉐도우 엣지": {
+        "canonical": "커버트 쉐도우",
+        "evidence": "official-parent-description-effect"
+      }
+    },
+    "소울마스터": {
+      "크로스 더 스틱스": {
+        "canonical": "엘리시온",
+        "evidence": "official-parent-description-effect"
+      },
+      "루나 디바이드 VI": {
+        "canonical": "솔라 슬래시 VI",
+        "evidence": "manual-reviewed-stance-pair",
+        "note": "솔라/루나 자세에 따라 이름이 바뀌는 동일 6차 마스터리 공격"
+      },
+      "솔루나 디바이드": {
+        "canonical": "소울 이클립스",
+        "evidence": "official-parent-description-effect"
+      }
+    },
+    "신궁": {
+      "얼티밋 스나이핑": {
+        "canonical": "스나이핑 VI",
+        "evidence": "official-parent-description-effect"
+      },
+      "인핸스 스나이핑 VI": {
+        "canonical": "스나이핑 VI",
+        "evidence": "official-parent-description-effect"
+      },
+      "풀버스트 샷": {
+        "canonical": "리피팅 크로스보우 카트리지",
+        "evidence": "official-parent-description-effect"
+      },
+      "리썰 버스트": {
+        "canonical": "리썰 퍼니셔",
+        "evidence": "official-parent-description-effect"
+      }
+    },
+    "아란": {
+      "하이퍼 부스트 엔드-아드레날린 서지": {
+        "canonical": "부스트 엔드-아드레날린 서지",
+        "evidence": "official-related-skill-enhancement"
+      },
+      "아드레날린 맥시멈 VI : 금빛 섬광": {
+        "canonical": "아드레날린 맥시멈 VI",
+        "evidence": "official-parent-description-effect"
+      },
+      "아드레날린 맥시멈 VI : 얼음 파동": {
+        "canonical": "아드레날린 맥시멈 VI",
+        "evidence": "official-parent-description-effect"
+      },
+      "아드레날린 맥시멈 VI : 얼음 폭풍": {
+        "canonical": "아드레날린 맥시멈 VI",
+        "evidence": "official-parent-description-effect"
+      },
+      "비욘더 앱솔루트": {
+        "canonical": "마하 언리시드",
+        "evidence": "official-parent-description-effect"
+      },
+      "파이널 비욘더 앱솔루트": {
+        "canonical": "마하 언리시드",
+        "evidence": "official-parent-description-effect"
+      }
+    },
+    "아크": {
+      "새어 나오는 흉몽": {
+        "canonical": "새어 나오는 악몽",
+        "evidence": "official-parent-description"
+      },
+      "플레인 스펠 VI": {
+        "canonical": "플레인 차지드라이브 VI",
+        "evidence": "official-parent-description-effect"
+      },
+      "멈출 수 없는 본능": {
+        "canonical": "멈출 수 없는 충동",
+        "evidence": "official-parent-description"
+      },
+      "심연의 공포": {
+        "canonical": "기어 다니는 공포",
+        "evidence": "official-parent-description-effect"
+      },
+      "스칼렛 스펠 VI": {
+        "canonical": "스칼렛 차지드라이브 VI",
+        "evidence": "official-parent-description-effect"
+      },
+      "어비스 스펠 VI": {
+        "canonical": "어비스 차지드라이브 VI",
+        "evidence": "official-parent-description-effect"
+      },
+      "거스트 스펠 VI": {
+        "canonical": "거스트 차지드라이브 VI",
+        "evidence": "official-parent-description-effect"
+      }
+    },
+    "엔젤릭버스터": {
+      "그랜드 피날레 : 응원 풍선": {
+        "canonical": "그랜드 피날레",
+        "evidence": "official-parent-description-effect"
+      }
+    },
+    "일리움": {
+      "글로리 윙:인챈트 자벨린 VI": {
+        "canonical": "글로리 윙:자벨린 VI",
+        "evidence": "official-parent-description-effect"
+      },
+      "크래프트:인챈트 자벨린 VI": {
+        "canonical": "크래프트:자벨린 VI",
+        "evidence": "official-parent-description-effect"
+      }
+    },
+    "제논": {
+      "퍼지롭 매스커레이드 VI : 처형": {
+        "canonical": "퍼지롭 매스커레이드 VI : 저격",
+        "evidence": "official-parent-description-effect"
+      }
+    },
+    "제로": {
+      "트랜센던트 VI : 시간": {
+        "canonical": "트랜센던트 VI",
+        "evidence": "official-parent-effect"
+      },
+      "트랜센던트 VI : 빛": {
+        "canonical": "트랜센던트 VI",
+        "evidence": "official-parent-effect"
+      },
+      "트랜센던트 : 시간": {
+        "canonical": "트랜센던트",
+        "evidence": "official-parent-effect"
+      },
+      "트랜센던트 : 빛": {
+        "canonical": "트랜센던트",
+        "evidence": "official-parent-effect"
+      }
+    },
+    "카인": {
+      "어나일레이션 : 데스 블레싱": {
+        "canonical": "어나일레이션",
+        "evidence": "official-parent-description-effect"
+      }
+    },
+    "캐논마스터": {
+      "맥스 캐논 레인보우": {
+        "canonical": "롤링 캐논 레인보우 VI",
+        "evidence": "official-parent-description-effect"
+      }
+    },
+    "캡틴": {
+      "서먼 크루 VI : 쌍권총 크루": {
+        "canonical": "서먼 크루 VI",
+        "evidence": "official-parent-effect"
+      },
+      "서먼 크루 VI : 명사수 크루": {
+        "canonical": "서먼 크루 VI",
+        "evidence": "official-parent-effect"
+      },
+      "데스 헤일": {
+        "canonical": "헤드 샷 VI",
+        "evidence": "official-parent-description-effect"
+      }
+    },
+    "키네시스": {
+      "이계의 공허": {
+        "canonical": "이계 여신의 축복",
+        "evidence": "official-parent-effect"
+      }
+    },
+    "패스파인더": {
+      "콤보 어썰트 VI(블래스트)": {
+        "canonical": "콤보 어썰트 VI",
+        "evidence": "official-parent-description"
+      },
+      "렐릭 언바운드(블래스트)": {
+        "canonical": "렐릭 언바운드",
+        "evidence": "official-parent-effect"
+      },
+      "옵시디언 배리어(블래스트)": {
+        "canonical": "옵시디언 배리어",
+        "evidence": "official-parent-description-effect"
+      },
+      "이볼브 템페스트": {
+        "canonical": "에인션트 템페스트",
+        "evidence": "manual-reviewed-mode-pair",
+        "note": "템페스트 소환수 모드의 연무장 파생 타격명"
+      },
+      "프라이멀 템페스트": {
+        "canonical": "에인션트 템페스트",
+        "evidence": "official-mode-selection-description"
+      },
+      "레이븐 템페스트": {
+        "canonical": "에인션트 템페스트",
+        "evidence": "manual-reviewed-mode-pair",
+        "note": "템페스트 소환수 모드의 연무장 파생 타격명"
+      }
+    },
+    "팬텀": {
+      "느와르 카르트 VI - 반전 카드": {
+        "canonical": "느와르 카르트 VI",
+        "evidence": "official-parent-description-effect"
+      }
+    },
+    "히어로": {
+      "파이널 블레이드": {
+        "canonical": "오라 블레이드 VI",
+        "evidence": "official-parent-description-effect"
+      }
+    }
+  }
+}

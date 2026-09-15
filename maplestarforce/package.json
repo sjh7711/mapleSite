@@ -1,0 +1,54 @@
+{
+  "name": "maplestarforce",
+  "version": "1.0.0",
+  "private": true,
+  "description": "여러 장비를 한 번에 계산하는 메이플스토리 스타포스 기대값 웹 계산기",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "build:preview": "vite build --mode preview",
+    "build:production": "vite build --mode production",
+    "preview": "vite preview",
+    "test": "node --test --test-concurrency=1 test/*.test.mjs",
+    "market:status": "node scripts/refresh-item-market-data.mjs --status",
+    "market:check": "node scripts/refresh-item-market-data.mjs --check",
+    "market:refresh": "node --max-old-space-size=4096 scripts/refresh-item-market-data.mjs",
+    "market:model-check": "node scripts/check-item-market-model.mjs",
+    "market:prior-check": "node scripts/check-item-market-pooled-prior.mjs",
+    "battle-practice:collect": "node scripts/collect-battle-practice-records.mjs",
+    "battle-practice:enrich": "node scripts/enrich-battle-practice-records.mjs",
+    "battle-practice:collect-efficiency": "node scripts/collect-maplescouter-efficiency.mjs",
+    "battle-practice:build-efficiency": "node scripts/build-maplescouter-references.mjs",
+    "battle-practice:build-references": "node scripts/build-maplescouter-references.mjs",
+    "battle-practice:merge-references": "node scripts/merge-maplescouter-references.mjs",
+    "battle-practice:merge-profiles": "node scripts/merge-battle-practice-profiles.mjs",
+    "battle-practice:import-shares": "node scripts/import-battle-practice-shares.mjs",
+    "battle-practice:build": "node scripts/build-battle-practice-profiles.mjs",
+    "battle-practice:build-raw": "node scripts/build-defense-normalized-battle-profiles.mjs",
+    "battle-practice:build-rings": "node scripts/build-special-ring-phase-profiles.mjs",
+    "battle-practice:validate": "node scripts/validate-battle-practice-profiles.mjs",
+    "skills:collect": "node scripts/collect-character-skill-dictionary.mjs",
+    "skills:build": "node scripts/build-character-skill-dictionary.mjs",
+    "skills:audit": "node scripts/audit-character-skill-dictionary.mjs",
+    "skills:research-error": "node scripts/research-skill-dictionary-error.mjs",
+    "skills:research-defense": "node scripts/research-defense-normalized-error.mjs",
+    "skills:research-provenance": "node scripts/research-combat-effect-provenance.mjs",
+    "skills:research-protocols": "node scripts/research-skill-dictionary-protocols.mjs",
+    "skills:audit-provenance": "node scripts/audit-combat-effect-provenance.mjs"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260829.1",
+    "@types/node": "^26.4.0",
+    "esbuild": "^0.25.12",
+    "typescript": "^7.0.2",
+    "vite": "^6.4.3",
+    "wrangler": "^4.127.1"
+  },
+  "dependencies": {
+    "maple-core": "file:../maple-core"
+  }
+}

@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>메이플 경매장 시세 수집기</title>
+    <link rel="stylesheet" href="manager.css">
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="eyebrow">MAPLE AUCTION SOLD DATA</div>
+        <h1>판매 완료 시세 수집</h1>
+        <p>정해진 장비와 시세 구간을 순서대로 조사합니다. 중단된 작업은 다음 실행에서 복구합니다.</p>
+      </header>
+
+      <section class="card">
+        <div class="section-heading">
+          <div><span class="step">1</span><strong>저장 폴더</strong></div>
+          <span id="permissionBadge" class="badge">선택 필요</span>
+        </div>
+        <div id="folderName" class="folder-name">아직 선택된 루트 폴더가 없습니다.</div>
+        <button id="chooseFolderButton" class="secondary" type="button">market-data 폴더 선택</button>
+        <p class="hint">원본은 <code>raw/</code>에 페이지별 JSONL로 저장합니다. 저장된 원본은 다시 덮어쓰지 않습니다.</p>
+      </section>
+
+      <section class="card">
+        <div class="section-heading">
+          <div><span class="step">2</span><strong>고정 조사 목록</strong></div>
+          <span id="catalogBadge" class="badge ready">불러오는 중</span>
+        </div>
+        <div class="metric-grid catalog-metrics">
+          <div class="metric"><span>전체 장비</span><strong id="catalogItemCount">-</strong></div>
+          <div class="metric"><span>핵심 장비</span><strong id="priorityOneCount">-</strong></div>
+          <div class="metric"><span>보조 장비</span><strong id="priorityTwoCount">-</strong></div>
+          <div class="metric"><span>검색 작업</span><strong id="queryCount">-</strong></div>
+        </div>
+        <details class="catalog-detail">
+          <summary>조사 범위 보기 <span id="catalogProgressSummary">진행 상태 불러오는 중</span></summary>
+          <div class="catalog-equipment-grid">
+            <section class="catalog-equipment-panel completed">
+              <div class="catalog-equipment-heading">
+                <strong>완료된 장비</strong>
+                <span id="completedEquipmentCount">-</span>
+              </div>
+              <ul id="completedEquipmentList" class="catalog-equipment-list">
+                <li class="catalog-equipment-empty">진행 상태를 불러오는 중입니다.</li>
+              </ul>
+            </section>
+            <section class="catalog-equipment-panel incomplete">
+              <div class="catalog-equipment-heading">
+                <strong>미완료된 장비</strong>
+                <span id="incompleteEquipmentCount">-</span>
+              </div>
+              <ul id="incompleteEquipmentList" class="catalog-equipment-list">
+                <li class="catalog-equipment-empty">진행 상태를 불러오는 중입니다.</li>
+              </ul>
+            </section>
+          </div>
+          <div class="catalog-scope-label">장비 구성</div>
+          <div id="catalogGroups" class="catalog-groups"></div>
+        </details>
+        <p class="hint">목록은 시세 학습용 고정 카탈로그입니다. 임의 프리셋을 추가하지 않고 부족한 표본부터 결정적으로 순회합니다.</p>
+      </section>
+
+      <section class="card">
+        <div class="section-heading">
+          <div><span class="step">3</span><strong>오늘의 검색 한도</strong></div>
+          <div class="quota-heading-actions">
+            <span id="dailyBadge" class="badge">KST</span>
+            <button id="accountSyncButton" class="ghost quota-sync" type="button"
+              title="로그인 계정을 바꾼 뒤 현재 계정의 상단 검색 횟수를 다시 적용합니다.">새 계정 동기화</button>
+          </div>
+        </div>
+        <div class="quota-row">
+          <div>
+            <span class="quota-label">사이트 검색 횟수</span>
+            <strong id="quotaCount">0 / 100</strong>
+          </div>
+          <div class="quota-breakdown">
+            <span id="normalQuota">일반 0 / 98</span>
+            <span id="reserveQuota">예비 0 / 2 (복구 0 · 추가 0)</span>
+          </div>
+        </div>
+        <div class="progress-track quota-track" aria-hidden="true">
+          <div id="quotaBar" class="progress-bar quota-bar"></div>
+        </div>
+        <div class="runtime-grid">
+          <div><span>페이지 크기</span><strong id="pageLimitValue">60 · 확인 전</strong></div>
+          <div><span>누적 원본</span><strong id="totalPageCount">0페이지</strong></div>
+        </div>
+      </section>
+
+      <section class="card run-card">
+        <div class="section-heading">
+          <div><span class="step">4</span><strong>수집 실행</strong></div>
+          <span id="targetBadge" class="badge">탭 확인 중</span>
+        </div>
+        <div class="current-job">
+          <span>현재 작업</span>
+          <strong id="currentJob">대기 중</strong>
+          <small id="currentJobDetail">판매 완료 · 최신 거래순</small>
+        </div>
+        <div id="includeFailedTasksOption" class="run-option">
+          <label class="run-option-control" for="includeFailedTasksCheckbox">
+            <input id="includeFailedTasksCheckbox" type="checkbox"
+              aria-describedby="includeFailedTasksHint">
+            <span class="run-option-copy">
+              <strong>실패한 작업 모두 포함</strong>
+              <small id="includeFailedTasksHint">선택하면 다음 날짜까지 보류된 실패 검색도 이번 수집 대상에 다시 넣습니다. 빈 결과 대기는 유지합니다.</small>
+            </span>
+          </label>
+          <span id="deferredFailureCount" class="badge">0개</span>
+        </div>
+        <div class="run-actions">
+          <button id="startButton" class="primary" type="button">수집 시작</button>
+          <button id="pauseButton" class="warning" type="button" disabled>일시정지</button>
+        </div>
+        <div class="utility-actions">
+          <button id="flushButton" class="secondary compact" type="button">미저장 원본 확인</button>
+          <button id="exportStateButton" class="ghost compact" type="button">진행 상태 내보내기</button>
+          <button id="resetCollectionProgressButton" class="ghost danger compact" type="button" disabled>수집 진행도 초기화</button>
+        </div>
+        <div class="diagnostic-tools">
+          <div class="diagnostic-heading">
+            <div>
+              <strong>필터 입력 진단</strong>
+              <small id="diagnosticTarget">거대한 공포 · 스타포스 제한 없음 · 올스탯% 합산 15% 이상</small>
+            </div>
+            <span id="diagnosticBadge" class="badge">실행 전</span>
+          </div>
+          <button id="diagnosticButton" class="diagnostic-button" type="button" disabled>진단 1회 실행</button>
+          <p class="hint">실제 필터 검색 1회를 사용합니다. 수집 진행도와 원본 파일은 변경하지 않습니다.</p>
+          <details id="diagnosticDetails" class="diagnostic-detail">
+            <summary>단계별 진단 결과</summary>
+            <ol id="diagnosticLog" class="diagnostic-log" role="log" aria-live="polite"></ol>
+            <div class="diagnostic-actions">
+              <button id="copyDiagnosticButton" class="ghost compact" type="button" disabled>진단 결과 복사</button>
+            </div>
+          </details>
+          <div class="network-diagnostic-tools">
+            <div class="diagnostic-heading">
+              <div>
+                <strong>전체 네트워크 진단</strong>
+                <small>연결된 경매장 탭의 모든 요청 완료·오류를 브라우저 수준에서 감시합니다.</small>
+              </div>
+              <span id="networkDiagnosticBadge" class="badge">대기</span>
+            </div>
+            <button id="networkDiagnosticButton" class="network-diagnostic-button" type="button"
+              aria-pressed="false" aria-controls="networkDiagnosticDetails" disabled>네트워크 감시 시작</button>
+            <p class="hint">수집과 동시에 최대 5분간 사용할 수 있고 검색 횟수는 쓰지 않습니다. 전체 URL·계정 ID·캐릭터 ID·검색 키·헤더·응답 본문은 기록하지 않습니다.</p>
+            <details id="networkDiagnosticDetails" class="diagnostic-detail">
+              <summary>네트워크 진단 결과 <span id="networkDiagnosticSummary" role="status" aria-live="polite">완료·오류 0 · tool-tip 0 · 리다이렉트 0 · 오류 0</span></summary>
+              <ol id="networkDiagnosticLog" class="diagnostic-log network-diagnostic-log"></ol>
+              <div class="diagnostic-actions">
+                <button id="copyNetworkDiagnosticButton" class="ghost compact" type="button" disabled>진단 결과 복사</button>
+              </div>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <section class="progress-card">
+        <div class="progress-row">
+          <strong id="progressTitle">대기 중</strong>
+          <span id="progressCount">0 / 0</span>
+        </div>
+        <div class="progress-track" aria-hidden="true">
+          <div id="progressBar" class="progress-bar"></div>
+        </div>
+        <div id="status" class="status" aria-live="polite">먼저 저장 폴더를 선택하세요.</div>
+        <ol id="log" class="log"></ol>
+      </section>
+
+      <footer>
+        판매자·제작자·로그인 정보·전체 HTML은 수집하지 않습니다. 검색 요청은 보수적으로 모두 일일 한도에 계산합니다.
+      </footer>
+    </main>
+    <script type="module" src="manager.js"></script>
+  </body>
+</html>

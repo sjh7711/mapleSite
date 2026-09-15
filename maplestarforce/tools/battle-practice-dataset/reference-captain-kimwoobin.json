@@ -1,0 +1,20 @@
+[
+  {
+    "characterName": "김우빈",
+    "characterClass": "캡틴",
+    "ied300": 9.46726862302483,
+    "ied380": 12.054176072234762,
+    "bossDamage": 47.214446952595935,
+    "flatAttack": 6.90744920993228,
+    "attackPercent": 50.01805869074492,
+    "criticalDamage": 30.866817155756205,
+    "allStatPercent": 10.15801354401806,
+    "amounts": {
+      "bossDamage": 40,
+      "flatAttack": 30,
+      "attackPercent": 12,
+      "criticalDamage": 8,
+      "allStatPercent": 9
+    }
+  }
+]

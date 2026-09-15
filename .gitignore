@@ -1,0 +1,38 @@
+# Dependencies and build output
+**/node_modules/
+**/dist/
+**/.wrangler/
+**/.artifacts/
+**/.venv/
+**/__pycache__/
+**/*.pyc
+
+# Secrets and machine-local state
+**/.env
+**/.env.*
+!maplestarforce/.env.preview
+!maplestarforce/.env.production
+**/*credentials*
+**/*secret*
+**/youtube-cookies.txt
+
+# Temporary browser and audit output
+**/.tmp*
+**/profile-*/
+
+# Large data is archived outside normal Git history
+maplestarforce/item_price_raw/
+maplestarforce/public/item-market/releases/*
+!maplestarforce/public/item-market/releases/22762152e065ef31aa1f/
+!maplestarforce/public/item-market/releases/22762152e065ef31aa1f/**
+maplestarforce/tools/item-market-dataset/market-data/
+!maplestarforce/tools/item-market-dataset/market-data/
+maplestarforce/tools/item-market-dataset/market-data/*
+!maplestarforce/tools/item-market-dataset/market-data/review.csv
+maplestarforce/tools/battle-practice-dataset/raw/
+maplestarforce/tools/battle-practice-dataset/generated/
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+*.swp

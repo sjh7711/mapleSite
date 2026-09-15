@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>메이플 경매장 배치 수집</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main>
+      <div class="eyebrow">MAPLE AUCTION</div>
+      <h1>판매 완료 시세 수집</h1>
+      <p class="description">
+        고정된 장비 목록의 최신 첫 페이지를 순회하고 미완료 작업을 복구합니다.
+      </p>
+
+      <button id="openManagerButton" class="primary" type="button">
+        시세 수집 관리자 열기
+      </button>
+
+      <section id="status" class="status" aria-live="polite">
+        경매장 페이지에서 실행해 주세요.
+      </section>
+
+      <p class="privacy">
+        판매자명·제작자명·쿠키·로그인 토큰·전체 HTML은 저장하지 않습니다.
+      </p>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

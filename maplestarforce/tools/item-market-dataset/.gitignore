@@ -1,0 +1,6 @@
+__pycache__/
+.venv/
+maple-auction_raw_*.jsonl
+market-data/*
+!market-data/review.csv
+*.pyc

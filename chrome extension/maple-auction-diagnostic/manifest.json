@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "메이플 경매장 배치 수집기",
+  "version": "0.8.6",
+  "description": "판매 완료 장비와 분류별 고잠재 시세를 185개 물리 검색으로 수집하고 복구합니다.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "webRequest"
+  ],
+  "host_permissions": [
+    "https://auction.maplestory.nexon.com/*",
+    "https://api.mskr.nexon.com/*"
+  ],
+  "action": {
+    "default_title": "메이플 경매장 배치 수집기",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "network-diagnostic-worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://auction.maplestory.nexon.com/*"
+      ],
+      "js": [
+        "tooltip-network-hook.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://auction.maplestory.nexon.com/*"
+      ],
+      "js": [
+        "capture-core.js",
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

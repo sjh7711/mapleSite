@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>사이트맵 제출 도우미</title>
+    <meta
+      name="description"
+      content="스타포스 계산기 사이트맵을 확인하고 Google Search Console 제출 화면을 여는 관리 도구입니다."
+    />
+    <link rel="icon" type="image/svg+xml" href="../tool-icons/starforce-star.svg" />
+    <link rel="stylesheet" href="../src/style.css" />
+    <link rel="stylesheet" href="../src/sitemap-submit.css" />
+  </head>
+  <body class="page--sitemap-submit">
+    <main class="page">
+      <header class="sitemap-submit__head">
+        <div>
+          <p class="sitemap-submit__eyebrow">검색 노출 관리</p>
+          <h1>사이트맵 제출</h1>
+        </div>
+        <a class="sitemap-submit__back" href="../">사이트로 돌아가기</a>
+      </header>
+
+      <section class="card sitemap-submit__card" aria-labelledby="sitemap-submit-title">
+        <div class="sitemap-submit__intro">
+          <h2 id="sitemap-submit-title">Google Search Console</h2>
+          <p>
+            사이트맵을 먼저 확인한 뒤 Google 창에서 최종 제출합니다.
+            Search Console 소유자 계정으로 로그인해야 합니다.
+          </p>
+        </div>
+
+        <form id="sitemap-submit-form" class="sitemap-submit__form">
+          <label class="field">
+            <span>사이트 속성</span>
+            <input
+              id="sitemap-property"
+              type="url"
+              value="https://starforce.pages.dev/"
+              readonly
+            />
+          </label>
+          <label class="field">
+            <span>새 사이트맵 추가 입력값</span>
+            <input id="sitemap-path" type="text" value="sitemap.xml" readonly />
+          </label>
+
+          <div
+            id="sitemap-status"
+            class="sitemap-submit__status"
+            data-state="loading"
+            role="status"
+            aria-live="polite"
+          >
+            <span class="sitemap-submit__status-dot" aria-hidden="true"></span>
+            <span id="sitemap-status-copy">사이트맵을 확인하고 있습니다.</span>
+          </div>
+
+          <div class="sitemap-submit__actions">
+            <button id="sitemap-open" class="button button--quiet" type="button">
+              사이트맵 열기
+            </button>
+            <button id="sitemap-copy" class="button button--quiet" type="button">
+              입력값 복사
+            </button>
+            <button class="button sitemap-submit__primary" type="submit">
+              Search Console에서 제출
+            </button>
+          </div>
+        </form>
+
+        <ol class="sitemap-submit__steps">
+          <li>
+            Search Console에서 <strong>https://starforce.pages.dev/</strong> 속성을
+            선택합니다.
+          </li>
+          <li><strong>새 사이트맵 추가</strong>에 <code>sitemap.xml</code>을 입력합니다.</li>
+          <li>Google 화면의 <strong>제출</strong> 버튼을 누릅니다.</li>
+        </ol>
+      </section>
+
+      <p id="sitemap-action-message" class="sitemap-submit__message" aria-live="polite"></p>
+    </main>
+    <script type="module" src="../src/pages/sitemap-submit.js"></script>
+  </body>
+</html>

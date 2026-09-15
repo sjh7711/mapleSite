@@ -1,0 +1,38 @@
+﻿schema_version,record_id,review_status,price_meso,price_eok,price_kind,observed_at,auction_group,world,item_name,starforce_preset_id,item_level,item_category,required_job,starforce,upgrade_applied,upgrade_remaining,upgrade_recoverable,scroll_kind,scroll_main_stat,scroll_attack,scroll_magic,flame_main_stat,flame_sub_stat,flame_all_stat_pct,flame_attack,flame_score,main_potential_grade,main_potential_line_1,main_potential_line_2,main_potential_line_3,main_potential_equiv_pct,additional_potential_grade,additional_potential_line_1,additional_potential_line_2,additional_potential_line_3,additional_potential_equiv_pct,tradeability,scissors_remaining,scissors_total,clean_price_meso,displayed_stats_json,extraction_status,validation_flags,source_filename,source_relative_path,source_sha256,pixel_sha256,phash,duplicate_group_id,image_width,image_height,ocr_engine,ocr_confidence,ocr_text,reviewer,reviewed_at,review_notes
+1.0,f436449cd28849ffab3d3cd1a225bc69,pending,7500000000,75.0,listing,2026-09-01,,,데이브레이크 펜던트,daybreak-pendant,140,펜던트,공용,21,6,0,0,혼돈류 결과,8,20,7,80,0,5,0,120,레전드리,올스탯 +9%,DEX +9%,DEX +9%,27,에픽,DEX +5,올스탯 +3,최대 HP +100,0,1회 교환 가능,9,10,15000000,"{""STR"":{""total"":""107"",""components"":[""8"",""+94"",""+5""]},""DEX"":{""total"":""190"",""components"":[""8"",""+94"",""+8"",""+80""]},""INT"":{""total"":""126"",""components"":[""8"",""+94"",""+8"",""+16""]},""LUK"":{""total"":""124"",""components"":[""8"",""+94"",""+6"",""+16""]},""올스탯"":{""total"":""5%"",""components"":[""0%"",""+5%""]},""최대 HP"":{""total"":""255"",""components"":[""0"",""+255""]},""최대 HP %"":{""total"":""5%"",""components"":[]},""공격력"":{""total"":""85"",""components"":[""2"",""+63"",""+20""]},""마력"":{""total"":""72"",""components"":[""2"",""+63"",""+7""]},""방어력"":{""total"":""307"",""components"":[""100"",""+203"",""+4""]}}",assisted_review,auction_group_missing|world_missing|scroll_kind_unconfirmed,75억_데브펜01.png,75억_데브펜01.png,5074e8773cfc452dfa3f211aca848c511915a5d41ca66632e66e8efc05dac96b,2065f3997306843d9b356f0b699795eae1669a13ae5d716ef4680c3ac25d08ad,71f1b887070f0f07,dup-f436449cd28849ffab3d3cd1a225bc69,307,738,tesseract:kor+eng:otsu:psm11,72.66,"슬 숨 숨 숨 송 숭 송 숨 숨 숨 KRHEKT
+술술 술술 송송
+데 이 브 이크 레 펜던트 (+6)
+1 회 교환 가능 (거래 후 교환 불가)
+(가위 사용 잔여 윗 수 : 9 7 10)
+주
++26 만 1712
+7
+장신구 펜던트
+착 용 직업 공용
+Lv. 140
+요구 레벨
+HERTS 여 명 의 보스 세트
+STR +107 (8+94+5)
+DEX +190(8+94+8+80)
+INT +126 (8+94+8+16)
+LUK +124(8+94+6+16)
+Sac
++5% (0% +5%)
+S\CHHP +255(0+255)
+AICH HP +596
+공격력
++85(2+63+20)
+마력 + ᅮ 72(2+63+7)
+방어력 +307(100+203+4)
+eM 강화 6 희 (잔여 0 회 , 복구 가능 0 회 )
+매 잠 재 능력 : 레전드
+=» SAA +9%
+= DEX +9%
+= DEX +9%
+0 에 디 셔널 잠 재 능력 : 에픽
+® DEX +4%
+a SAR +3
+a 4/Cj HP +100
+ᄒ
+x
+복 장착 불가",Codex-assisted,2026-09-01,"사진 대조 보정. 추옵 DEX +80, INT +16, LUK +16, 올스탯 +5%. 작 누적 STR +5, DEX +8, INT +8, LUK +6, HP +255, 공격력 +20, 마력 +7, 방어력 +4. 최종 수치만으로 정확한 주문서 종류는 확정 불가."

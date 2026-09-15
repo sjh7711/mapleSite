@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.wrangler/
+.env*
+!.env.preview
+!.env.production
+
+# 연무장 원본에는 공개 캐릭터 닉네임과 원본 피해량이 들어간다.
+tools/battle-practice-dataset/raw/
+tools/battle-practice-dataset/generated/

@@ -1,0 +1,39 @@
+{
+  "schema_version": "maplestarforce.item-market.manifest.v1",
+  "dataset_version": "22762152e065ef31aa1f",
+  "generated_at": "2026-09-04T05:45:28.465+09:00",
+  "data": {
+    "sold_at_from": "2026-07-06T02:22:31.975Z",
+    "sold_at_through": "2026-09-03T20:26:41.962Z",
+    "captured_at_through": "2026-09-04T05:45:28.465+09:00",
+    "source_files": 1402,
+    "observations": 72806,
+    "unique_sales": 57719,
+    "duplicate_observations": 15087,
+    "item_count": 187,
+    "model_ready_sales": 56486
+  },
+  "compatibility": {
+    "source_schema": "maple-auction.capture.v2",
+    "minimum_extension_version": "0.7.7",
+    "minimum_catalog_version": "2026-09-02.7",
+    "normalizer_version": "0.7.2",
+    "toolchain_fingerprint": "445b3e8eac19abec8ac3f466040c9b512bf1ec4fd0a1134853e81e2bd3b49a7a",
+    "native_listing_id_required": true
+  },
+  "sampling_notice": "검색 가격 하한·스타포스·잠재 조건에 따라 가격 범위가 달라질 수 있으며 단순 분위수는 시장 전체 적정가가 아닙니다.",
+  "model": {
+    "status": "component_estimator_beta",
+    "promoted": false
+  },
+  "quality": {
+    "unknown_potential_lines": 1275,
+    "starforce_unknown_records": 0,
+    "stats_missing_records": 1,
+    "stat_component_mismatch_records": 0
+  },
+  "catalog": {
+    "file": "releases/22762152e065ef31aa1f/catalog.json",
+    "sha256": "e6df4ff28c87dd8408610dd1f595cb419d211163dada96ab2e77e80b818dc892"
+  }
+}

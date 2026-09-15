@@ -1,0 +1,152 @@
+:root {
+  color-scheme: light;
+  font-family: Pretendard, "Noto Sans KR", "Segoe UI", sans-serif;
+  color: #172b4d;
+  background: #f7f8fa;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  width: 330px;
+  margin: 0;
+  background:
+    radial-gradient(circle at top right, rgba(255, 171, 0, 0.15), transparent 42%),
+    #f7f8fa;
+}
+
+main {
+  padding: 22px;
+}
+
+.eyebrow {
+  margin-bottom: 6px;
+  color: #974f0c;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+h1 {
+  margin: 0;
+  font-size: 21px;
+  line-height: 1.25;
+}
+
+.description {
+  margin: 8px 0 18px;
+  color: #44546f;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+button {
+  width: 100%;
+  min-height: 42px;
+  border: 0;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 100ms ease, filter 100ms ease;
+}
+
+button:hover:not(:disabled) {
+  filter: brightness(0.96);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.primary {
+  color: #fff;
+  background: #0c66e4;
+}
+
+.secondary {
+  margin-top: 8px;
+  color: #172b4d;
+  background: #dfe1e6;
+}
+
+details {
+  margin-top: 14px;
+  border-top: 1px solid #dcdfe4;
+  padding-top: 12px;
+}
+
+summary {
+  color: #626f86;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.status {
+  min-height: 56px;
+  margin-top: 14px;
+  padding: 11px 12px;
+  border: 1px solid #dcdfe4;
+  border-radius: 8px;
+  color: #44546f;
+  background: rgba(255, 255, 255, 0.76);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+.status.success {
+  border-color: #7ee2b8;
+  color: #164b35;
+  background: #dcfff1;
+}
+
+.status.error {
+  border-color: #ff9c8f;
+  color: #5d1f1a;
+  background: #ffeceb;
+}
+
+.shortcut {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 14px;
+  color: #626f86;
+  font-size: 11px;
+}
+
+.shortcut > span:first-child {
+  margin-right: auto;
+  font-weight: 700;
+}
+
+kbd {
+  min-width: 21px;
+  padding: 3px 5px;
+  border: 1px solid #b7bbc3;
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  color: #44546f;
+  background: #fff;
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.privacy {
+  margin: 14px 0 0;
+  color: #7a869a;
+  font-size: 10px;
+  line-height: 1.5;
+}

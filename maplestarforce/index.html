@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>메이플 스타포스 기댓값 계산기</title>
+    <meta
+      name="description"
+      content="여러 장비를 한 번에 계산하는 메이플스토리 스타포스 기댓값 계산기. 2026 강화 개편 기준."
+    />
+    <link rel="icon" type="image/svg+xml" href="./tool-icons/starforce-star.svg" />
+    <link rel="stylesheet" href="./src/style.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="page__head">
+        <h1>스타포스 기댓값</h1>
+        <p class="page__hint">
+          <span>스페어값 · 시작 · 목표</span>
+          <button id="wheel-toggle" class="chip chip--switch" type="button"></button>
+        </p>
+        <button
+          id="menu"
+          class="menu-button"
+          type="button"
+          aria-label="장비 목록 열기"
+          aria-expanded="false"
+        >
+          장비
+        </button>
+      </header>
+      <nav id="toolnav" class="toolnav" aria-label="계산기 목록"></nav>
+      <div id="drawer-backdrop" class="drawer-backdrop"></div>
+
+
+      <div class="layout">
+      <section class="card card--settings">
+        <div class="settings settings--row">
+          <div class="field field--inline">
+            <span>이벤트</span>
+            <div id="event" class="chips"></div>
+          </div>
+          <div class="field field--inline">
+            <span>MVP</span>
+            <div id="mvp" class="chips"></div>
+          </div>
+          <div class="field field--inline">
+            <span>PC방</span>
+            <div id="pc" class="chips"></div>
+          </div>
+        </div>
+      </section>
+
+      <div class="layout__side">
+        <section class="card card--total">
+          <div class="card__head">
+            <div class="fee">
+              <span class="fee__label">대장장이 배율</span>
+              <div id="multipliers" class="chips chips--multiplier"></div>
+            </div>
+            <h2>준비할 메소</h2>
+          </div>
+          <p class="total">
+            <span id="total-scaled" class="total__scaled"></span>
+            <span id="total-cost">-</span>
+          </p>
+          <p id="total-storage" class="total__storage"></p>
+
+        </section>
+
+        <aside class="card card--picker">
+          <button id="picker-close" class="drawer-close" type="button">
+            닫기
+          </button>
+          <div id="picker" class="picker"></div>
+          <div class="picker__actions">
+            <button
+              id="prices-lock"
+              class="button button--quiet picker__lock"
+              type="button"
+            ></button>
+            <button id="reset-prices" class="button button--quiet button--reset" type="button">
+              스페어값 리셋
+            </button>
+          </div>
+        </aside>
+      </div>
+
+        <div class="layout__main">
+          <section class="card card--enhance" aria-label="강화 목록">
+            <div class="enhance-toolbar">
+              <div class="enhance-toolbar__left">
+                <div id="slots" class="chips chips--slot"></div>
+                <form id="starforce-character" class="starforce-character" novalidate>
+                  <div class="starforce-character__field">
+                    <label class="sr-only" for="character-name">캐릭터 닉네임</label>
+                    <input
+                      id="character-name"
+                      name="characterName"
+                      type="search"
+                      maxlength="12"
+                      autocomplete="off"
+                      spellcheck="false"
+                      placeholder="캐릭터 닉네임"
+                    />
+                    <button
+                      id="character-clear"
+                      class="button button--quiet starforce-character__clear"
+                      type="button"
+                      aria-label="불러온 캐릭터 정보 초기화"
+                      title="불러온 캐릭터 정보 초기화"
+                      aria-hidden="true"
+                      disabled
+                    >
+                      <span aria-hidden="true">×</span>
+                    </button>
+                  </div>
+                  <button
+                    id="character-load"
+                    class="button starforce-character__load"
+                    type="submit"
+                    aria-label="장착 장비 불러오기"
+                    title="장착 장비 불러오기"
+                  >
+                    <svg
+                      class="starforce-character__load-icon"
+                      aria-hidden="true"
+                      viewBox="0 0 20 20"
+                      fill="none"
+                    >
+                      <circle cx="8.25" cy="8.25" r="4.75" stroke="currentColor" stroke-width="1.8" />
+                      <path d="M11.8 11.8L16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+                    </svg>
+                  </button>
+                  <span
+                    id="character-status"
+                    class="starforce-character__status"
+                    role="status"
+                    aria-live="polite"
+                  ></span>
+                </form>
+              </div>
+              <div class="enhance-toolbar__right">
+                <div id="bulk" class="bulk"></div>
+                <button id="clear-items" class="button button--quiet button--reset" type="button">
+                  목록 리셋
+                </button>
+              </div>
+            </div>
+            <section
+              id="character-equipment"
+              class="character-equipment"
+              aria-label="불러온 캐릭터 장착 장비"
+              hidden
+            ></section>
+            <div id="items" class="items"></div>
+            <p id="total-meta" class="total__meta"></p>
+          </section>
+
+          <footer class="page__foot">
+            문의:
+            <a
+              id="contact-mail"
+              class="page__contact"
+              href="mailto:apfhd159862@naver.com"
+              >apfhd159862@naver.com</a
+            >
+            <button id="contact-copy" class="page__copy" type="button">
+              복사
+            </button>
+          </footer>
+
+      </div>
+
+    </main>
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

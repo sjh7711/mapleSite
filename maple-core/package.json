@@ -1,0 +1,33 @@
+{
+  "name": "maple-core",
+  "version": "1.0.0",
+  "private": true,
+  "description": "메이플스토리 기대값 계산 코어. Discord·브라우저 어디에도 기대지 않는 순수 계산만 둔다.",
+  "type": "module",
+  "exports": {
+    "./starforce": "./src/starforce.js",
+    "./scroll": "./src/scroll.js",
+    "./scroll-reform": "./src/scroll-reform.js",
+    "./scroll-economy": "./src/scroll-economy.js",
+    "./pet": "./src/pet.js",
+    "./ability": "./src/ability.js",
+    "./ability-reform": "./src/ability-reform.js",
+    "./soul": "./src/soul.js",
+    "./reform-2026-09-17": "./src/reform-2026-09-17.js",
+    "./potential": "./src/potential.js",
+    "./add-option": "./src/add-option.js",
+    "./stat-profile": "./src/stat-profile.js",
+    "./stat-efficiency": "./src/stat-efficiency.js",
+    "./combat-source-ledger": "./src/combat-source-ledger.js",
+    "./combat-model": "./src/combat-model.js"
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

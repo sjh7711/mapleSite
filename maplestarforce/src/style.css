@@ -1,0 +1,3304 @@
+:root {
+  color-scheme: dark;
+  --bg: #12141a;
+  --card: #1b1e26;
+  --line: #2b303c;
+  --text: #e8eaf0;
+  --muted: #9aa3b5;
+  --accent: #ffc107;
+  --accent-soft: rgba(255, 193, 7, 0.12);
+  --page-max-width: 1320px;
+  --page-gutter: 16px;
+  --page-title-size: 1.5rem;
+  --page-hint-size: 0.9375rem;
+  --toolnav-width: 156px;
+  --font-ui: "Pretendard Variable", "Pretendard", "SUIT Variable", "SUIT",
+    "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --font-numeric: "Pretendard Variable", "Pretendard", "Segoe UI",
+    "Noto Sans KR", "Malgun Gothic", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  /* 페이지 높이가 바뀌어도 전체 계산기 중심선이 좌우로 움직이지 않는다. */
+  scrollbar-gutter: stable;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  line-height: 1.55;
+  letter-spacing: -0.012em;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+  letter-spacing: inherit;
+}
+
+input[type="number"],
+.total,
+.result__value {
+  font-family: var(--font-numeric);
+  font-variant-numeric: tabular-nums;
+}
+
+.page {
+  width: 100%;
+  max-width: var(--page-max-width);
+  margin: 0 auto;
+  /* 맨 아래 한 줄(24px)은 문의처 자리로 비워 둔다. */
+  padding: 18px var(--page-gutter) 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.page__head h1 {
+  margin: 0;
+  font-size: var(--page-title-size);
+  font-weight: 750;
+  letter-spacing: -0.035em;
+}
+
+.page__head p,
+.page__foot {
+  margin: 0;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.page__foot {
+  padding-top: 8px;
+}
+
+.card {
+  /* 문의 줄 위로 올라와 가리도록 쌓임 순서를 한 단 올린다.
+     스크롤 중에 카드가 문의 줄 밑으로 비쳐 지나가지 않게 하기 위함이다. */
+  position: relative;
+  z-index: 1;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 20px;
+}
+
+.card h2 {
+  margin: 0 0 16px;
+  font-size: 1.125rem;
+  color: var(--text);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.card__head h2 {
+  margin: 0;
+}
+
+.settings {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 20px;
+}
+
+@media (max-width: 560px) {
+  .settings {
+    grid-template-columns: 1fr;
+  }
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.9375rem;
+  color: var(--muted);
+}
+
+select,
+input {
+  background: #14161d;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 10px;
+  font: inherit;
+  font-size: 1.0625rem;
+  width: 100%;
+}
+
+select:focus,
+input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* 키보드로 이동할 때 페이지마다 현재 위치를 잃지 않도록 같은 링을 쓴다. */
+:where(
+  button,
+  a[href],
+  summary,
+  [role="button"],
+  [tabindex]:not([tabindex="-1"])
+):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9375rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.toggle input {
+  width: auto;
+}
+
+.items {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+  /* 삭제 좌표는 직접 보정하므로 브라우저의 별도 스크롤 앵커와 충돌하지 않는다. */
+  overflow-anchor: none;
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background: #171a21;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.item__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+  /* ✕ 는 폭과 상관없이 오른쪽 위에 띄운다. 그 자리만큼 비워 둔다. */
+  position: relative;
+  padding-right: 52px;
+}
+
+.item__head .button--remove {
+  position: absolute;
+  top: 0;
+  right: 0;
+}
+
+/* 이름은 남는 자리를 다 쓰고, 입력칸은 저마다 정해진 폭을 지킨다. */
+.item__head .item__name {
+  flex: 1 1 120px;
+  min-width: 120px;
+}
+
+.item__strategy {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
+}
+
+.item__strategy .chip {
+  padding: 3px 9px;
+  font-size: 0.875rem;
+}
+
+.item__strategy .strategy__label {
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+.item__policy {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.item[data-invalid="true"] {
+  border-color: #e05c5c;
+}
+
+.item__error {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: #ff9b9b;
+  font-size: 0.9375rem;
+}
+
+.button {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button:hover {
+  border-color: var(--accent);
+}
+
+.button--ghost {
+  width: 100%;
+}
+
+.button--remove {
+  background: none;
+  color: var(--muted);
+  font-size: 1.25rem;
+  /* 테두리가 정사각형으로 보이도록 폭과 높이를 같게 잡는다. */
+  flex: none;
+  width: 50px;
+  height: 50px;
+  padding: 0;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+}
+
+.button.button--remove {
+  border-color: transparent;
+  background: transparent;
+}
+
+.button.button--remove:hover {
+  border-color: #e26d6d;
+  background: rgba(255, 110, 110, 0.08);
+  color: #ff9b9b;
+}
+
+.button.button--remove:focus-visible {
+  border-color: #e26d6d;
+  outline-color: #e26d6d;
+  color: #ffaaaa;
+}
+
+.card--total {
+  background: linear-gradient(180deg, #1f2330, var(--card));
+}
+
+.total {
+  margin: 0;
+  /* 식이 길어지면 답이 다음 줄로 넘어가고, 그때 오른쪽 끝에 붙는다. */
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 8px;
+  font-size: 2.375rem;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: -0.02em;
+}
+
+/* 배율과 상관없이 답은 늘 오른쪽 끝에 둔다. */
+#total-cost {
+  margin-left: auto;
+}
+
+.total__sub {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 1.0625rem;
+}
+
+.total__meta {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.total__scaled {
+  white-space: nowrap;
+  /* 답만 노란색으로 남기고 앞의 식은 뒤로 물린다. */
+  color: var(--muted);
+}
+
+.chips--multiplier {
+  margin-left: auto;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 1rem;
+  white-space: nowrap;
+  /* 자릿수가 달라도 숫자 폭이 같아야 열이 흔들리지 않는다. */
+  font-variant-numeric: tabular-nums;
+}
+
+th,
+td {
+  padding: 9px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+}
+
+th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.empty {
+  color: var(--muted);
+  font-size: 1rem;
+  text-align: center;
+  padding: 20px 0;
+}
+
+details summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+details summary::-webkit-details-marker {
+  display: none;
+}
+
+details summary h2 {
+  display: inline;
+}
+
+details summary::after {
+  content: " ▾";
+  color: var(--muted);
+}
+
+details[open] summary::after {
+  content: " ▴";
+}
+
+details summary h2 {
+  margin-bottom: 0;
+}
+
+details[open] > summary {
+  margin-bottom: 16px;
+}
+
+/* 왼쪽 위에 장비 박스, 오른쪽에 설정과 결과. */
+.layout {
+  display: grid;
+  /* 장비 이름이 잘리지 않도록 목록 쪽을 넓힌다. 본문은 그만큼 좁아진다. */
+  grid-template-columns: 540px minmax(0, 1fr);
+  /* 오른쪽 본문이 두 행을 걸친다. 행 높이를 정해 두지 않으면 그 높이가
+     두 행에 반씩 나뉘어 설정 카드 아래에 빈칸이 생긴다. */
+  grid-template-rows: max-content 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.layout__main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* 설정 · 준비할 메소 · 장비창을 한 덩어리로 화면에 붙여 둔다. */
+.layout__side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: sticky;
+  top: 16px;
+  /* 아래 한 줄은 문의처 자리라 그만큼 덜 쓴다. */
+  max-height: calc(100vh - 32px - 24px);
+}
+
+/* 화면보다 길면 이 안에서만 스크롤한다. 짧으면 스크롤바가 나오지 않는다. */
+.card--picker {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+/* 칩 한 줄뿐이라 위아래를 덜 띄운다. */
+.card--settings {
+  padding-top: 13px;
+  padding-bottom: 13px;
+}
+
+.settings--row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px 20px;
+}
+
+@media (max-width: 760px) {
+  .settings--row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .layout__side {
+    position: static;
+    max-height: none;
+  }
+
+}
+
+.hint {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+/* 250·200 / 160·140 을 두 줄로 세워 세로 길이를 절반으로 줄인다.
+   그래야 목록을 화면에 고정해도 안에서 스크롤할 일이 없다. */
+.picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* 줄마다 좌우 6px씩 여백이 이미 있어서, 열 사이는 조금만 띄우면 된다. */
+  gap: 14px 4px;
+  align-items: start;
+}
+
+.picker__folded {
+  grid-column: 1 / -1;
+}
+
+.picker__level {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 6px;
+  color: var(--text);
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.picker__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 88px;
+  align-items: center;
+  gap: 6px;
+  /* 안쪽 요소 크기가 바뀌어도 행 높이는 46px로 고정한다. */
+  min-height: 46px;
+  /* 레벨 이름과 버튼 테두리가 같은 선에서 시작하도록 좌우 여백을 두지 않는다. */
+  padding: 0;
+  border-radius: 7px;
+}
+
+/* 눌러서 담는 자리를 박스로 감싸 어디까지가 버튼인지 드러낸다.
+   칸 크기를 줄과 같은 값으로 잡아 두어 줄끼리 아이콘·이름이 나란히 선다. */
+.picker__pick {
+  display: grid;
+  grid-template-columns: 18px 22px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font: inherit;
+  cursor: pointer;
+  color: var(--text);
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.picker__pick:hover {
+  background: #14161d;
+  border-color: var(--accent);
+}
+
+.picker__pick img,
+.picker__fallback {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.picker__fallback {
+  display: grid;
+  place-items: center;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.picker__name {
+  font-size: 0.9375rem;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.picker__pick:hover .picker__name {
+  color: var(--accent);
+}
+
+.picker__row input {
+  padding: 6px 7px;
+  font-size: 1rem;
+  text-align: right;
+}
+
+.picker__unit {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.button--quiet {
+  background: none;
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 0.875rem;
+  padding: 6px 10px;
+  margin-top: 12px;
+  width: 100%;
+}
+
+.button--quiet:hover {
+  color: var(--text);
+}
+
+.button--compact {
+  width: auto;
+  margin-top: 0;
+  padding: 5px 11px;
+  border-radius: 8px;
+}
+
+.card__head .button--quiet {
+  margin-top: 0;
+  width: auto;
+}
+
+.item__name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.item__name img,
+.item__name .picker__fallback {
+  width: 24px;
+  height: 24px;
+  flex: none;
+}
+
+/* 아이콘 원본이 26~40px인데 22~24px로 그리다 보니 늘 축소가 일어난다.
+   화면 밀도가 낮은 데스크톱에서는 pixelated가 픽셀을 통째로 버려 선이 끊긴다.
+   고밀도 화면에서는 오히려 확대라 또렷하므로 그대로 둔다. */
+@media (max-resolution: 1.5dppx) {
+  .picker__pick img,
+  .item__name img {
+    image-rendering: auto;
+  }
+}
+
+/* 같은 장비가 여럿일 때 이름 옆에 붙는 순번. + 배지와 같은 결로 맞췄다. */
+.item__count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  margin-left: 7px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  vertical-align: 2px;
+}
+
+.item__name small {
+  display: block;
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 0.8125rem;
+}
+
+/* 파괴방지·확정복구를 단계별로 고르는 칩. */
+.strategy {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.strategy__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.strategy__label {
+  color: var(--text);
+  font-size: 0.9375rem;
+  /* 글자가 커져도 라벨이 두 줄로 깨지지 않게 폭을 글자에 맞춘다. */
+  white-space: nowrap;
+  flex: none;
+}
+
+.chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  background: #14161d;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 11px;
+  font: inherit;
+  font-size: 0.9375rem;
+  cursor: pointer;
+}
+
+.chip:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+.chip[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* 독립 ON/OFF 버튼은 선택형 칩과 같은 노란색을 쓰더라도 상태 점으로 구분한다. */
+.chip[data-kind="toggle"] {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.chip[data-kind="toggle"]::before {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border: 1px solid #6f7785;
+  border-radius: 50%;
+  background: transparent;
+  content: "";
+}
+
+.chip[data-kind="toggle"][aria-pressed="true"]::before {
+  border-color: var(--accent);
+  background: var(--accent);
+  box-shadow: inset 0 0 0 2px #14161d;
+}
+
+.chip:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* 자동 최적화가 고른 항목은 못 누르더라도 또렷하게 보여야 한다. */
+.chip:disabled[aria-pressed="true"] {
+  opacity: 1;
+}
+
+.item__policy {
+  display: none;
+}
+
+.field--wide {
+  grid-column: 1 / -1;
+}
+
+.field--wide .chips {
+  padding-top: 2px;
+}
+
+/* 장비마다 접어 두는 단계별 기댓값. */
+.item__details {
+  border-top: 1px dashed var(--line);
+  padding-top: 8px;
+}
+
+.item__details summary {
+  cursor: pointer;
+  /* 파괴방지·확정복구 라벨과 같은 밝기로 맞춘다. 옆의 기댓값 요약은
+     .item__stats 가 따로 흐린 색을 잡고 있어 영향받지 않는다. */
+  color: var(--text);
+  font-size: 0.875rem;
+  list-style: none;
+}
+
+.item__details summary::-webkit-details-marker {
+  display: none;
+}
+
+.item__details[open] summary {
+  margin-bottom: 8px;
+}
+
+.item__stages {
+  font-size: 0.9375rem;
+}
+
+.item__stages th,
+.item__stages td {
+  padding: 5px 8px;
+}
+
+.card--total .table-scroll {
+  margin-top: 18px;
+}
+
+.card--total .total__meta {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.hint--foot {
+  margin: 10px 0 0;
+}
+
+/* 강화할 장비 행에서는 이름표를 드롭다운 왼쪽에 둔다. */
+.field--inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.field--inline > span {
+  white-space: nowrap;
+}
+
+/* 설정·장비 행의 항목 이름을 또렷하게. */
+.field > span {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* 네이티브 select로는 펼쳤을 때 스크롤 위치를 정할 수 없어 직접 만든 드롭다운. */
+.dropdown {
+  position: relative;
+  width: 100%;
+}
+
+.dropdown__button {
+  width: 100%;
+  background: #14161d;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 10px;
+  font: inherit;
+  font-size: 1.0625rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dropdown__button::after {
+  content: "▾";
+  float: right;
+  color: var(--muted);
+}
+
+.dropdown__button[aria-expanded="true"] {
+  border-color: var(--accent);
+}
+
+.dropdown__button:hover {
+  border-color: var(--accent);
+}
+
+.dropdown__list {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 348px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: #14161d;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+}
+
+.dropdown__option {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--text);
+  font: inherit;
+  font-size: 1rem;
+  text-align: left;
+  padding: 7px 9px;
+  cursor: pointer;
+}
+
+.dropdown__option:hover {
+  background: #1f2330;
+}
+
+.dropdown__option[aria-selected="true"] {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* 시작 이하의 목표는 고를 수는 있지만 보통 고를 값이 아니라 한 단계 죽인다. */
+.dropdown__option[data-dim="true"] {
+  color: var(--muted);
+}
+
+/* 모든 계산기가 공유하는 검색형 선택창. 페이지별 색상·검색·해제 규칙이
+   갈라지지 않도록 기본 동작과 크기를 이곳에서 한 번만 정한다. */
+.search-select {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.search-select__input {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding-right: 36px;
+  cursor: pointer;
+}
+
+.search-select__input[type="search"]::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.search-select[data-clearable="true"] .search-select__input {
+  padding-right: 62px;
+}
+
+.search-select__clear,
+.search-select__toggle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 2;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+
+.search-select__clear {
+  right: 32px;
+  width: 28px;
+  color: var(--text);
+  font-size: 1rem;
+  opacity: 0.32;
+  transition: opacity 120ms ease, color 120ms ease;
+}
+
+.search-select__clear:hover,
+.search-select__clear:focus-visible {
+  color: #fff;
+  opacity: 0.95;
+}
+
+.search-select__clear[hidden] {
+  display: none;
+}
+
+.search-select__toggle {
+  right: 0;
+  width: 36px;
+  font-size: 0.75rem;
+}
+
+.search-select__toggle:disabled,
+.search-select__clear:disabled,
+.search-select[data-disabled="true"] .search-select__input {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.search-select[data-open="true"] .search-select__input {
+  border-color: var(--accent);
+}
+
+.search-select__options {
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 5px);
+  right: 0;
+  left: 0;
+  max-height: min(380px, 52dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #171a22;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35);
+}
+
+.search-select__options[hidden] {
+  display: none;
+}
+
+.search-select__group {
+  margin: 4px 6px 2px;
+  padding: 5px 2px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+  font-size: 0.73rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.search-select__group[data-tone="legendary"] { color: #62d98b; }
+.search-select__group[data-tone="unique"] { color: #f6cc62; }
+.search-select__group[data-tone="epic"] { color: #c99cff; }
+.search-select__group[data-tone="rare"] { color: #74a8ff; }
+.search-select__group[data-tone="mixed"] { color: #9fb3c8; }
+
+.search-select__option {
+  display: block;
+  width: 100%;
+  min-height: 34px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.search-select__option:hover,
+.search-select__option[data-active="true"] {
+  background: rgba(255, 193, 7, 0.1);
+  color: #ffe083;
+}
+
+.search-select__option[data-tone="legendary"]:hover,
+.search-select__option[data-tone="legendary"][data-active="true"] {
+  background: rgba(98, 217, 139, 0.14);
+  color: #7be49f;
+}
+
+.search-select__option[data-tone="unique"]:hover,
+.search-select__option[data-tone="unique"][data-active="true"] {
+  background: rgba(246, 204, 98, 0.14);
+  color: #ffe083;
+}
+
+.search-select__option[data-tone="epic"]:hover,
+.search-select__option[data-tone="epic"][data-active="true"] {
+  background: rgba(201, 156, 255, 0.14);
+  color: #d9b9ff;
+}
+
+.search-select__option[data-tone="rare"]:hover,
+.search-select__option[data-tone="rare"][data-active="true"] {
+  background: rgba(116, 168, 255, 0.14);
+  color: #9bc0ff;
+}
+
+.search-select__option[data-tone="mixed"]:hover,
+.search-select__option[data-tone="mixed"][data-active="true"] {
+  background: rgba(159, 179, 200, 0.14);
+  color: #bed0e2;
+}
+
+.search-select__option[aria-selected="true"] {
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.search-select__option[data-dim="true"] {
+  color: var(--muted);
+}
+
+.search-select__option:disabled {
+  color: #626a78;
+  cursor: not-allowed;
+}
+
+.search-select__empty {
+  padding: 9px 8px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.search-select__pad {
+  min-height: 34px;
+}
+
+.card:has(.search-select__options:not([hidden])) {
+  z-index: 32;
+}
+
+@media (max-width: 620px) {
+  .search-select__input {
+    min-height: 44px;
+  }
+
+  .search-select__option {
+    min-height: 42px;
+    padding-block: 9px;
+  }
+}
+
+/* 직접 넣은 배율: 값과 빼기 버튼을 알약 하나처럼 붙인다. */
+.chip--custom {
+  display: inline-flex;
+  align-items: stretch;
+  padding: 0;
+  overflow: hidden;
+}
+
+.chip--custom[data-selected="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.chip__label,
+.chip__remove {
+  background: none;
+  border: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  padding: 5px 6px 5px 11px;
+}
+
+.chip--custom[data-selected="true"] .chip__label {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.chip__remove {
+  padding: 5px 9px 5px 4px;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.chip__remove:hover {
+  color: #ff9b9b;
+}
+
+.chip--input {
+  width: 84px;
+  padding: 4px 8px;
+  text-align: center;
+  border-color: var(--accent);
+}
+
+.input--narrow {
+  width: 100%;
+  min-width: 48px;
+}
+
+/* 시작·목표는 서로, 개수·스페어는 서로 같은 폭을 갖는다. */
+
+
+.item__head .input--narrow {
+  width: 68px;
+  min-width: 0;
+}
+
+.strategy__row .toggle {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.breakdown {
+  /* 칸에서는 오른쪽에 붙되, 두 줄은 이 덩어리 안에서 왼쪽으로 맞춘다. */
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  text-align: left;
+}
+
+.breakdown__parts {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+/* 두 줄을 따로 다뤄야 좁은 화면에서 한 줄만 감출 수 있다. */
+.total__note > span {
+  display: block;
+}
+
+.total__note {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.total__storage {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.picker__folded > summary {
+  margin-top: 4px;
+  padding: 4px 0;
+  color: var(--muted);
+  font-size: 0.9375rem;
+  cursor: pointer;
+}
+
+.picker__folded[open] > summary {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.card__lead {
+  display: flex;
+  align-items: center;
+  /* 제목과 기본값 박스 사이를 넉넉히 띄운다. */
+  gap: 8px 28px;
+  flex-wrap: wrap;
+}
+
+.bulk {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 12px;
+  background: #171a21;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.bulk__label {
+  color: var(--muted);
+  font-size: 0.9375rem;
+  white-space: nowrap;
+}
+
+/* 캐릭터 장비 조회 폼은 자바스크립트가 200제 제목 줄로 옮긴 뒤에만 보인다.
+   정적 원래 자리에서는 첫 렌더링 높이를 밀지 않는다. */
+.card--picker > .starforce-character {
+  display: none;
+}
+
+.picker__level > .starforce-character {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  margin-left: auto;
+  gap: 4px;
+  font-weight: 400;
+  letter-spacing: normal;
+}
+
+.starforce-character__field {
+  display: block;
+  width: 92px;
+  min-width: 0;
+}
+
+.starforce-character__field input {
+  height: 27px;
+  padding: 3px 6px;
+  font-size: 0.75rem;
+  line-height: 1.2;
+}
+
+.starforce-character__load {
+  flex: none;
+  min-height: 27px;
+  padding: 3px 7px;
+  border-radius: 7px;
+  font-size: 0.6875rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.starforce-character__status {
+  max-width: 66px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.6875rem;
+  font-weight: 400;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.starforce-character__status:empty {
+  display: none;
+}
+
+.starforce-character[data-state="success"] .starforce-character__status {
+  color: var(--accent);
+}
+
+.starforce-character[data-state="error"] .starforce-character__status {
+  color: #ff9b9b;
+}
+
+.starforce-character[data-state="loading"] .starforce-character__load {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 760px) {
+  .picker__level > .starforce-character {
+    margin-left: auto;
+  }
+
+  .starforce-character__field {
+    width: min(120px, 34vw);
+  }
+
+  .starforce-character__status {
+    max-width: min(90px, 22vw);
+  }
+}
+
+/* 캐릭터 조회 결과와 연결된 프리셋은 평소 크기·배치를 그대로 두고 테두리만
+   강조한다. main.js가 버튼이나 행 어느 쪽에 표식을 붙여도 같은 모양이다. */
+.picker__pick[data-character-match="true"],
+.picker__row[data-character-match="true"] .picker__pick {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent-soft);
+}
+
+
+
+/* 배율 버튼도 기본값과 같은 작은 박스로 묶는다. */
+.fee {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 12px;
+  background: #171a21;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.fee__label {
+  color: var(--muted);
+  font-size: 0.9375rem;
+  white-space: nowrap;
+}
+
+.breakdown__main {
+  white-space: nowrap;
+}
+
+.breakdown__step {
+  color: var(--muted);
+}
+
+/* 아이콘 앞의 + 배지. 평소엔 조용히 있다가 줄에 커서를 올리면 살아난다. */
+.picker__plus {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  transition: background 0.12s ease, transform 0.12s ease;
+}
+
+/* 획을 직접 그려서 글꼴에 따라 굵기나 중심이 흔들리지 않게 한다. */
+.picker__plus::before,
+.picker__plus::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--muted);
+  border-radius: 1px;
+  transition: background 0.12s ease;
+}
+
+.picker__plus::before {
+  width: 9px;
+  height: 2px;
+}
+
+.picker__plus::after {
+  width: 2px;
+  height: 9px;
+}
+
+.picker__pick:hover .picker__plus {
+  background: var(--accent-soft);
+  transform: scale(1.1);
+}
+
+.picker__pick:hover .picker__plus::before,
+.picker__pick:hover .picker__plus::after {
+  background: var(--accent);
+}
+
+/* 0성과 17성이 같은 자리에서 끝나야 화살표가 나란히 선다. */
+.range__from {
+  display: inline-block;
+  min-width: 2ch;
+  text-align: right;
+}
+
+/* 평균 스페어 · 평균 시도는 자릿수를 맞춰 오른쪽에 세운다.
+   빈 목록 안내는 한 칸을 다 쓰므로 제외한다. */
+th:nth-last-child(-n + 2),
+td:not(.empty):nth-last-child(-n + 2) {
+  text-align: right;
+}
+
+/* 고정가 칸. 생김새는 그대로 두고 손대지 못하게만 한다. */
+.input--locked {
+  cursor: default;
+}
+
+/* ───────────────────────────────────────────────────────────
+   여기부터는 좁은 화면에서만 걸리는 규칙이다. 760px보다 넓은
+   화면의 모습은 위쪽 규칙 그대로 유지된다.
+   ─────────────────────────────────────────────────────────── */
+
+.menu-button,
+.drawer-backdrop,
+.drawer-close {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .page {
+    padding: 14px 12px 36px;
+  }
+
+  .page__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  /* 장비 목록을 여는 버튼. 머리줄에 두면 스크롤을 내렸을 때 손이 닿지 않아
+     화면 오른쪽 위에 띄워 둔다. */
+  .menu-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    right: 12px;
+    top: 12px;
+    z-index: 45;
+    width: 52px;
+    height: 40px;
+    padding: 0 10px;
+    background: #171a21;
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+    color: var(--accent);
+    font: inherit;
+    font-size: 0.875rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+  }
+
+  /* 서랍이 열려 있는 동안에는 가려 둔다. 닫기와 미는 손짓이 이미 있다. */
+  body[data-drawer="open"] .menu-button {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .menu-button[aria-expanded="true"] {
+    border-color: var(--accent);
+  }
+
+  /* 설정과 준비할 메소는 본문 위에 그대로 두고, 장비 목록만 서랍으로 만든다. */
+  .layout__side {
+    display: flex;
+    position: static;
+    max-height: none;
+  }
+
+  .card--picker {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 50;
+    width: min(360px, 88vw);
+    margin: 0;
+    padding: 0 12px 12px;
+    border-radius: 0;
+    border: none;
+    border-left: 1px solid var(--line);
+    background: var(--bg);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    transform: translateX(100%);
+    transition: transform 0.2s ease;
+    /* 세로 스크롤은 브라우저에 맡기고 가로 손짓만 직접 받는다. */
+    touch-action: pan-y;
+  }
+
+  /* 손가락을 따라가는 동안에는 애니메이션이 끼어들면 안 된다. */
+  .card--picker[data-dragging] {
+    transition: none;
+  }
+
+  body[data-drawer="open"] .card--picker {
+    transform: translateX(0);
+  }
+
+  body[data-drawer="open"] {
+    overflow: hidden;
+  }
+
+  .drawer-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 40;
+    background: rgba(0, 0, 0, 0.55);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+
+  body[data-drawer="open"] .drawer-backdrop {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* 목록을 아무리 내려도 닫기는 서랍 맨 위에 붙어 있는다. */
+  .drawer-close {
+    display: block;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    width: calc(100% + 24px);
+    margin: 0 -12px 12px;
+    padding: 13px;
+    background: var(--bg);
+    color: var(--muted);
+    border: none;
+    border-bottom: 1px solid var(--line);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .drawer-close:active {
+    color: var(--text);
+  }
+
+  /* 목록 비우기도 제목 줄 오른쪽 끝에 올린다. 아래 기본값 박스는 폭을 다 쓴다. */
+  .card__head {
+    position: relative;
+  }
+
+  .card__head .button--quiet {
+    position: absolute;
+    top: 0;
+    right: 0;
+  }
+
+  .card__lead h2 {
+    padding-right: 105px;
+  }
+
+  /* 박스와 박스 사이는 어디서나 34px로 느껴지게 맞춘다.
+     장비 박스끼리가 12(패딩) + 10(간격) + 12(패딩) = 34px이므로 여기도 10px.
+     준비할 메소 카드는 건드리지 않도록 기본값 박스가 있는 머리줄만 고른다. */
+  .card__head:has(.card__lead) {
+    margin-bottom: 10px;
+  }
+
+  /* 기본값 박스를 장비 박스와 같은 폭으로 맞추고 위아래를 넉넉히 둔다. */
+  .card__lead {
+    flex-basis: 100%;
+    /* 제목 쪽에는 상자 패딩이 없으니 22 + 12 = 34px이 되도록 22px을 준다. */
+    gap: 22px 28px;
+  }
+
+  .bulk {
+    width: 100%;
+    flex-wrap: wrap;
+    padding: 12px;
+  }
+
+  /* 이름표를 위로 올려야 두 드롭다운이 한 줄에 나란히 선다.
+     줄 높이를 줄이지 않으면 글자 위에 남는 여백 탓에 위쪽 패딩이 더 커 보인다. */
+  .bulk__label,
+  .fee__label {
+    flex-basis: 100%;
+    line-height: 1.1;
+  }
+
+  /* 대장장이 배율도 같은 모양으로 둔다. 제목이 위, 버튼이 아래. */
+  .fee {
+    width: 100%;
+    flex-wrap: wrap;
+    padding: 12px;
+  }
+
+  /* 이름표까지 넣을 자리는 없다. 숫자와 단위만으로도 뜻이 통한다. */
+  .item__head .field--spare > span:first-child {
+    display: none;
+  }
+
+
+
+  /* 손가락으로 누를 자리를 키운다. */
+  .picker__row {
+    min-height: 52px;
+  }
+
+  .picker__pick {
+    padding: 9px 8px;
+  }
+
+  .picker__pick:active {
+    background: #14161d;
+    border-color: var(--accent);
+  }
+
+  .picker__pick:active .picker__name {
+    color: var(--accent);
+  }
+
+  .picker__pick:active .picker__plus {
+    background: var(--accent-soft);
+  }
+
+  .picker__pick:active .picker__plus::before,
+  .picker__pick:active .picker__plus::after {
+    background: var(--accent);
+  }
+
+  .item__strategy .chip {
+    padding: 8px 13px;
+    font-size: 0.9375rem;
+  }
+
+  .chip:active {
+    border-color: var(--accent);
+  }
+
+  /* 데스크톱처럼 식과 답을 같은 크기로 두고, 화면 폭에 맞춰 한 줄에 들어갈
+     만큼만 줄인다. 넓은 화면에서는 데스크톱과 똑같은 2.375rem이 된다. */
+  .total {
+    font-size: clamp(1.25rem, 5.6vw, 2.375rem);
+  }
+
+  /* 굴려서 바꾸라는 안내는 휠이 없는 화면에서 뜻이 없다. */
+  .total__note--wheel {
+    display: none;
+  }
+
+  /* 결과 표는 장비마다 카드로 편다. 값이 길어 가로로 밀면 읽기 어렵다. */
+  #per-item thead {
+    display: none;
+  }
+
+  #per-item {
+    white-space: normal;
+  }
+
+  #per-item tr {
+    display: block;
+    margin-bottom: 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+  }
+
+  #per-item td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 3px 0;
+    border-bottom: none;
+  }
+
+  #per-item td[data-short]::before {
+    content: attr(data-short);
+    flex: none;
+    color: var(--muted);
+    font-size: 0.875rem;
+  }
+
+  #per-item td:not(.empty):nth-last-child(-n + 2) {
+    text-align: left;
+  }
+
+  /* 값은 어느 칸이든 오른쪽 끝에 맞추고, 길면 그 안에서 줄을 바꾼다. */
+  #per-item .breakdown {
+    align-items: flex-end;
+    text-align: right;
+    min-width: 0;
+  }
+
+  #per-item .breakdown__main,
+  #per-item .breakdown__parts {
+    white-space: normal;
+  }
+
+  /* 단계별 표는 값이 짧아 표 그대로가 낫다. 카드로 펴면 22단계가 100줄이 된다.
+     대신 글자를 줄이고, 길어지면 표 안에서만 스크롤하도록 높이를 묶는다. */
+  .item__stages {
+    font-size: 0.75rem;
+  }
+
+  .item__stages th,
+  .item__stages td {
+    padding: 5px 4px;
+  }
+
+  /* 표 안에 따로 스크롤을 두면 끝에 닿았을 때 페이지가 멈춘 것처럼 느껴진다.
+     압축한 표는 22단계라도 600px 남짓이라 페이지 스크롤로 충분하다. */
+
+  /* 드롭다운이 화면을 다 덮지 않도록 */
+  .dropdown__list {
+    max-height: min(348px, 46vh);
+  }
+}
+
+/* 장비 박스 안에서 스페어값을 바로 고친다. 숫자 칸과 단위를 붙여 둔다.
+   단위를 칸 안쪽에 겹쳐 두므로 기준점 노릇을 해야 한다. hover 여부와
+   상관없이 필요한 속성이라 미디어 쿼리 밖에 둔다. */
+.spare-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
+/* 왼쪽 목록에서는 칸이 격자 한 칸을 다 써야 한다. */
+.spare-input--fill {
+  display: block;
+}
+
+.item__head .spare-input input {
+  width: 78px;
+  min-width: 0;
+  /* 단위 바로 앞에 숫자가 붙어야 자릿수가 달라도 읽는 위치가 같다. */
+  text-align: right;
+}
+
+/* 단위 글자가 왼쪽 목록 크기(13px)를 그대로 따라오면 옆의 숫자(17px)와 어긋난다.
+   시작·목표 이름표와 같은 크기로 맞춘다. */
+.item__head .spare-input .picker__unit {
+  font-size: 0.9375rem;
+}
+
+/* ── 휠로 바꿀 수 있다는 힌트 ────────────────────────────────────
+   손이 올라간 채 0.2초가 지나면 노란 테두리와 ↕ 가 함께 나타난다.
+   그때부터 휠이 값을 바꾼다. 터치 화면에는 hover가 없어 제외된다. */
+@media (hover: hover) {
+  .spare-input::before,
+  .dropdown::before {
+    content: "↕";
+    position: absolute;
+    top: 50%;
+    left: 5px;
+    transform: translateY(-50%);
+    color: var(--muted);
+    font-size: 0.75rem;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.18s ease;
+  }
+
+  /* 표시를 실제로 휠이 열린 상태에 맞춘다. 안내문 그대로
+     "테두리가 보이면 스크롤 가능"이 되도록. */
+  .spare-input:has(input[data-armed])::before,
+  .dropdown:has([data-armed])::before {
+    opacity: 0.85;
+  }
+
+  /* 고칠 수 없는 칸에는 알릴 것이 없다. */
+  .spare-input:has(input[readonly])::before {
+    content: none;
+  }
+
+}
+
+/* 실제 휠 조작이 활성화된 칸은 포인터 종류 판정과 무관하게 같은 노란
+   테두리를 쓴다. 하이브리드 터치·마우스 환경에서도 안내가 빠지지 않는다. */
+input[data-armed],
+.dropdown__button[data-armed] {
+  border-color: var(--accent);
+}
+
+input,
+.dropdown__button {
+  transition: border-color 0.15s ease;
+}
+
+/* ↕ 는 글자 자체가 좁아 왼쪽 여백을 조금만 내주면 원래 폭 안에 들어간다. */
+.dropdown__button {
+  padding-left: 18px;
+}
+
+.item__head .dropdown,
+.bulk .dropdown {
+  width: 84px;
+}
+
+.spare-input input {
+  padding-left: 20px;
+}
+
+/* 스페어값 칸의 위아래 화살표를 없앤다. 휠과 키보드로 바꿀 수 있어 자리만
+   차지하고, 숫자를 오른쪽에 붙여 둔 정렬도 흐트러뜨린다. */
+.picker__row input::-webkit-outer-spin-button,
+.picker__row input::-webkit-inner-spin-button,
+.spare-input input::-webkit-outer-spin-button,
+.spare-input input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.picker__row input,
+.spare-input input {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* 잠그면 흰 테두리로 상태를 드러낸다. */
+.picker__lock[aria-pressed="true"] {
+  border-color: var(--text);
+  color: var(--text);
+}
+
+/* 장비창이 넓어진 만큼 오른쪽은 조금씩 줄인다. */
+.item__head .dropdown,
+.bulk .dropdown {
+  width: 80px;
+}
+
+.item__head .spare-input input {
+  width: 94px;
+}
+
+.button--remove {
+  width: 44px;
+  height: 44px;
+}
+
+/* 좁은 화면에서는 서랍이 좁아 한 줄이 낫다. */
+@media (max-width: 760px) {
+  .picker {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 자물쇠는 스페어값을 다루는 버튼과 한 줄에 둔다. */
+.picker__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.picker__actions .button--quiet {
+  margin-top: 0;
+}
+
+/* 두 버튼을 같은 크기로 나눠 갖는다. */
+.picker__actions > .button {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+/* 왼쪽 열이 좁으니 설정 세 항목은 세로로 쌓는다. */
+.layout__side .settings--row {
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+/* 좁은 칸에서는 총액 글자를 줄여야 식이 한 줄에 들어간다. */
+.layout__side .total {
+  font-size: 2rem;
+}
+
+
+
+/* 단계별 기댓값 오른쪽 빈자리에 그 장비의 결과를 적는다. */
+.item__details > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+/* details[open] summary::after 가 우선순위가 더 높아 열었을 때만 표시가
+   되살아난다. 열린 상태까지 함께 눌러 둔다. */
+.item__details > summary::after,
+.item__details[open] > summary::after {
+  content: none;
+}
+
+/* 한글은 기본값이면 음절 아무 데서나 끊겨 "단계별 기댓 / 값" 이 된다.
+   띄어쓰기에서만 넘어가게 해 "단계별 / 기댓값" 으로 떨어뜨린다. */
+.item__toggle {
+  word-break: keep-all;
+}
+
+/* 앞을 줄바꿈 없는 공백으로 둬 표시가 혼자 다음 줄로 내려가지 않게 한다. */
+.item__toggle::after {
+  content: "\00a0▾";
+  color: var(--muted);
+}
+
+.item__details[open] .item__toggle::after {
+  content: "\00a0▴";
+}
+
+.item__stats {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 0.9375rem;
+  text-align: right;
+}
+
+.item__stats strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* 조작 안내는 제목 옆 빈자리에 둔다.
+   .page__head p 규칙이 margin을 0으로 눌러 버리므로 더 좁혀서 적는다. */
+.page__head .page__hint {
+  /* 글자와 스위치를 나란히 둔다. */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 0 auto;
+  color: var(--muted);
+  font-size: 0.9375rem;
+  text-align: right;
+}
+
+@media (max-width: 760px) {
+  /* 휠이 없는 화면에서는 알릴 것이 없다. */
+  .page__head .page__hint {
+    display: none;
+  }
+}
+
+.page__head {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+}
+
+/* 장비 목록 아래에 붙는 요약. */
+.items + .total__meta {
+  margin-top: 0;
+}
+
+/* 배율 상자를 위에, 준비할 메소 제목을 그 아래에 둔다. */
+.card--total .card__head {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+/* 그 외 레벨도 위 목록처럼 두 칸씩 늘어놓는다.
+   details는 내용이 슬롯 하나로 묶여서 안쪽 상자에 격자를 건다. */
+.picker__folded-body {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 4px;
+  align-items: start;
+}
+
+@media (max-width: 760px) {
+  .picker__folded-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 설정 상자는 왼쪽 위에 두되 따라오지는 않는다. */
+.layout > .card--settings {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.layout > .layout__side {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.layout > .layout__main {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+.layout > .card--settings .settings--row {
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+/* 이름표 길이가 제각각이라 칩이 서로 다른 자리에서 시작한다.
+   가장 긴 이름표에 맞춰 폭을 잡아 세 줄의 칩을 같은 선에서 시작하게 한다. */
+.layout > .card--settings .field--inline > span {
+  min-width: 46px;
+}
+
+@media (max-width: 760px) {
+  .layout > .card--settings,
+  .layout > .layout__side,
+  .layout > .layout__main {
+    grid-column: 1;
+    grid-row: auto;
+  }
+}
+
+/* 금액 아래로 남는 여백을 줄인다. */
+.card--total {
+  padding-bottom: 12px;
+}
+
+/* ── 준비할 메소 상자 높이 줄이기 ──────────────────────────────
+   금액 한 줄이 본문 줄높이(1.6)를 그대로 받아 위아래로 크게 벌어져 있었다.
+   빈 줄로 남는 창고 문단도 여백만 차지한다. */
+.layout__side .total {
+  line-height: 1.2;
+}
+
+#total-storage:empty {
+  display: none;
+}
+
+.card--total {
+  padding-top: 14px;
+}
+
+.card--total .card__head {
+  margin-bottom: 8px;
+  gap: 6px;
+}
+
+/* 준비할 메소에서 줄인 높이를 목록의 장비명 버튼에 얹는다. */
+.picker__pick {
+  padding: 9px 8px;
+}
+
+/* 줄 높이를 버튼이 정하게 두고, 금액 칸이 같은 높이로 늘어나게 한다.
+   가운데 정렬로 두면 금액 칸만 작아 보였다. */
+.picker__row {
+  min-height: 0;
+  align-items: stretch;
+}
+
+.picker__group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* 그룹은 저마다 한 줄을 통째로 쓰고, 안쪽 장비를 두 열로 깐다. */
+.picker__group {
+  grid-column: 1 / -1;
+}
+
+/* 목록 순서대로 왼쪽에서 오른쪽으로 채운다. 모상하견 옆에 장신망이 온다. */
+.picker__group-body {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 4px;
+}
+
+@media (max-width: 760px) {
+  .picker__group-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.picker__row .spare-input--fill,
+.picker__row input {
+  height: 100%;
+}
+
+.picker__unit {
+  align-self: center;
+}
+
+.item__stat {
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  /* 한 줄에 나란히 두면 폭이 모자라 "기댓값 307.95" 처럼 어중간하게 잘린다.
+     토글 아래로 내려 한 줄을 온전히 쓰게 한다. */
+  .item__details > summary {
+    flex-wrap: wrap;
+    gap: 4px 12px;
+  }
+
+  .item__stats {
+    margin-left: 0;
+    flex-basis: 100%;
+    text-align: left;
+  }
+}
+
+/* 배율이 1.00이면 앞의 식이 비는데, 빈 요소도 오른쪽 여백은 그대로 차지해
+   금액이 8px 밀려 시작한다. 비었을 때는 아예 없앤다. */
+#total-scaled:empty {
+  display: none;
+}
+
+/* 단위를 숫자 칸 안쪽 오른쪽 끝에 얹는다. input은 자식을 가질 수 없어
+   껍데기에 겹쳐 두고, 숫자가 겹치지 않도록 그만큼 오른쪽 여백을 준다. */
+.spare-input .picker__unit {
+  position: absolute;
+  right: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.spare-input input {
+  padding-right: 26px;
+}
+
+@media (max-width: 760px) {
+  /* 이 규칙이 뒤에 와야 데스크톱 폭 지정(94px)에 밀리지 않는다. */
+  .item__head .spare-input input {
+    width: 88px;
+  }
+
+  /* 좁은 화면에는 ↕ 표시가 없으니 왼쪽 자리를 비워 둘 이유도 없다. */
+  .spare-input input {
+    padding-left: 10px;
+  }
+}
+
+/* 목록 자리 버튼. 담긴 것이 있는 자리는 점으로 표시한다. */
+.chips--slot {
+  gap: 4px;
+}
+
+/* 슬롯은 다른 칩과 성격이 달라 알약 대신 네모로 두고, 눌러 옮겨 다니는
+   자리라 다른 칩보다 조금 크게 잡는다. */
+.chips--slot .chip {
+  position: relative;
+  height: 42px;
+  min-width: 42px;
+  padding: 0 12px;
+  font-size: 1rem;
+  line-height: 1;
+  text-align: center;
+  border-radius: 8px;
+}
+
+.chips--slot .chip[data-filled]::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  right: 5px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.chips--slot .chip[aria-pressed="true"][data-filled]::after {
+  background: var(--accent);
+}
+
+@media (max-width: 760px) {
+  /* 좁은 화면에서는 기본값 상자가 한 줄을 다 쓰므로, 자리 버튼을 제목 옆에 둔다.
+     오른쪽 105px은 떠 있는 "목록 비우기" 자리라 비워 둔다. */
+  .card__lead h2 {
+    padding-right: 0;
+  }
+
+  /* 제목과 슬롯 사이를 좁히고, 오른쪽에는 떠 있는 "목록 리셋" 자리만 남긴다. */
+  .card__lead {
+    gap: 10px 12px;
+  }
+
+  .card__lead .chips--slot {
+    margin-right: 92px;
+  }
+}
+
+/* 배경이 없어 카드에 묻히던 버튼들을 한 단계 또렷하게. */
+.card__head .button--quiet,
+.picker__actions .button--quiet {
+  background: #232936;
+  color: var(--text);
+}
+
+.card__head .button--quiet:hover,
+.picker__actions .button--quiet:hover {
+  background: #2b3241;
+}
+
+/* 삭제·초기화는 평소에는 중립색, 가리켰을 때만 위험색으로 표시한다. */
+.button.button--reset,
+.card__head .button.button--reset,
+.picker__actions .button.button--reset {
+  border-color: var(--line);
+  background: #191c24;
+  color: var(--muted);
+}
+
+.button.button--reset:hover:not(:disabled),
+.card__head .button.button--reset:hover:not(:disabled),
+.picker__actions .button.button--reset:hover:not(:disabled) {
+  border-color: #e26d6d;
+  background: rgba(255, 110, 110, 0.08);
+  color: #ffaaaa;
+}
+
+/* ── 첫 화면 흔들림(CLS) 줄이기 ────────────────────────────────
+   내용을 자바스크립트가 채우는 자리들이라, 처음엔 높이 0이었다가 갑자기
+   늘어나면서 아래 요소를 밀어낸다. 채워질 만큼의 높이를 미리 잡아 둔다.
+   장비를 더하거나 빼면 이 숫자도 함께 손봐야 한다. */
+#event,
+#mvp,
+#pc,
+#multipliers {
+  min-height: 30px;
+}
+
+#slots {
+  min-height: 37px;
+}
+
+#bulk {
+  min-height: 50px;
+}
+
+@media (min-width: 761px) {
+  /* 250·200 / 160·140 두 줄 + 그 외 레벨 접힌 줄 기준. */
+  #picker {
+    min-height: 634px;
+  }
+}
+
+/* 화면 맨 아래 한 줄을 문의처 전용으로 비워 둔다. 페이지가 그만큼
+   아래 여백을 갖고 있어서 내용이 이 줄 밑으로 들어오지 않는다.
+   배경은 두지 않아 뒤가 그대로 비친다. */
+.page__foot {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 0;
+  /* 창 오른쪽 끝이 아니라 본문과 같은 폭 안에서 오른쪽 끝에 맞춘다.
+     그래야 강화 목록 열의 오른쪽 변과 같은 선에 선다. */
+  max-width: 1320px;
+  margin: 0 auto;
+  /* 딱 한 줄(24px)만 쓰고 글자를 그 안에 세로 가운데로 둔다. */
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  /* flex에서는 요소 사이 공백이 사라져서 간격을 직접 준다. */
+  gap: 5px;
+  min-height: 24px;
+  padding: 0 max(16px, env(safe-area-inset-right))
+    env(safe-area-inset-bottom) 16px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+  /* 빈 자리로 마우스가 통과하도록 두고, 글자와 버튼만 받는다. */
+  pointer-events: none;
+}
+
+.page__foot > * {
+  pointer-events: auto;
+}
+
+.page__contact {
+  color: inherit;
+  text-decoration: none;
+}
+
+.page__contact:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+/* 주소 옆의 복사 버튼. */
+.page__copy {
+  padding: 0 5px;
+  line-height: 16px;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  font: inherit;
+  font-size: 0.6875rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.page__copy:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.page__copy[data-copied] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* ── 폭이 좁을 때의 장비 줄 배치 ────────────────────────────────
+   한 줄에 이름·스페어값·시작·목표·✕ 를 모두 담으려면 약 630px이 필요하다.
+   그보다 좁으면 ✕ 를 오른쪽 위에 띄우고 시작·목표를 아랫줄로 내린다. */
+@media (max-width: 1160px) {
+  /* 이름과 스페어값이 윗줄을 나눠 쓴다. */
+  .item__head .item__name {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  /* 이름 아래로 내려오면 오른쪽으로 밀지 않고 왼쪽에 붙인다. */
+  .item__head .field--spare {
+    margin-left: 0;
+  }
+
+  /* 이름 옆에 스페어값을 붙이고, 그 뒤에 폭 100%짜리 빈 칸을 끼워
+     시작·목표가 반드시 아랫줄에서 시작하게 한다. */
+  .item__head .field--spare {
+    order: 1;
+  }
+
+  .item__head::before {
+    content: "";
+    order: 2;
+    flex-basis: 100%;
+    height: 0;
+  }
+
+  .item__head .item__range {
+    order: 3;
+  }
+
+  /* 이름표와 최적화 스위치가 윗줄을 나눠 쓰고, 칩은 그 아래 한 줄을 온전히 쓴다.
+     칩을 DOM보다 뒤로 미뤄야 스위치가 이름표 옆에 온다. */
+  .strategy__row .chips {
+    order: 1;
+    flex-basis: 100%;
+  }
+}
+
+/* 강화 최적화 스위치. 체크박스 대신 켜짐/꺼짐이 글자로 드러나게 한다. */
+.chip--optimize {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.chip--optimize strong,
+.chip--switch strong {
+  margin-left: 4px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.chip--optimize[aria-pressed="true"] strong,
+.chip--switch[aria-pressed="true"] strong {
+  color: var(--accent);
+}
+
+/* 시작과 목표는 언제나 나란히. 사이에서 줄이 바뀌지 않는다. */
+.item__range {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.chip--switch {
+  white-space: nowrap;
+}
+
+/* 성급은 세로로 길게 늘어놓으면 30줄이라 훑기 어렵다. 넓은 화면에서는
+   여섯 칸씩 끊어 격자로 편다. 보이는 줄 수는 여는 쪽에서 재서 맞춘다. */
+@media (min-width: 761px) {
+  /* :not([hidden]) 이 없으면 display:grid 가 [hidden] 의 display:none 을 이겨
+     접어 둔 목록이 그대로 펼쳐진 채 남는다. */
+  .dropdown__list[data-columns="6"]:not([hidden]) {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 4px;
+    /* 목록이 버튼보다 넓다. 오른쪽 끝을 버튼 오른쪽 끝에 맞춰 왼쪽으로 편다. */
+    left: auto;
+    right: 0;
+    width: 318px;
+  }
+
+  /* 격자에서만 자리를 차지한다. 세로 한 줄로 깔릴 때 끼어들면 빈 줄이 된다. */
+  .dropdown__list[data-columns="6"] .dropdown__pad {
+    display: block;
+  }
+
+  .dropdown__list[data-columns="6"] .dropdown__option {
+    padding: 9px 4px;
+    text-align: center;
+    font-size: 1.0625rem;
+    /* 칸이 촘촘해 글자만으로는 경계가 흐리다. 옅은 테두리로 칸을 나눈다. */
+    border: 1px solid var(--line);
+  }
+
+  .dropdown__list[data-columns="6"] .dropdown__option[aria-selected="true"] {
+    border-color: var(--accent);
+  }
+
+  /* 글자를 더 죽이면 안 보이는 수준이 된다. 대신 칸을 한 겹 가라앉혀
+     "고를 수는 있지만 뒤에 있는 칸"으로 읽히게 한다. */
+  .dropdown__list[data-columns="6"] .dropdown__option[data-dim="true"] {
+    background: rgba(0, 0, 0, 0.22);
+    border-color: #1f232c;
+  }
+
+  /* 가라앉힌 칸도 마우스를 올리면 올라와야 누를 수 있다는 게 보인다. */
+  .dropdown__list[data-columns="6"] .dropdown__option[data-dim="true"]:hover {
+    background: #1f2330;
+    border-color: var(--line);
+  }
+}
+
+.dropdown__pad {
+  display: none;
+}
+
+/* 계산기 사이를 오가는 공통 탐색. 좁은 화면에서는 왼쪽 서랍, 본문과
+   사이드바가 모두 들어가는 넓은 화면에서는 바깥 왼쪽 레일이 된다. */
+.page__title-row {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.toolnav {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  gap: 7px;
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 72;
+  width: min(280px, 86vw);
+  margin: 0;
+  padding: 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--bg);
+  border-right: 1px solid var(--line);
+  box-shadow: 14px 0 32px rgba(0, 0, 0, 0.35);
+  visibility: hidden;
+  transform: translateX(-105%);
+  transition:
+    transform 0.2s ease,
+    visibility 0.2s ease;
+}
+
+.toolnav[data-open="true"] {
+  visibility: visible;
+  transform: translateX(0);
+}
+
+.toolnav__item {
+  position: relative;
+  width: 100%;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 11px;
+  background: #14161d;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--muted);
+  font-size: var(--page-hint-size);
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.toolnav__icon {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.toolnav__icon--item {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.42));
+}
+
+.toolnav__icon--starforce {
+  fill: #ffd928;
+  stroke: #eeb400;
+  stroke-width: 1.15;
+  filter: drop-shadow(0 0 3px rgba(255, 210, 0, 0.38));
+}
+
+.toolnav__label {
+  min-width: 0;
+}
+
+.toolnav__item:hover {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+/* 지금 보고 있는 곳은 눌러도 갈 데가 없으므로 링크가 아니다. */
+.toolnav__item[aria-current="page"] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+  cursor: default;
+}
+
+.toolnav__close {
+  min-height: 42px;
+  margin: -2px -2px 5px;
+  padding: 7px 9px 11px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: transparent;
+  color: var(--text);
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  font: inherit;
+  cursor: pointer;
+}
+
+.toolnav__close strong {
+  font-size: 1rem;
+}
+
+.toolnav__close span {
+  color: var(--muted);
+  font-size: 1.6rem;
+  font-weight: 300;
+  line-height: 1;
+}
+
+.toolnav-toggle {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: #171a21;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.toolnav-toggle:hover,
+.toolnav-toggle[aria-expanded="true"] {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.toolnav-toggle:focus-visible,
+.toolnav__close:focus-visible,
+.toolnav__item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.toolnav-toggle__icon {
+  width: 16px;
+  display: grid;
+  gap: 3px;
+}
+
+.toolnav-toggle__icon span {
+  display: block;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+}
+
+.toolnav-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 71;
+  background: rgba(0, 0, 0, 0.58);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 0.2s ease,
+    visibility 0.2s ease;
+}
+
+body[data-toolnav-drawer="open"] {
+  overflow: hidden;
+}
+
+body[data-toolnav-drawer="open"] .toolnav-backdrop {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+/* 일반 노트북·데스크톱에서도 모든 계산기를 발견할 수 있게 아이콘 레일을
+   상시 둔다. 이름은 가리키거나 키보드 포커스를 옮겼을 때 바로 나타난다. */
+@media (min-width: 1280px) {
+  .toolnav-toggle,
+  .toolnav__close,
+  .toolnav-backdrop {
+    display: none;
+  }
+
+  .toolnav {
+    inset: 18px auto auto max(8px, calc(50vw - 660px - 66px));
+    z-index: 20;
+    width: 52px;
+    max-height: calc(100vh - 36px);
+    padding: 6px;
+    overflow: visible;
+    background: rgba(27, 30, 38, 0.96);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+    visibility: visible;
+    transform: none;
+  }
+
+  .toolnav__item {
+    min-height: 38px;
+    padding: 7px;
+  }
+
+  .toolnav__label {
+    position: absolute;
+    top: 50%;
+    left: calc(100% + 10px);
+    z-index: 3;
+    min-width: max-content;
+    padding: 6px 9px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: #171a21;
+    box-shadow: 0 7px 18px rgba(0, 0, 0, 0.38);
+    color: var(--text);
+    font-size: 0.8125rem;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-4px, -50%);
+    transition: opacity 120ms ease, transform 120ms ease;
+  }
+
+  .toolnav__item:is(:hover, :focus-visible) .toolnav__label {
+    opacity: 1;
+    transform: translate(0, -50%);
+  }
+}
+
+/* 1320px 본문 바깥 여백이 아직 없는 구간에서는 레일 한 칸만큼 본문을
+   안쪽으로 밀어 서로 겹치지 않게 한다. */
+@media (min-width: 1280px) and (max-width: 1439px) {
+  .page {
+    padding-left: 76px;
+  }
+}
+
+@media (min-width: 1700px) {
+  .toolnav {
+    inset: 18px auto auto max(
+      16px,
+      calc(50vw - 660px - var(--toolnav-width) - 18px)
+    );
+    width: var(--toolnav-width);
+    padding: 8px;
+  }
+
+  .toolnav__item {
+    min-height: 38px;
+    gap: 8px;
+    padding: 7px 10px;
+  }
+
+  .toolnav__icon {
+    width: 18px;
+    height: 18px;
+  }
+
+  .toolnav__icon--item {
+    width: 28px;
+    height: 28px;
+  }
+
+  .toolnav__label,
+  .toolnav__item:is(:hover, :focus-visible) .toolnav__label {
+    position: static;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    box-shadow: none;
+    color: inherit;
+    font-size: inherit;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 계산을 아직 붙이지 않은 자리. 무엇이 들어올지만 적어 둔다. */
+.draft {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  background: #171a21;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+}
+
+.draft__line {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+/* 아직 장비창이 없는 도구는 한 열로 편다. */
+.layout--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.layout--single > .layout__main {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+/* 계산 결과 한 줄. 이름은 왼쪽, 값은 오른쪽에 붙인다. */
+.result__line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.result__line strong {
+  color: var(--accent);
+  font-size: 1.125rem;
+}
+
+.result__line > span:last-child {
+  color: var(--text);
+}
+
+/* 계산기 페이지는 상자가 여러 개 쌓여서, 기본 여백 그대로면 한 화면에
+   두세 개밖에 안 들어온다. 안쪽을 고르게 줄여 통일감을 준다. */
+.layout--single .card {
+  padding: 12px 14px;
+}
+
+.layout--single .card h2 {
+  margin-bottom: 8px;
+  font-size: 0.9375rem;
+}
+
+/* 결과 줄은 값이 오른쪽 끝까지 밀려 눈이 멀리 간다. 읽기 좋은 폭으로 묶는다. */
+.layout--single .result__line {
+  max-width: 560px;
+}
+
+/* 칸을 3등분하면 세 자리 숫자 하나가 400px을 차지한다. 내용만큼만 차지하고
+   남는 자리는 다음 칸이 이어받도록 줄로 흘려 준다. */
+.layout--single .settings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.layout--single .field--inline {
+  gap: 6px;
+}
+
+.layout--single .field--inline input {
+  width: 88px;
+  flex: none;
+}
+
+/* 상자 하나에 칩 한 줄만 있을 때 위아래가 뜨지 않게 한다. */
+.layout--single .card > .chips:last-child {
+  margin-bottom: 0;
+}
+
+.layout--single .settings + .settings {
+  margin-top: 8px;
+}
+
+.layout--single .chips + .settings,
+.layout--single .settings + .chips {
+  margin-top: 10px;
+}
+
+.layout--single .field--inline > span {
+  font-size: 0.875rem;
+}
+
+.layout--single .field--inline input {
+  padding: 6px 9px;
+  font-size: 1rem;
+}
+
+/* 결과 줄은 촘촘하되 읽는 흐름은 살린다. */
+.layout--single .result__line {
+  margin: 0;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(43, 48, 60, 0.5);
+}
+
+.layout--single .result__line:last-of-type {
+  border-bottom: none;
+}
+
+.layout--single .table-scroll {
+  margin-top: 10px;
+}
+
+.layout--single .item__stages,
+.layout--single table {
+  font-size: 0.875rem;
+}
+
+.layout--single table th,
+.layout--single table td {
+  padding: 5px 8px;
+}
+
+/* 페이지 사이 간격도 함께 좁힌다. */
+.layout--single {
+  gap: 12px;
+}
+
+.layout--single .layout__main {
+  gap: 12px;
+}
+
+/* 상자마다 z-index가 붙어 쌓임 맥락이 생기는 탓에, 펼친 목록이 아래 상자에
+   가려진다. 목록이 열려 있는 동안만 그 상자를 위로 올린다. */
+.card:has(.dropdown__list:not([hidden])) {
+  z-index: 30;
+}
+
+/* ── 강화 목록 상단 도구와 캐릭터 장비창 ───────────────────── */
+.enhance-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px 12px;
+  margin-bottom: 14px;
+}
+
+.enhance-toolbar__left,
+.enhance-toolbar__right {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.enhance-toolbar__left {
+  gap: 8px;
+}
+
+.enhance-toolbar .chips--slot {
+  flex-wrap: nowrap;
+}
+
+.enhance-toolbar__right {
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.enhance-toolbar .starforce-character {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: none;
+  gap: 4px;
+  font-weight: 400;
+  letter-spacing: normal;
+}
+
+.enhance-toolbar .starforce-character__field {
+  position: relative;
+  flex: 0 0 120px;
+  width: 120px;
+  min-width: 0;
+  max-width: 120px;
+}
+
+.enhance-toolbar .starforce-character__field input {
+  min-width: 0;
+  height: 42px;
+  padding: 7px 30px 7px 8px;
+  font-size: 0.8125rem;
+}
+
+.enhance-toolbar .starforce-character__load {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 42px;
+  height: 42px;
+  min-height: 42px;
+  padding: 0;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  line-height: 1;
+}
+
+.enhance-toolbar .starforce-character__load-icon {
+  width: 19px;
+  height: 19px;
+}
+
+.enhance-toolbar .starforce-character__clear {
+  display: grid;
+  place-items: center;
+  position: absolute;
+  z-index: 1;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 34px;
+  min-height: 34px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border-color: transparent;
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 1.125rem;
+  line-height: 1;
+  opacity: 0.45;
+  transition: color 0.15s ease, opacity 0.15s ease;
+}
+
+.enhance-toolbar .starforce-character__clear:not([data-visible="true"]) {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.enhance-toolbar .starforce-character__clear:hover:not(:disabled) {
+  color: #ffaaaa;
+  opacity: 1;
+}
+
+.enhance-toolbar .starforce-character__field input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.enhance-toolbar .starforce-character__status {
+  flex: 0 1 auto;
+  max-width: 72px;
+}
+
+.enhance-toolbar #bulk {
+  flex: none;
+  width: auto;
+  min-height: 52px;
+  gap: 6px;
+  padding: 4px 8px;
+  flex-wrap: nowrap;
+}
+
+.enhance-toolbar .bulk__label {
+  font-size: 15px;
+}
+
+.enhance-toolbar .bulk .field--inline {
+  flex: none;
+  gap: 4px;
+  font-size: 15px;
+}
+
+.enhance-toolbar .bulk .field--inline + .field--inline {
+  margin-left: 4px;
+}
+
+.enhance-toolbar .bulk .dropdown {
+  flex: none;
+  width: 72px;
+}
+
+.enhance-toolbar .bulk .dropdown__button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  height: 42px;
+  padding: 0 8px 0 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.enhance-toolbar .bulk .dropdown__button::after {
+  flex: none;
+  float: none;
+}
+
+.enhance-toolbar #clear-items {
+  flex: none;
+  width: auto;
+  margin: 0;
+  padding: 7px 9px;
+  white-space: nowrap;
+}
+
+.character-equipment[hidden] {
+  display: none;
+}
+
+.character-equipment {
+  --equipment-size: 42px;
+  width: min(100%, 356px);
+  margin: 2px auto 18px;
+  padding: 10px 12px 12px;
+  background: linear-gradient(180deg, #171b24 0%, #13161d 100%);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+}
+
+.character-equipment__caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+  font-size: 0.75rem;
+}
+
+.character-equipment__caption strong {
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.character-equipment__caption span {
+  flex: none;
+  color: var(--muted);
+}
+
+.character-equipment__grid {
+  display: grid;
+  grid-template-columns: repeat(7, var(--equipment-size));
+  grid-template-rows: repeat(5, var(--equipment-size));
+  justify-content: center;
+  gap: 4px;
+}
+
+.character-equipment__character {
+  display: grid;
+  grid-column: 3 / 6;
+  grid-row: 1 / 5;
+  place-items: center;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 62%, #252c39 0%, #171b24 70%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 8px;
+}
+
+.character-equipment__character img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: auto;
+  transform: scale(2.6);
+  transform-origin: center 56%;
+}
+
+.character-equipment__character span {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  font-size: 1.25rem;
+}
+
+.character-equipment__slot {
+  position: relative;
+  display: grid;
+  grid-column: var(--equipment-column);
+  grid-row: var(--equipment-row);
+  place-items: center;
+  width: var(--equipment-size);
+  height: var(--equipment-size);
+  padding: 2px;
+  overflow: hidden;
+  background: #202530;
+  color: var(--text);
+  border: 1px solid #343b49;
+  border-radius: 7px;
+}
+
+button.character-equipment__slot {
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease,
+    transform 0.12s ease;
+}
+
+button.character-equipment__slot:hover,
+button.character-equipment__slot:focus-visible {
+  z-index: 1;
+  background: #292f3c;
+  border-color: var(--accent);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.character-equipment__slot[data-empty="true"] {
+  background: rgba(23, 27, 36, 0.55);
+  border-color: rgba(52, 59, 73, 0.55);
+}
+
+.character-equipment__slot[data-disabled="true"] {
+  opacity: 0.42;
+}
+
+.character-equipment__slot img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.character-equipment__star {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  padding: 1px 3px;
+  background: rgba(9, 11, 15, 0.82);
+  color: #ffe276;
+  border-radius: 4px;
+  font-size: 0.5625rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+@media (max-width: 1280px) {
+  .enhance-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .enhance-toolbar__right {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 520px) {
+  .enhance-toolbar {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "slots character"
+      "bulk bulk"
+      "reset reset";
+    gap: 8px 4px;
+  }
+
+  .enhance-toolbar__left,
+  .enhance-toolbar__right {
+    display: contents;
+  }
+
+  .enhance-toolbar .chips--slot {
+    grid-area: slots;
+    justify-self: start;
+  }
+
+  .enhance-toolbar .starforce-character {
+    grid-area: character;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .enhance-toolbar .starforce-character__field {
+    flex: 1 1 auto;
+    width: auto;
+    max-width: none;
+  }
+
+  .enhance-toolbar .bulk {
+    grid-area: bulk;
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .enhance-toolbar .bulk__label {
+    flex-basis: auto;
+  }
+
+  .enhance-toolbar #clear-items {
+    grid-area: reset;
+    justify-self: end;
+  }
+
+  .enhance-toolbar .starforce-character__field input {
+    padding-right: 26px;
+    padding-left: 6px;
+    font-size: 0.75rem;
+  }
+
+  .enhance-toolbar .starforce-character__clear {
+    right: 3px;
+    width: 22px;
+  }
+
+  .character-equipment {
+    --equipment-size: 36px;
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
+  .character-equipment__slot img {
+    width: 29px;
+    height: 29px;
+  }
+}
+
+/* 540px 장비 목록을 그대로 두면 태블릿 폭에서 오른쪽 강화 카드가 지나치게
+   좁아진다. 이 구간에서만 목록을 한 열로 줄여 두 영역을 함께 유지한다. */
+@media (min-width: 761px) and (max-width: 1080px) {
+  .layout {
+    grid-template-columns: 400px minmax(0, 1fr);
+  }
+
+  .picker__group-body,
+  .picker__folded-body {
+    grid-template-columns: 1fr;
+  }
+
+  .enhance-toolbar__left,
+  .enhance-toolbar__right {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 380px) {
+  .enhance-toolbar .chips--slot .chip {
+    width: 38px;
+    min-width: 38px;
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
+  .enhance-toolbar #bulk {
+    gap: 4px;
+    padding-right: 6px;
+    padding-left: 6px;
+  }
+
+  .enhance-toolbar .bulk .field--inline + .field--inline {
+    margin-left: 0;
+  }
+
+  .enhance-toolbar .bulk .dropdown {
+    width: 68px;
+  }
+
+  .character-equipment {
+    --equipment-size: 32px;
+  }
+
+  .character-equipment__slot img {
+    width: 26px;
+    height: 26px;
+  }
+}

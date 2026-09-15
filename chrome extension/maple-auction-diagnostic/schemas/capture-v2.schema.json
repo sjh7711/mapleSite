@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.maple-auction/schemas/capture-v2.schema.json",
+  "title": "Maple Auction capture v2",
+  "type": "object",
+  "required": ["schema_version", "capture", "items"],
+  "properties": {
+    "schema_version": { "const": "maple-auction.capture.v2" },
+    "capture": {
+      "type": "object",
+      "required": [
+        "batch_id",
+        "captured_at",
+        "extension_version",
+        "source_site",
+        "source_path",
+        "viewer_world",
+        "auction_group",
+        "search_context",
+        "result_summary"
+      ],
+      "properties": {
+        "batch_id": { "type": "string", "minLength": 1 },
+        "captured_at": { "type": "string", "pattern": "T.*(?:Z|[+-][0-9]{2}:[0-9]{2})$" },
+        "extension_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+        "source_site": { "const": "https://auction.maplestory.nexon.com" },
+        "source_path": { "type": ["string", "null"] },
+        "viewer_world": { "type": ["string", "null"] },
+        "auction_group": { "type": ["string", "null"] },
+        "collection_mode": { "enum": ["current_page", "preset_sequence", "catalog_sweep", "catalog_resume", "catalog_restart"] },
+        "catalog": { "type": ["object", "null"] },
+        "query_task": { "type": ["object", "null"] },
+        "attempt": { "type": ["object", "null"] },
+        "daily_quota": { "type": ["object", "null"] },
+        "preset": { "type": ["object", "null"] },
+        "preset_index": { "type": ["integer", "null"], "minimum": 1 },
+        "preset_count": { "type": ["integer", "null"], "minimum": 1 },
+        "search_context": {
+          "type": "object",
+          "required": ["page_kind", "keyword", "sort", "page", "limit", "only_current_world", "filters", "raw_filters"],
+          "properties": {
+            "page_kind": { "enum": ["active", "sold", "expired", "unknown"] },
+            "keyword": { "type": ["string", "null"] },
+            "sort": { "type": ["string", "null"] },
+            "page": { "type": ["integer", "null"], "minimum": 1 },
+            "limit": { "type": ["integer", "null"], "minimum": 1 },
+            "only_current_world": { "type": ["boolean", "null"] },
+            "price_search_key_present": { "type": "boolean" },
+            "filter_search_applied": { "type": "boolean" },
+            "filters": { "type": "object" },
+            "raw_filters": { "type": "object" }
+          }
+        },
+        "result_summary": {
+          "type": "object",
+          "required": ["total_results", "total_pages", "current_page", "has_next_page", "page_item_count"],
+          "properties": {
+            "total_results": { "type": ["integer", "null"], "minimum": 0 },
+            "total_pages": { "type": ["integer", "null"], "minimum": 1 },
+            "current_page": { "type": ["integer", "null"], "minimum": 1 },
+            "has_next_page": { "type": ["boolean", "null"] },
+            "page_item_count": { "type": "integer", "minimum": 0 },
+            "requested_page_limit": { "type": ["integer", "null"], "minimum": 1 },
+            "displayed_page_limit": { "type": ["integer", "null"], "minimum": 1 },
+            "site_search_usage": { "type": ["object", "null"] },
+            "page_signature": { "type": ["string", "null"] },
+            "boundary_keys": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["observation_id", "row_index", "listing", "item", "raw_evidence", "quality_warnings"],
+        "properties": {
+          "observation_id": { "type": "string", "minLength": 3 },
+          "row_index": { "type": "integer", "minimum": 1 },
+          "result_rank": { "type": "integer", "minimum": 1 },
+          "matched_preset_ids": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+          "selection_channels": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+          "listing": {
+            "type": "object",
+            "required": [
+              "listing_id",
+              "listing_id_source",
+              "listing_fingerprint",
+              "status",
+              "price_meso",
+              "quantity",
+              "listing_world",
+              "is_cross_world"
+            ],
+            "properties": {
+              "listing_id": { "type": ["string", "null"] },
+              "listing_id_source": { "enum": ["native", "derived", "unavailable"] },
+              "listing_fingerprint": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+              "status": { "enum": ["active", "sold", "expired", "unknown"] },
+              "price_meso": { "type": "string", "pattern": "^[0-9]+$" },
+              "quantity": { "type": "integer", "minimum": 1 },
+              "sold_at": { "type": ["string", "null"] },
+              "sold_at_precision": { "enum": ["date", "datetime", null] },
+              "expires_at": { "type": ["string", "null"] },
+              "listing_world": { "type": ["string", "null"] },
+              "is_cross_world": { "type": ["boolean", "null"] }
+            }
+          },
+          "item": {
+            "type": "object",
+            "required": [
+              "item_id",
+              "item_id_source",
+              "catalog_key",
+              "name",
+              "base_level",
+              "required_level",
+              "required_level_reduction",
+              "starforce",
+              "stats",
+              "potential",
+              "additional_potential"
+            ],
+            "properties": {
+              "item_id": { "type": ["string", "null"] },
+              "item_id_source": { "enum": ["native", "icon_asset_key", "catalog", "unavailable"] },
+              "catalog_key": { "type": ["string", "null"] },
+              "name": { "type": ["string", "null"] },
+              "catalog_id": { "type": ["string", "null"] },
+              "base_level": { "type": ["integer", "null"] },
+              "required_level": { "type": ["integer", "null"] },
+              "required_level_reduction": { "type": ["integer", "null"], "minimum": 0 },
+              "starforce": {
+                "type": "object",
+                "required": ["value", "source", "confidence"],
+                "properties": {
+                  "value": { "type": ["integer", "null"], "minimum": 0 },
+                  "applicable": { "type": ["boolean", "null"] },
+                  "source": { "enum": ["dom", "api_response", "tooltip_absence", "query_filter", "catalog", "repaired", "unknown"] },
+                  "confidence": { "enum": ["confirmed", "inferred", "unknown"] }
+                }
+              },
+              "stats": {
+                "type": "object",
+                "required": ["normalized", "lines"],
+                "properties": {
+                  "normalized": { "const": false },
+                  "lines": { "type": "array" }
+                }
+              },
+              "potential": { "type": "object" },
+              "additional_potential": { "type": "object" }
+            }
+          },
+          "raw_evidence": { "type": "object" },
+          "quality_warnings": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "required": ["algorithm", "payload_sha256"],
+      "properties": {
+        "algorithm": { "const": "SHA-256" },
+        "payload_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    }
+  }
+}

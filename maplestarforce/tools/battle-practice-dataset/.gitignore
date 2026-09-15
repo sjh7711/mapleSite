@@ -1,0 +1,5 @@
+raw/
+generated/
+*.summary.json
+*.report.json
+

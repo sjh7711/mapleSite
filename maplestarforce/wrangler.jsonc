@@ -1,0 +1,10 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "starforce",
+  "pages_build_output_dir": "./dist",
+  "compatibility_date": "2026-08-29",
+  // NEXON_API_KEY는 Preview 환경의 암호화된 Pages secret으로만 설정한다.
+  "env": {
+    "preview": {}
+  }
+}

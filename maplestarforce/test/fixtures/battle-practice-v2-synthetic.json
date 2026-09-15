@@ -1,0 +1,109 @@
+{
+  "enemyDefense": 3.8,
+  "rawChannels": [
+    {
+      "source": "일반 공격",
+      "rawWeight": 0.65,
+      "localIgnoreDefenseSources": []
+    },
+    {
+      "source": "관통 공격 VI",
+      "rawWeight": 0.35,
+      "localIgnoreDefenseSources": [70]
+    }
+  ],
+  "donors": [
+    { "characterName": "학습표본1", "ignoreDefensePercent": 85 },
+    { "characterName": "학습표본2", "ignoreDefensePercent": 88 },
+    { "characterName": "학습표본3", "ignoreDefensePercent": 90 },
+    { "characterName": "학습표본4", "ignoreDefensePercent": 92 },
+    { "characterName": "학습표본5", "ignoreDefensePercent": 94 }
+  ],
+  "dictionary": {
+    "schema": "maplestarforce.skill-mechanics.v1",
+    "contentHash": "synthetic-skill-dictionary-v1",
+    "classes": {
+      "테스트직업": {
+        "skills": [
+          {
+            "name": "일반 공격",
+            "aliases": [],
+            "semantics": {
+              "attack": true,
+              "durationSeconds": [],
+              "ignoreDefense": [],
+              "targetSkillNames": [],
+              "reviewRequired": false
+            }
+          },
+          {
+            "name": "관통 공격 VI",
+            "aliases": [],
+            "semantics": {
+              "attack": true,
+              "durationSeconds": [],
+              "ignoreDefense": [
+                {
+                  "kind": "ignore-defense",
+                  "scope": "character-global",
+                  "percent": 50,
+                  "bossApplicable": true,
+                  "activation": "unspecified",
+                  "aggregation": "skill-base",
+                  "aggregationTarget": "관통 공격 VI",
+                  "evidence": "몬스터 방어율 50% 무시"
+                }
+              ],
+              "targetSkillNames": [],
+              "reviewRequired": false
+            }
+          },
+          {
+            "name": "관통 공격 강화",
+            "aliases": [],
+            "semantics": {
+              "attack": false,
+              "durationSeconds": [],
+              "ignoreDefense": [
+                {
+                  "kind": "ignore-defense",
+                  "scope": "skill-local",
+                  "percent": 20,
+                  "bossApplicable": true,
+                  "activation": "level-milestone",
+                  "requiredLevel": 40,
+                  "aggregation": "additive-to-skill",
+                  "aggregationTarget": "관통 공격 VI",
+                  "evidence": "40레벨 : 몬스터 방어율 무시 20% 증가"
+                }
+              ],
+              "targetSkillNames": ["관통 공격"],
+              "reviewRequired": false
+            }
+          },
+          {
+            "name": "전투 깃발",
+            "aliases": [],
+            "semantics": {
+              "attack": false,
+              "durationSeconds": [30],
+              "ignoreDefense": [
+                {
+                  "kind": "ignore-defense",
+                  "scope": "character-global",
+                  "percent": 20,
+                  "bossApplicable": true,
+                  "activation": "timed",
+                  "aggregation": "independent",
+                  "evidence": "30초 동안 몬스터 방어율 무시 20% 증가"
+                }
+              ],
+              "targetSkillNames": [],
+              "reviewRequired": false
+            }
+          }
+        ]
+      }
+    }
+  }
+}

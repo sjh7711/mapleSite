@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.maple-auction/schemas/normalized-v2.schema.json",
+  "title": "Maple Auction normalized v2 record",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "normalizer_version",
+    "source",
+    "capture",
+    "observation_id",
+    "row_index",
+    "listing",
+    "item",
+    "repair_changes",
+    "quality_warnings"
+  ],
+  "properties": {
+    "schema_version": { "const": "maple-auction.normalized.v2" },
+    "normalizer_version": { "enum": ["0.4.0", "0.6.0", "0.6.1", "0.7.0", "0.7.1", "0.7.2"] },
+    "source": {
+      "type": "object",
+      "required": ["schema_version", "extension_version", "batch_id", "row_index"]
+    },
+    "capture": { "type": "object" },
+    "observation_id": { "type": "string", "minLength": 3 },
+    "row_index": { "type": "integer", "minimum": 1 },
+    "matched_preset_ids": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "selection_channels": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "listing": {
+      "type": "object",
+      "required": [
+        "listing_id",
+        "listing_id_source",
+        "listing_fingerprint",
+        "listing_fingerprint_collision_risk",
+        "status",
+        "price_meso"
+      ],
+      "properties": {
+        "catalog_id": { "type": ["string", "null"] },
+        "listing_id": { "type": ["string", "null"] },
+        "listing_id_source": { "enum": ["native", "derived", "unavailable"] },
+        "listing_fingerprint": { "type": ["string", "null"] },
+        "listing_fingerprint_collision_risk": { "type": "boolean" },
+        "status": { "enum": ["active", "sold", "expired", "unknown"] },
+        "price_meso": { "type": "string", "pattern": "^[0-9]+$" }
+      }
+    },
+    "item": {
+      "type": "object",
+      "required": [
+        "name",
+        "base_level",
+        "required_level",
+        "required_level_reduction",
+        "starforce",
+        "stats",
+        "potential",
+        "additional_potential"
+      ],
+      "properties": {
+        "base_level": { "type": ["integer", "null"] },
+        "required_level": { "type": ["integer", "null"] },
+        "required_level_reduction": { "type": ["integer", "null"], "minimum": 0 },
+        "starforce": {
+          "type": "object",
+          "required": ["value", "source", "confidence"],
+          "properties": {
+            "value": { "type": ["integer", "null"], "minimum": 0 },
+            "applicable": { "type": ["boolean", "null"] },
+            "source": { "enum": ["dom", "api_response", "tooltip_absence", "query_filter", "catalog", "repaired", "unknown"] },
+            "confidence": { "enum": ["confirmed", "inferred", "unknown"] }
+          }
+        },
+        "stats": {
+          "type": "object",
+          "required": ["normalized", "base", "starforce", "scroll", "flame", "other", "total", "validation"],
+          "properties": {
+            "normalized": { "const": true },
+            "base": { "type": "object" },
+            "starforce": { "type": "object" },
+            "scroll": { "type": "object" },
+            "flame": { "type": "object" },
+            "other": { "type": "object" },
+            "total": { "type": "object" },
+            "validation": { "type": "object" }
+          }
+        },
+        "potential": {
+          "type": "object",
+          "required": ["collected", "grade", "lines"],
+          "properties": {
+            "collected": { "type": "boolean" },
+            "grade": { "enum": ["legendary", "unique", "epic", "rare", "none", null] },
+            "lines": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["line_index", "code", "value", "unit", "tier", "is_prime", "params"],
+                "properties": {
+                  "line_index": { "type": "integer", "minimum": 1 },
+                  "code": { "type": "string", "minLength": 1 },
+                  "value": { "type": ["number", "null"] },
+                  "unit": { "enum": ["pct", "flat", "seconds", "level", null] },
+                  "tier": { "enum": ["legendary", "unique", "epic", "rare", null] },
+                  "is_prime": { "type": ["boolean", "null"] },
+                  "params": { "type": "object" }
+                }
+              }
+            }
+          }
+        },
+        "additional_potential": {
+          "type": "object",
+          "required": ["collected", "grade", "lines"],
+          "properties": {
+            "collected": { "type": "boolean" },
+            "grade": { "enum": ["legendary", "unique", "epic", "rare", "none", null] },
+            "lines": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": ["line_index", "code", "value", "unit", "tier", "is_prime", "params"],
+                "properties": {
+                  "line_index": { "type": "integer", "minimum": 1 },
+                  "code": { "type": "string", "minLength": 1 },
+                  "value": { "type": ["number", "null"] },
+                  "unit": { "enum": ["pct", "flat", "seconds", "level", null] },
+                  "tier": { "enum": ["legendary", "unique", "epic", "rare", null] },
+                  "is_prime": { "type": ["boolean", "null"] },
+                  "params": { "type": "object" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "repair_changes": { "type": "array", "items": { "type": "string" } },
+    "quality_warnings": { "type": "array", "items": { "type": "string" } }
+  }
+}
