@@ -212,7 +212,18 @@ export function searchableSelect(options, value, onChange, {
       applyOptionState(control, option);
       control.addEventListener("pointerdown", (event) => event.preventDefault());
       control.addEventListener("click", () => commit(option));
-      list.append(control);
+      if (control.disabled && option.disabledReason) {
+        // 비활성 버튼 대신 감싸는 요소가 마우스를 받아 기본 툴팁을 표시한다.
+        const hint = document.createElement("span");
+        hint.className = "search-select__option-hint";
+        hint.title = text(option.disabledReason);
+        hint.setAttribute("role", "presentation");
+        control.setAttribute("aria-description", hint.title);
+        hint.append(control);
+        list.append(hint);
+      } else {
+        list.append(control);
+      }
     });
 
     const active = list.querySelector(`[data-option-index="${activeIndex}"]`);

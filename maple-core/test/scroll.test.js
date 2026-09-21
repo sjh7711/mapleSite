@@ -13,6 +13,7 @@ import {
   chaosMean,
   chaosOutcomeDistribution,
   chaosSumAtLeast,
+  earringSuccessRate,
   traceSuccessRate,
 } from "../src/scroll.js";
 
@@ -228,6 +229,33 @@ test("손재주는 5레벨당 0.5%p씩 단계적으로 올라간다", () => {
   assert.equal(traceSuccessRate(30, { dexterity: 100 }), 0.4);
   assert.equal(traceSuccessRate(30, { dexterity: 150 }), 0.4);
   assert.equal(traceSuccessRate(30, { dexterity: -10 }), 0.3);
+});
+
+test("귀지 10%는 손재주·길드를 더해 최대 24%이고 피버타임은 적용하지 않는다", () => {
+  assert.equal(earringSuccessRate(), 0.1);
+  assert.equal(earringSuccessRate({ dexterity: true }), 0.2);
+  assert.equal(earringSuccessRate({ guild: true }), 0.14);
+  for (const fever of [false, true]) {
+    assert.equal(earringSuccessRate({ fever }), 0.1);
+    assert.equal(earringSuccessRate({ dexterity: 100, guild: true, fever }), 0.24);
+  }
+  for (const [level, expected] of [[-1, 0.1], [4, 0.1], [5, 0.105], [9, 0.105], [10, 0.11], [99, 0.195], [100, 0.2], [150, 0.2]]) {
+    assert.equal(earringSuccessRate({ dexterity: level }), expected);
+  }
+});
+
+test("귀지 보정이 주문서 사용량과 복구 비용까지 반영된다", () => {
+  // 잔여 1칸, 순백 복구만 허용: 평균 주문서 1/p장, 평균 순백 (1-p)/p회.
+  const cost = calculateSlotCraft({
+    slots: 1,
+    successRate: earringSuccessRate({ dexterity: 100, guild: true }),
+    scrollCost: 80_000_000,
+    cleanCost: 2_800_000,
+    innocentCost: Number.POSITIVE_INFINITY,
+  });
+  assert.ok(Math.abs(cost.expected.scrolls - 1 / 0.24) < 1e-9);
+  const expected = (80_000_000 + 0.76 * 2_800_000) / 0.24;
+  assert.ok(Math.abs(cost.expectedCost - expected) < 0.001);
 });
 
 test("놀긍혼 한 번의 평균 상승은 1.777이다", () => {

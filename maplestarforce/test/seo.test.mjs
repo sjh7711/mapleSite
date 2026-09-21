@@ -11,6 +11,10 @@ const PUBLIC_URLS = [
   "https://starforce.pages.dev/add-option/",
   "https://starforce.pages.dev/scroll/",
   "https://starforce.pages.dev/pet/",
+  "https://starforce.pages.dev/about/",
+  "https://starforce.pages.dev/privacy/",
+  "https://starforce.pages.dev/sources/",
+  "https://starforce.pages.dev/soul/",
 ];
 
 const PAGE_FAVICONS = new Map([
@@ -36,7 +40,7 @@ test("모든 페이지가 기능을 구분하는 파비콘을 선언한다", asy
   }
 });
 
-test("사이트맵은 운영에 공개된 계산기만 중복 없이 포함한다", async () => {
+test("사이트맵은 공개 계산기와 안내 페이지를 중복 없이 포함한다", async () => {
   const sitemap = await read("../public/sitemap.xml");
   const locations = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/gu)].map(
     (match) => match[1],
@@ -69,7 +73,7 @@ test("robots와 운영 기능 플래그가 사이트맵 공개 범위를 지킨�
   );
   assert.match(
     redirects,
-    /\/sitemap\.xml\/\s+\/sitemap\.xml\s+301/u,
+    /\/sitemap\.xml\/\s+\/sitemap\.xml\s+200/u,
   );
   assert.match(
     redirects,

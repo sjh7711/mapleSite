@@ -1140,8 +1140,6 @@ test("구버전 장비도 네이티브 title 대신 접근 가능한 맞춤 툴�
   assert.match(component, /setAttribute\("aria-describedby", tooltipController\.tooltip\.id\)/u);
   assert.match(component, /addEventListener\("focus"/u);
   assert.match(component, /event\.key === "Escape"/u);
-  assert.match(component, /tooltip\.addEventListener\("pointerenter", cancelScheduledHide\)/u);
-  assert.match(component, /tooltipController\.scheduleHide\(slot\)/u);
   assert.match(component, /const equipment = grid\.getBoundingClientRect\(\)/u);
   assert.match(component, /const canFloatLeft = leftSpace >= tooltipWidth/u);
   assert.match(component, /const canFloatRight = rightSpace >= tooltipWidth/u);
@@ -1185,7 +1183,7 @@ test("구버전 장비도 네이티브 title 대신 접근 가능한 맞춤 툴�
   assert.match(component, /starSlotCount = Math\.max\(25, Math\.ceil\(visibleStars \/ 5\) \* 5\)/u);
   assert.match(component, /groupIndex < starSlotCount \/ 5/u);
   assert.match(component, /star\.dataset\.filled/u);
-  assert.match(component, /visibleStars >= 22/u);
+  assert.match(component, /visibleStars >= 23/u);
   assert.match(styles, /__header\[data-sparkle="true"\]::before/u);
   assert.match(styles, /profile-equipment-tooltip__exceptional-badge/u);
 });
@@ -1411,4 +1409,17 @@ test("특수 스킬 반지 한 칸은 대각선으로 나뉜 두 독립 버튼�
     styles,
     /profile-equipment__special-ring-pair::after[\s\S]*linear-gradient\([\s\S]*to bottom right/u,
   );
+});
+
+test('무기 소울 툴팁에 증폭 등급·세 줄·상시 공격력을 표시한다', () => {
+  const model = getCharacterEquipmentTooltipModel({
+    name: '테스트 무기', tooltip: {
+      soulName: '위대한 루시드의 소울 적용', soulOption: '공격력 +3%',
+      soulActive: true, soulAttack: 20, soulMagic: 0,
+      soulPotentialGrade: '레전드리', soulAmplification: 2,
+      soulPotentialLines: ['공격력 +4%', '공격력 +3%', '공격력 +3%'],
+    },
+  });
+  assert.deepEqual(model.soul, ['위대한 루시드의 소울 적용', '공격력 +3%', '공격력 +20',
+    '소울 증폭 2단계 · 레전드리', '공격력 +4%', '공격력 +3%', '공격력 +3%']);
 });

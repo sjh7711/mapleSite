@@ -186,3 +186,26 @@ export function getPotentialTargetTypesForRow({
     (type !== "stat-equivalent" || (hasProfile && index === 0))
   );
 }
+
+/** 이전 프라임의 줄별 목표를 두 줄 합계 목표로 옮긴다. 첫 칸은 비워 둔다. */
+export function migratePrimePotentialTargetSets(targetSets) {
+  return targetSets.map(({ targets }) => {
+    const totals = new Map();
+    for (const target of targets.slice(1)) {
+      if (!target.type) continue;
+      const previous = totals.get(target.type);
+      if (!previous || !isCompletePotentialTarget(previous)) {
+        totals.set(target.type, { ...target });
+      } else if (isCompletePotentialTarget(target)) {
+        const left = Number(previous.value);
+        const right = Number(target.value);
+        previous.value = target.type === "ignore-defense"
+          ? Number((100 * (1 - (1 - left / 100) * (1 - right / 100))).toFixed(10))
+          : left + right;
+      }
+    }
+    const next = [{ type: "", value: "" }, ...totals.values()];
+    while (next.length < 3) next.push({ type: "", value: "" });
+    return { targets: next };
+  });
+}

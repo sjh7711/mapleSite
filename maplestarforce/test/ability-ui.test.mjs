@@ -8,7 +8,7 @@ test("어빌리티 계산기는 별도 페이지와 메뉴 진입점을 제공�
   const [vite, html, shell] = await Promise.all([
     read("../vite.config.js"),
     read("../ability/index.html"),
-    read("../src/shared/shell.js"),
+    read("../src/shared/tool-nav.js"),
   ]);
 
   assert.match(vite, /ability: resolve\(__dirname, "ability\/index\.html"\)/u);
@@ -28,8 +28,9 @@ test("어빌리티 화면은 통합 블랙·카오스 방식과 잠금·반값·
   ]);
 
   assert.match(source, /Object\.values\(ABILITY_RESET_METHODS\)/u);
-  assert.match(source, /\.filter\(\(method\) => method\.id !== "chaos"\)/u);
-  assert.match(core, /label: "블랙\(카오스\) 서큘레이터"/u);
+  assert.match(source, /\.filter\(\(method\) => \["optimal", "honor", "advanced"\]\.includes\(method\.id\)\)/u);
+  assert.match(core, /label: "일반 재설정"/u);
+  assert.match(core, /label: "블서큘\(카서큘\)"/u);
   assert.doesNotMatch(source, /서큘레이터 1개 \(억 메소\)/u);
   assert.doesNotMatch(source, /대형 보스 명예의 훈장 가격/u);
   assert.match(source, /"잠금"/u);
@@ -57,16 +58,14 @@ test("최적 전략은 허용할 서큘레이터를 따로 고르고 추천 순�
   assert.match(core, /6개 이하의 순열/u);
   assert.match(core, /const STRATEGY_EXPECTED_CACHE = new Map/u);
   assert.match(core, /honor → value-only → honor/u);
-  assert.match(source, /"미라클 서큘레이터 허용"/u);
-  assert.match(source, /"블랙 서큘레이터 허용"/u);
-  assert.match(source, /"카오스 서큘레이터 허용"/u);
-  assert.match(source, /"미라클 보유량"/u);
-  assert.match(source, /"블랙 보유량"/u);
-  assert.match(source, /"카오스 보유량"/u);
+  assert.match(source, /"미서큘 허용"/u);
+  assert.match(source, /"블서큘\(카서큘\) 허용"/u);
+  assert.match(source, /"미서큘 보유량"/u);
+  assert.match(source, /"블서큘\(카서큘\) 보유량"/u);
   assert.match(source, /miracleCount: state\.miracleCount/u);
-  assert.match(source, /미라클 성공 시/u);
-  assert.match(source, /미라클 소진 시/u);
-  assert.match(source, /추천 전략 평균 명성치/u);
+  assert.match(source, /미서큘 성공 시/u);
+  assert.match(source, /미서큘 소진 시/u);
+  assert.match(source, /추천 전략 평균 비용/u);
   assert.match(source, /추천 진행 순서/u);
   assert.doesNotMatch(source, /"진행 순서"/u);
   assert.match(source, /자동 잠금/u);
@@ -86,7 +85,7 @@ test("어빌리티 목표 선택지는 지정한 인기 순서를 적용한다",
   );
   assert.match(
     source,
-    /"abnormal-damage",\s*"boss-damage",\s*"buff-duration",\s*"critical",\s*"cooldown-skip",\s*"attack",\s*"magic",\s*"item-drop",\s*"meso-drop"/u,
+    /"abnormal-damage",\s*"boss-damage",\s*"passive-level",\s*"buff-duration",\s*"critical",\s*"cooldown-skip",\s*"attack",\s*"magic",\s*"item-drop",\s*"meso-drop"/u,
   );
   assert.match(source, /"보스용 적용"/u);
   assert.match(source, /"사냥용 적용"/u);
@@ -120,7 +119,7 @@ test("블랙·카오스 목표는 등급 선택 없이 목표 수치로 등급�
   assert.match(source, /\.sort\(\(left, right\) => right - left\)\.forEach/u);
   assert.match(source, /targetValueOptions\(target\.type, line, values, optionInfo\)/u);
   assert.doesNotMatch(source, /gradeOptions/u);
-  assert.doesNotMatch(source, /ability-target-grade/u);
+  assert.match(source, /lowerLegendaryMethod\(\) && line > 0/u);
 });
 
 test("어빌리티 목표 수치는 드롭다운 안에서 등급별 머리글로 구분한다", async () => {
@@ -179,10 +178,10 @@ test("목표 도달 확률의 평균으로 보기는 평균 재설정과 같은 
   assert.match(source, /function averageEquivalentTargetChancePercent/u);
   assert.match(source, /const expectedResets = 1 \/ probability/u);
   assert.match(source, /1 - \(\(1 - probability\) \*\* expectedResets\)/u);
-  assert.match(source, /averageMode\s*\? result\.expectedResets\s*:\s*calculateAbilityAttemptsForChance/su);
+  assert.match(source, /averageMode\s*\? result\.expectedResets\s*:\s*state\.method === "abyss" \? calculateAbilityAbyssAttemptsForChance/su);
   assert.match(
     source,
-    /averageValue: \(\) => averageEquivalentTargetChancePercent\(result\.probability\)/u,
+    /averageValue: averageChance/u,
   );
 });
 

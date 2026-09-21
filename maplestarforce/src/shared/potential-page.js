@@ -4,6 +4,7 @@ import {
   calculatePotentialRankUpExpected,
   calculatePotentialRankUpReachForChance,
   calculatePotentialExpected,
+  calculatePrimePotentialExpected,
   calculateResetsForChance,
   convertPotentialTargetToEquivalents,
   getAvailablePotentialResetMethods,
@@ -11,8 +12,12 @@ import {
   getPotentialRankUpInfo,
   getPotentialResetCost,
   getPotentialResetMethod,
+  getPotentialSuccessCombinations,
 } from "maple-core/potential";
 import { loadPotentialTables } from "./potential-tables.js";
+import {
+  potentialCalculatorLayout, potentialOptionSet, potentialSelectorGroup, potentialTargetItem,
+} from "./potential-form-ui.js";
 import {
   MAX_POTENTIAL_TARGET_SETS,
   getRegularOptimalPreset,
@@ -30,6 +35,7 @@ import {
   getPotentialTargetInfo,
   getPotentialTargetTypesForRow,
   isCompletePotentialTarget,
+  migratePrimePotentialTargetSets,
   migratePotentialTargetChanceDefault,
   normalizePotentialTargetChance,
   orderPotentialTargetTypes,
@@ -141,6 +147,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
     itemLevel: 200,
     grade: "legendary",
     resetMethod: "meso",
+    primeTargetSets: null,
     mainStat: "STR",
     subStat: "DEX",
     attackType: "attack",
@@ -211,6 +218,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
       targetSets: [{ targets: migratedTargets }],
     };
   }
+  delete state.fixedFirstOption;
   const gradeProgressDefaults = { rare: 0, epic: 0, unique: 0 };
   const loadedGradeProgress =
     state.rankProgressByGrade && typeof state.rankProgressByGrade === "object"
@@ -265,6 +273,20 @@ function mountPotentialSystem({ system, onSystemChange }) {
     }
     return { targets };
   });
+  const savedPrimeSets = normalizedPresetTargetSets(state.primeTargetSets);
+  state.primeTargetSets = savedPrimeSets.length ? savedPrimeSets : [{ targets: [
+    { type: "", value: "" },
+    ...Array.from({ length: 2 }, (_, index) => ({
+      type: typeof state.primeLineTargets?.[index]?.type === "string" ? state.primeLineTargets[index].type : "",
+      value: state.primeLineTargets?.[index]?.value ?? "",
+    })),
+  ] }];
+  for (const set of state.primeTargetSets) set.targets[0] = { type: "", value: "" };
+  if (state.primeTargetMode !== "sum") {
+    state.primeTargetSets = migratePrimePotentialTargetSets(state.primeTargetSets);
+    state.primeTargetMode = "sum";
+  }
+  delete state.primeLineTargets;
   if (!displayedResetMethods(system, state.grade).some(
     (method) => method.id === state.resetMethod,
   )) {
@@ -288,6 +310,18 @@ function mountPotentialSystem({ system, onSystemChange }) {
       Array.isArray(preset.targetSets)
     )
     .slice(0, MAX_SAVED_TARGET_PRESETS);
+  let migratedPrimePreset = false;
+  savedTargetPresets = savedTargetPresets.map((preset) => {
+    if (preset.resetMethod !== "prime" || preset.primeTargetMode === "sum") return preset;
+    migratedPrimePreset = true;
+    return {
+      ...preset,
+      primeTargetMode: "sum",
+      targetSets: migratePrimePotentialTargetSets(normalizedPresetTargetSets(preset.targetSets)),
+      expectation: null,
+    };
+  });
+  if (migratedPrimePreset) persistTargetPresets();
   if (!getPotentialProfile()) {
     state.showEquivalence = false;
   }
@@ -322,6 +356,10 @@ function mountPotentialSystem({ system, onSystemChange }) {
 
   function persistTargetPresets() {
     safeSave(targetPresetStorageKey, savedTargetPresets);
+  }
+
+  function targetSetsKey() {
+    return state.resetMethod === "prime" ? "primeTargetSets" : "targetSets";
   }
 
   function activeResetMethod() {
@@ -389,12 +427,21 @@ function mountPotentialSystem({ system, onSystemChange }) {
     return `${activeResetMethod().tableSource}:${state.grade}:${state.part}:${Math.round(state.itemLevel)}`;
   }
 
-  function targetTypesForRow(targets, index) {
+  function targetTypesForRow(targets, index, { includeProfileTargets = false } = {}) {
+    const hasProfile = includeProfileTargets || Boolean(getPotentialProfile());
+    if (activeResetMethod().fixedFirstLine) {
+      if (index === 0) return [];
+      const types = tables ? getAvailablePotentialTargetTypes(tables.slice(1), { part: Number(state.part), system }) : [];
+      return getPotentialTargetTypesForRow({
+        availableTargetTypes: orderPotentialTargetTypes(types, { system }),
+        targets: targets.slice(1), index: index - 1, hasProfile,
+      });
+    }
     return getPotentialTargetTypesForRow({
       availableTargetTypes,
       targets,
       index,
-      hasProfile: Boolean(getPotentialProfile()),
+      hasProfile,
     });
   }
 
@@ -402,6 +449,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
     let changed = false;
     for (let index = 0; index < targetSet.targets.length; index += 1) {
       const target = targetSet.targets[index];
+      if (activeResetMethod().fixedFirstLine && index === 0) continue;
       if (target.type === "") {
         if (target.value !== "") {
           target.value = "";
@@ -421,7 +469,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
 
   function normalizeTargetSets() {
     if (availableTargetTypes.length === 0) return false;
-    return state.targetSets.reduce(
+    return state[targetSetsKey()].reduce(
       (changed, targetSet) => normalizeTargetSet(targetSet) || changed,
       false,
     );
@@ -473,17 +521,25 @@ function mountPotentialSystem({ system, onSystemChange }) {
 
   function targetControl(target, index, targetSet, { keyPrefix, groupLabel }) {
     const targets = targetSet.targets;
+    const firstLineDisabled = activeResetMethod().fixedFirstLine && index === 0;
     const allowedTypes = targetTypesForRow(targets, index);
+    // 캐릭터 환산 목표도 목록에 표시하되, 정보가 없으면 선택할 수 없게 한다.
+    const visibleTypes = targetTypesForRow(targets, index, { includeProfileTargets: true });
     const targetOptions = [
       { value: "", label: "없음" },
-      ...allowedTypes
+      ...visibleTypes
         .filter((value) => getPotentialTargetInfo(value))
         .map((value) => ({
           value,
           label: getPotentialTargetInfo(value).label,
+          disabled: !allowedTypes.includes(value),
+          disabledReason: value === "stat-equivalent" && !allowedTypes.includes(value)
+            ? "내 캐릭터 정보를 불러오면 사용할 수 있습니다."
+            : "",
         })),
     ];
     const select = searchableSelect(targetOptions, target.type, (value) => {
+      if (value && !allowedTypes.includes(value)) return;
       update(() => {
         target.type = value;
         target.value = "";
@@ -494,8 +550,9 @@ function mountPotentialSystem({ system, onSystemChange }) {
       ariaLabel: `${groupLabel}의 ${index + 1}번째 옵션`,
       placeholder: "옵션 검색",
       clearable: true,
+      disabled: firstLineDisabled,
     });
-    select.disabled = allowedTypes.length === 0;
+    select.disabled = firstLineDisabled || allowedTypes.length === 0;
     const targetInfo = getPotentialTargetInfo(target.type);
     select.title = targetInfo?.label ?? `${groupLabel}의 ${index + 1}번째 옵션`;
     const value = numberControl(
@@ -512,53 +569,24 @@ function mountPotentialSystem({ system, onSystemChange }) {
         allowDecimalDraft: target.type === "stat-equivalent",
       },
     );
-    value.disabled = !targetTypesForRow(targets, index).includes(target.type);
-    const controls = element("div", "target-row");
+    value.disabled = firstLineDisabled || !targetTypesForRow(targets, index).includes(target.type);
     value.setAttribute("aria-label", `${groupLabel}의 ${index + 1}번째 최소 수치`);
-    const valueControl = element("span", "target-value");
-    valueControl.append(
-      value,
-      element("span", "target-value__unit", targetInfo?.unit ?? ""),
-    );
-    controls.append(select, valueControl);
-    const item = element("div", "target-item");
-    item.append(controls);
-    return item;
+    return potentialTargetItem({ select, value, unit: targetInfo?.unit ?? "", disabled: firstLineDisabled });
   }
 
   function optionSetControl(targetSet, setIndex) {
     const targets = targetSet.targets;
     const label = `옵션 세트 ${setIndex + 1}`;
     const keyPrefix = `set-${setIndex}-`;
-    const set = element("section", "option-set");
-    const head = element("div", "option-set__head");
-    const title = element("div", "option-set__title-row");
-    title.append(
-      element("h3", "option-set__title", label),
-      element("span", "option-set__badge", "모두 만족"),
-    );
-    head.append(title);
-    if (state.targetSets.length > 1) {
-      const removeSet = element("button", "icon-button option-set__remove", "×");
-      removeSet.type = "button";
-      removeSet.title = `${label} 삭제`;
-      removeSet.setAttribute("aria-label", `${label} 삭제`);
-      removeSet.addEventListener("click", () => update(() => {
-        state.targetSets.splice(setIndex, 1);
-      }));
-      head.append(removeSet);
-    }
-
-    const list = element("div", "target-list");
-    list.append(
-      ...targets.map((target, index) => targetControl(
-        target,
-        index,
-        targetSet,
-        { keyPrefix, groupLabel: label },
+    const set = potentialOptionSet({
+      label,
+      targets: targets.map((target, index) => targetControl(
+        target, index, targetSet, { keyPrefix, groupLabel: label },
       )),
-    );
-    set.append(head, list);
+      onRemove: state[targetSetsKey()].length > 1 ? () => update(() => {
+        state[targetSetsKey()].splice(setIndex, 1);
+      }) : null,
+    });
     const equivalenceText = state.showEquivalence && getPotentialProfile()
       ? targetSetEquivalenceText(targets)
       : "";
@@ -655,13 +683,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
     );
     const gradePicker = chipRow(gradeChips);
     gradePicker.classList.add("potential-grade-picker");
-    const gradePickerGroup = element("div", "potential-selector-group potential-selector-group--grade");
-    gradePickerGroup.setAttribute("role", "group");
-    gradePickerGroup.setAttribute("aria-label", "현재 등급");
-    gradePickerGroup.append(
-      element("p", "potential-selector-group__label", "현재 등급"),
-      gradePicker,
-    );
+    const gradePickerGroup = potentialSelectorGroup("현재 등급", gradePicker);
     const availableMethods = displayedResetMethods(system, state.grade);
     const methodChips = availableMethods.map((method) => {
       const control = chip(
@@ -714,13 +736,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
     calculationModePicker.classList.add("potential-calculation-mode");
     calculationModePicker.setAttribute("role", "group");
     calculationModePicker.setAttribute("aria-label", "잠재능력 계산 종류");
-    const calculationModeGroup = element("div", "potential-selector-group potential-selector-group--target");
-    calculationModeGroup.setAttribute("role", "group");
-    calculationModeGroup.setAttribute("aria-label", "목표");
-    calculationModeGroup.append(
-      element("p", "potential-selector-group__label", "목표"),
-      calculationModePicker,
-    );
+    const calculationModeGroup = potentialSelectorGroup("목표", calculationModePicker, "target");
     if (!rankInfo.canRankUp) {
       calculationModePicker.lastElementChild.title = state.grade === "legendary"
         ? "레전드리는 최고 등급입니다."
@@ -842,12 +858,12 @@ function mountPotentialSystem({ system, onSystemChange }) {
     if (state.calculationMode === "rank-up") {
       return rankUpTargetCard();
     }
-    const activeTypes = state.targetSets.flatMap((targetSet) =>
+    const activeTypes = state[targetSetsKey()].flatMap((targetSet) =>
       targetSet.targets.map((target) => target.type),
     );
     const profile = getPotentialProfile();
     const setList = element("div", "option-sets");
-    state.targetSets.forEach((targetSet, setIndex) => {
+    state[targetSetsKey()].forEach((targetSet, setIndex) => {
       if (setIndex > 0) {
         const separator = element("div", "option-set-or", "또는");
         separator.setAttribute("aria-hidden", "true");
@@ -858,16 +874,16 @@ function mountPotentialSystem({ system, onSystemChange }) {
     const addSet = element("button", "button option-set-add", "+ 옵션 세트 추가");
     addSet.type = "button";
     addSet.disabled =
-      state.targetSets.length >= MAX_TARGET_SETS ||
+      state[targetSetsKey()].length >= MAX_TARGET_SETS ||
       tableState !== "ready" ||
       availableTargetTypes.length === 0;
-    addSet.title = state.targetSets.length >= MAX_TARGET_SETS
+    addSet.title = state[targetSetsKey()].length >= MAX_TARGET_SETS
       ? `옵션 세트는 최대 ${MAX_TARGET_SETS}개까지 만들 수 있습니다.`
       : "다른 성공 조건을 추가합니다.";
     addSet.addEventListener("click", () => update(() => {
-      if (state.targetSets.length >= MAX_TARGET_SETS) return;
+      if (state[targetSetsKey()].length >= MAX_TARGET_SETS) return;
       const targetSet = { targets: structuredClone(defaultTargets) };
-      state.targetSets.push(targetSet);
+      state[targetSetsKey()].push(targetSet);
       normalizeTargetSet(targetSet);
     }));
     const equivalenceToggle = toggleChip(
@@ -883,7 +899,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
       ? "%급 계산 결과 표시 전환"
       : "내 캐릭터 정보를 불러오면 사용할 수 있습니다.";
     const resetTargets = resetAction("목표 초기화", () => update(() => {
-      state.targetSets = [{ targets: structuredClone(defaultTargets) }];
+      state[targetSetsKey()] = [{ targets: structuredClone(defaultTargets) }];
     }), {
       className: "button--compact",
       title: "모든 옵션 세트를 지우고 빈 세트 하나로 되돌립니다.",
@@ -892,7 +908,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
     const targetActions = chipRow(resetTargets, equivalenceToggle);
 
     let presetAction = null;
-    const supportsPreset = supportsRegularOptimalPreset({
+    const supportsPreset = !activeResetMethod().fixedFirstLine && supportsRegularOptimalPreset({
       system,
       part: state.part,
       grade: state.grade,
@@ -921,7 +937,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
         preset && presetTargetSets.length === preset.targetSets.length,
       );
       const isApplied = presetIsValid &&
-        targetSetsEqual(state.targetSets, presetTargetSets);
+        targetSetsEqual(state[targetSetsKey()], presetTargetSets);
       const presetName = POTENTIAL_PARTS[state.part];
       const presetAttackLabel = preset?.kind === "accessory"
         ? ""
@@ -946,7 +962,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
         : "선택한 공식 확률표에서 정옵션을 만들 수 없습니다.";
       applyPreset.addEventListener("click", () => {
         if (!presetIsValid || isApplied) return;
-        const hasConfiguredTargets = state.targetSets.some(
+        const hasConfiguredTargets = state[targetSetsKey()].some(
           (targetSet) => targetSet.targets.some((target) =>
             target.type || target.value !== ""
           ),
@@ -962,7 +978,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
           )
         ) return;
         update(() => {
-          state.targetSets = structuredClone(presetTargetSets);
+          state[targetSetsKey()] = structuredClone(presetTargetSets);
           normalizeTargetSets();
         });
       });
@@ -971,9 +987,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
       if (preset?.kind === "accessory") {
         const presetOptions = element("div", "target-preset-options");
         const includeNearOptimal = toggleChip(
-          state.presetIncludeNearOptimal
-            ? "-3% 포함 ON"
-            : "-3% 포함 OFF",
+          "-3% 포함",
           Boolean(state.presetIncludeNearOptimal),
           () => update(() => {
             state.presetIncludeNearOptimal = !state.presetIncludeNearOptimal;
@@ -984,9 +998,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
         includeNearOptimal.title =
           "장신구 STR·DEX·INT·LUK 목표에 정옵션 -3%까지 포함합니다. Lv.250은 30%, Lv.200은 27% 이상입니다.";
         const includeDropMeso = toggleChip(
-          state.presetIncludeDropMeso !== false
-            ? "드메 포함 ON"
-            : "드메 포함 OFF",
+          "드메 포함",
           state.presetIncludeDropMeso !== false,
           () => update(() => {
             state.presetIncludeDropMeso = state.presetIncludeDropMeso === false;
@@ -1001,9 +1013,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
       } else if (preset?.kind === "weapon" || preset?.kind === "emblem") {
         const canToggleIgnoreDefense = Boolean(preset?.canIncludeIgnoreDefense);
         const includeIgnoreDefense = toggleChip(
-          state.presetIncludeIgnoreDefense
-            ? "방무 1줄 포함 ON"
-            : "방무 1줄 포함 OFF",
+          "방무 1줄 포함",
           Boolean(state.presetIncludeIgnoreDefense),
           () => update(() => {
             if (!canToggleIgnoreDefense) return;
@@ -1013,7 +1023,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
           { key: "preset-include-ignore-defense" },
         );
         includeIgnoreDefense.title = canToggleIgnoreDefense
-          ? "방무는 최대 한 줄만 정옵션에 포함합니다. 기본값은 OFF입니다."
+          ? "방무는 최대 한 줄만 정옵션에 포함합니다."
           : "선택한 공식 확률표에서는 방무 옵션을 사용할 수 없습니다.";
         const presetOptions = element("div", "target-preset-options");
         if (preset?.canIncludePpyogong) {
@@ -1092,8 +1102,10 @@ function mountPotentialSystem({ system, onSystemChange }) {
     return settings;
   }
 
-  function completeTargets(targets) {
-    return targets.filter(isCompletePotentialTarget);
+  function completeTargets(targets, prime = activeResetMethod().fixedFirstLine) {
+    return targets.flatMap((target, index) =>
+      isCompletePotentialTarget(target) && (!prime || index > 0)
+        ? [{ type: target.type, value: target.value }] : []);
   }
 
   function targetSetsEqual(left, right) {
@@ -1142,9 +1154,9 @@ function mountPotentialSystem({ system, onSystemChange }) {
     });
   }
 
-  function presetTargetSummary(targetSets) {
+  function presetTargetSummary(targetSets, prime) {
     return normalizedPresetTargetSets(targetSets)
-      .map((targetSet) => completeTargets(targetSet.targets))
+      .map((targetSet) => completeTargets(targetSet.targets, prime))
       .filter((targets) => targets.length > 0)
       .map(targetSetSummary)
       .join(" 또는 ");
@@ -1160,8 +1172,10 @@ function mountPotentialSystem({ system, onSystemChange }) {
     }, { capability: "potentialEquivalence" });
     try {
       const result = calculateTargetSets(targetSets, profile);
-      if (!Number.isFinite(result?.expectedResets)) return null;
+      if (!Number.isFinite(result?.expectedResets) && !result?.dependsOnFirstLine) return null;
       return {
+        expectedResetsRange: result.dependsOnFirstLine ? result.expectedResetsRange : null,
+        expectedCostRange: result.dependsOnFirstLine ? result.expectedCostRange : null,
         expectedCost: Number.isFinite(result.expectedCost)
           ? result.expectedCost
           : null,
@@ -1177,6 +1191,12 @@ function mountPotentialSystem({ system, onSystemChange }) {
   }
 
   function savedExpectationText(expectation, method) {
+    if (expectation?.expectedResetsRange) {
+      const cost = expectation.expectedCostRange
+        ? ` · ${formatRange(expectation.expectedCostRange.map((value) => value ?? Infinity), (value) => formatPotentialResetMeso(value, method))}`
+        : "";
+      return `저장 당시 평균 큐브 · ${formatRange(expectation.expectedResetsRange.map((value) => value ?? Infinity), formatAttempts)}${cost}`;
+    }
     if (Number.isFinite(expectation?.expectedCost)) {
       return `저장 당시 기댓값 · ${formatMeso(expectation.expectedCost)}`;
     }
@@ -1187,7 +1207,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
   }
 
   function savedTargetPresetCard() {
-    const currentTargetSets = state.targetSets
+    const currentTargetSets = state[targetSetsKey()]
       .map((targetSet) => completeTargets(targetSet.targets))
       .filter((targets) => targets.length > 0);
     const nameInput = document.createElement("input");
@@ -1223,12 +1243,13 @@ function mountPotentialSystem({ system, onSystemChange }) {
         itemLevel: Math.round(state.itemLevel),
         grade: state.grade,
         resetMethod: state.resetMethod,
+        ...(activeResetMethod().fixedFirstLine ? { primeTargetMode: "sum" } : {}),
         mainStat: state.mainStat,
         subStat: state.subStat,
         attackType: state.attackType,
         characterLevel: Math.round(state.characterLevel),
         enemyDefense: Number(state.enemyDefense),
-        targetSets: structuredClone(state.targetSets),
+        targetSets: structuredClone(state[targetSetsKey()]),
         expectation,
         savedAt: new Date().toISOString(),
       });
@@ -1263,7 +1284,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
             return getPotentialResetMethod(system, "meso");
           }
         })();
-        const summary = presetTargetSummary(preset.targetSets);
+        const summary = presetTargetSummary(preset.targetSets, Boolean(method.fixedFirstLine));
         const item = element("article", "target-preset-library__item");
         const copy = element("div", "target-preset-library__copy");
         copy.append(
@@ -1307,7 +1328,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
             state.enemyDefense = preset.enemyDefense ?? state.enemyDefense;
             state.rankProgressByGrade = { rare: 0, epic: 0, unique: 0 };
             state.rankTargetGrade = "";
-            state.targetSets = targetSets;
+            state[targetSetsKey()] = targetSets;
           }, { reload: true });
         });
         const removeButton = element("button", "icon-button target-preset-library__remove", "×");
@@ -1334,7 +1355,8 @@ function mountPotentialSystem({ system, onSystemChange }) {
   }
 
   function calculateTargetSets(targetSets, profile) {
-    return calculatePotentialExpected({
+    const calculate = activeResetMethod().fixedFirstLine ? calculatePrimePotentialExpected : calculatePotentialExpected;
+    return calculate({
       tables,
       system,
       grade: state.grade,
@@ -1362,8 +1384,12 @@ function mountPotentialSystem({ system, onSystemChange }) {
     });
   }
 
-  function statEquivalentSuccessCondition(target, profile, setNumber) {
-    const threshold = Number(target.value);
+  function targetSuccessCondition(targets, profile, setNumber) {
+    const statEquivalent = targets.length === 1 && targets[0].type === "stat-equivalent";
+    const threshold = Number(targets[0].value);
+    const title = statEquivalent
+      ? `주스탯 ${formatGrade(threshold)}%급 이상 조합`
+      : `${targetSetSummary(targets)} 이상 조합`;
     const content = element("div", "stat-combinations");
     const head = element("header", "stat-combinations__head");
     head.append(
@@ -1371,25 +1397,36 @@ function mountPotentialSystem({ system, onSystemChange }) {
       element(
         "h4",
         "stat-combinations__title",
-        `주스탯 ${formatGrade(threshold)}%급 이상 조합`,
+        title,
       ),
     );
     content.append(head);
 
-    const { combinations, totalCount, hiddenCount, truncated } =
-      getStatEquivalentSuccessCombinations({
-        tables,
+    const combinationOptions = {
+      tables: activeResetMethod().fixedFirstLine ? tables.slice(1) : tables,
+      limit: MAX_STAT_EQUIVALENT_COMBINATIONS,
+      sortDirection: state.statEquivalentSortDirection,
+    };
+    const { combinations, conditions, totalCount, hiddenCount, truncated } = statEquivalent
+      ? getStatEquivalentSuccessCombinations({
+        ...combinationOptions,
         target: threshold,
         profile,
-        limit: MAX_STAT_EQUIVALENT_COMBINATIONS,
-        sortDirection: state.statEquivalentSortDirection,
+      })
+      : getPotentialSuccessCombinations({
+        ...combinationOptions,
+        ...profile,
+        enemyDefense: Number(state.enemyDefense),
+        targets: targets.map(({ type, value }) => ({ targetType: type, target: Number(value) })),
       });
     if (combinations.length === 0) {
       content.append(
         element(
           "p",
           "stat-combinations__empty",
-          `현재 확률표에는 ${formatGrade(threshold)}%급 이상이 되는 옵션 조합이 없습니다.`,
+          statEquivalent
+            ? `현재 확률표에는 ${formatGrade(threshold)}%급 이상이 되는 옵션 조합이 없습니다.`
+            : "현재 확률표에는 모든 목표를 만족하는 옵션 조합이 없습니다.",
         ),
       );
       return content;
@@ -1400,7 +1437,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
     list.setAttribute("role", "region");
     list.setAttribute(
       "aria-label",
-      `주스탯 ${formatGrade(threshold)}%급 이상 옵션 조합`,
+      title,
     );
     combinations.forEach((combination) => {
       const item = element("li", "stat-combination");
@@ -1413,7 +1450,12 @@ function mountPotentialSystem({ system, onSystemChange }) {
         element(
           "span",
           "stat-combination__total",
-          `합계 ${formatOptionGrade(combination.score)}%급`,
+          statEquivalent
+            ? `합계 ${formatOptionGrade(combination.score)}%급`
+            : `합계 ${conditions.map(({ targetType }, index) => targetSummary({
+              type: targetType,
+              value: formatOptionGrade(combination.scores[index]),
+            })).join(" · ")}`,
         ),
       );
       list.append(item);
@@ -1430,34 +1472,11 @@ function mountPotentialSystem({ system, onSystemChange }) {
 
   function successConditions(targetSets, profile) {
     const list = element("div", "success-conditions");
-    let hasStatEquivalentTarget = false;
     targetSets.forEach((targetSet, index) => {
       if (index > 0) list.append(element("span", "success-conditions__or", "또는"));
       const item = element("div", "success-condition");
-      const statEquivalentTarget = targetSet.targets.length === 1 &&
-        targetSet.targets[0].type === "stat-equivalent"
-        ? targetSet.targets[0]
-        : null;
-      if (statEquivalentTarget) {
-        hasStatEquivalentTarget = true;
-        item.classList.add("success-condition--stat-equivalent");
-        item.append(
-          statEquivalentSuccessCondition(
-            statEquivalentTarget,
-            profile,
-            targetSet.number,
-          ),
-        );
-      } else {
-        item.append(
-          element("span", "success-condition__label", `세트 ${targetSet.number}`),
-          element(
-            "span",
-            "success-condition__value",
-            targetSetSummary(targetSet.targets),
-          ),
-        );
-      }
+      item.classList.add("success-condition--stat-equivalent");
+      item.append(targetSuccessCondition(targetSet.targets, profile, targetSet.number));
       list.append(item);
     });
     const node = details("성공 조건 보기", list);
@@ -1467,7 +1486,6 @@ function mountPotentialSystem({ system, onSystemChange }) {
       state.successConditionsOpen = node.open;
       persist();
     });
-    if (!hasStatEquivalentTarget) return node;
 
     const sortControls = chipRow(
       chip(
@@ -1491,7 +1509,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
     );
     sortControls.classList.add("success-condition-sort");
     sortControls.setAttribute("role", "group");
-    sortControls.setAttribute("aria-label", "주스탯 %급 성공 조건 정렬");
+    sortControls.setAttribute("aria-label", "성공 조건 정렬");
 
     const panel = element("div", "success-conditions-panel");
     panel.append(node, sortControls);
@@ -1517,6 +1535,12 @@ function mountPotentialSystem({ system, onSystemChange }) {
     return `1 / ${odds} · ${percentage}`;
   }
 
+  function formatRange(values, format) {
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    return min === max ? format(min) : `${format(min)} ~ ${format(max)}`;
+  }
+
   function reachChanceSection(result, methodInfo) {
     const attemptsMetric = metric("목표 도달 재설정", "-");
     const attemptsLabel = attemptsMetric.querySelector("span");
@@ -1534,17 +1558,22 @@ function mountPotentialSystem({ system, onSystemChange }) {
     }
     const updateReadout = (chancePercent) => {
       const attempts = calculateResetsForChance(
-        result.probability,
+        result.probability ?? result.probabilityRange?.[0] ?? 0,
         chancePercent / 100,
       );
       const chanceLabel = `${formatTargetChance(chancePercent)}% 도달`;
       attemptsLabel.textContent = `${chanceLabel} ${methodInfo.usesMeso ? "재설정" : "큐브"}`;
-      attemptsValue.textContent = formatAttempts(attempts);
+      attemptsValue.textContent = result.dependsOnFirstLine
+        ? formatRange(result.probabilityRange.map((probability) => calculateResetsForChance(probability, chancePercent / 100)), formatAttempts)
+        : formatAttempts(attempts);
       if (costLabel && costValue) {
         costLabel.textContent = `${chanceLabel} ${methodInfo.usesMeso ? "비용" : "큐브 사용 메소"}`;
-        costValue.textContent = Number.isFinite(attempts)
-          ? formatPotentialResetMeso(attempts * result.resetCost, methodInfo)
+        const costForAttempts = (count) => Number.isFinite(count)
+          ? formatPotentialResetMeso(count * result.resetCost, methodInfo)
           : "도달 불가";
+        costValue.textContent = result.dependsOnFirstLine
+          ? formatRange(result.probabilityRange.map((probability) => calculateResetsForChance(probability, chancePercent / 100)), costForAttempts)
+          : costForAttempts(attempts);
       }
     };
 
@@ -1704,7 +1733,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
       return section;
     }
     const section = createResultCard("기댓값");
-    const activeTargetSets = state.targetSets
+    const activeTargetSets = state[targetSetsKey()]
       .map((targetSet, index) => ({
         number: index + 1,
         targets: completeTargets(targetSet.targets),
@@ -1741,7 +1770,9 @@ function mountPotentialSystem({ system, onSystemChange }) {
     }
     const oneResetProbability = resultLine(
       "1회 재설정 확률",
-      formatOneResetProbability(result.probability),
+      result.dependsOnFirstLine
+        ? formatRange(result.probabilityRange, (probability) => formatProbability(probability, 8))
+        : formatOneResetProbability(result.probability),
       true,
     );
     oneResetProbability.classList.add("result__line--probability");
@@ -1749,13 +1780,17 @@ function mountPotentialSystem({ system, onSystemChange }) {
     const averageMetrics = [
       metric(
         methodInfo.usesMeso ? "평균 재설정" : "평균 큐브",
-        formatAttempts(result.expectedResets),
+        result.dependsOnFirstLine
+          ? formatRange(result.expectedResetsRange, formatAttempts)
+          : formatAttempts(result.expectedResets),
       ),
     ];
-    if (result.expectedCost !== null) {
+    if (result.resetCost !== null) {
       averageMetrics.push(metric(
         methodInfo.usesMeso ? "평균 비용" : "평균 큐브 사용 메소",
-        formatPotentialResetMeso(result.expectedCost, methodInfo),
+        result.dependsOnFirstLine
+          ? formatRange(result.expectedCostRange, (cost) => formatPotentialResetMeso(cost, methodInfo))
+          : formatPotentialResetMeso(result.expectedCost, methodInfo),
       ));
     }
     section.append(
@@ -1773,9 +1808,15 @@ function mountPotentialSystem({ system, onSystemChange }) {
       );
     }
 
+    if (methodInfo.fixedFirstLine) {
+      if (result.dependsOnFirstLine) section.append(note("첫 줄의 옵션 중복 제한에 따라 결과가 달라져 가능한 범위로 표시합니다.", "fine-print"));
+      section.append(note("첫 줄을 제외한 두 줄의 합계로 판정합니다. 현재 두 줄은 공식 분포로 평균하며, 목표 도달 확률별 횟수는 평균 기반 근사값입니다.", "fine-print"));
+    }
     if (!methodInfo.usesMeso) {
       section.append(note(
-        "장비 레벨별 큐브 사용 메소를 반영했습니다. 큐브 자체 가치는 포함하지 않습니다.",
+        methodInfo.revealCostBasis === "standard-cube-assumption"
+          ? "사용 메소는 기존 큐브와 같은 장비 레벨별 비용식으로 추정했습니다. 큐브 자체 가치는 포함하지 않습니다."
+          : "장비 레벨별 큐브 사용 메소를 반영했습니다. 큐브 자체 가치는 포함하지 않습니다.",
         "fine-print",
       ));
     }
@@ -1783,28 +1824,19 @@ function mountPotentialSystem({ system, onSystemChange }) {
   }
 
   function render() {
-    const grid = element("div", "calculator-grid");
-    grid.classList.add("calculator-grid--potential");
-    const controls = element("div", "calculator-column");
     const equipment = equipmentCard();
-    equipment.classList.add("calculator-equipment");
     const targets = targetCard();
-    targets.classList.add("calculator-targets");
-    const setup = element("div", "potential-setup-grid");
-    setup.append(equipment, targets);
     const profile = characterProfileCard({
       extraContent: manualCharacterSettings(),
       collapseReferenceDetails: true,
       equipmentMetric: system,
     });
     profile.classList.add("calculator-profile");
-    controls.append(setup, profile);
-    const results = element("aside", "calculator-result");
-    results.append(resultCard());
-    if (state.calculationMode === "options") {
-      results.append(savedTargetPresetCard());
-    }
-    grid.append(controls, results);
+    const results = [resultCard()];
+    if (state.calculationMode === "options") results.push(savedTargetPresetCard());
+    const grid = potentialCalculatorLayout({
+      equipment, targets, extraControls: [profile], results,
+    });
     renderWithFocus(root, [grid]);
   }
 

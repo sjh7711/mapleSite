@@ -7,6 +7,8 @@ import {
   calculateSoulAmplificationPath,
   calculateSoulPotentialRankUpExpected,
   calculateSoulPotentialRankUpStage,
+  calculateSoulPotentialExpected,
+  getSoulPotentialTables,
   getSoulAmplificationChance,
   getSoulAmplificationGauge,
   getSoulAutomaticEnhancementEligibility,
@@ -384,20 +386,53 @@ test("현재 등급의 천장 진행만 이어받고 등업 후 진행은 0에�
   );
 });
 
-test("미공개 소울 잠재 옵션표를 일반 잠재 표로 대신 계산하지 않는다", () => {
-  assert.equal(SOUL_REFORM_2026_09_17.potential.optionTypeWeights, null);
-  assert.equal(
-    SOUL_REFORM_2026_09_17.potential.optionValuesByAmplificationStage,
-    null,
-  );
-  assert.throws(() => assertSoulPotentialOptionTablesReady(), (error) => {
-    assert.match(
-      error.message,
-      /potential\.optionTypeWeights.*potential\.optionValuesByAmplificationStage/,
-    );
-    assert.doesNotMatch(error.message, /ether\.dropRates/);
-    return true;
-  });
+test("소울 옵션뽑기는 네 등급과 네 증폭 단계의 공식 표를 고정하여 계산한다", () => {
+  const costs = { rare: 20_000_000, epic: 40_000_000, unique: 65_000_000, legendary: 88_000_000 };
+  for (const [grade, cost] of Object.entries(costs)) {
+    for (const stage of [1, 2, 3, 4]) {
+      const tables = getSoulPotentialTables({ grade, stage });
+      const lines = tables.map((table) => {
+        const total = table.reduce((sum, option) => sum + option.probability, 0);
+        return table.map((option) => ({
+          attack: Number(option.name.match(/^공격력 \+([\d.]+)%$/)?.[1] ?? 0),
+          probability: option.probability / total,
+        }));
+      });
+      let expectedProbability = 0;
+      for (const first of lines[0]) for (const second of lines[1]) for (const third of lines[2]) {
+        if (first.attack + second.attack + third.attack >= 1.5) {
+          expectedProbability += first.probability * second.probability * third.probability;
+        }
+      }
+      const result = calculateSoulPotentialExpected({
+        grade, stage, mainStat: "STR", targetType: "attack-power-percent", target: 1.5,
+      });
+      assertClose(result.rawProbability, expectedProbability, 1e-12);
+      assert.equal(result.resetCost, cost);
+      assert.ok(Number.isFinite(result.expectedResets) && result.expectedResets > 0);
+      assertClose(result.expectedCost / result.expectedResets, cost, 1e-6);
+    }
+  }
+});
+
+test("소울 옵션뽑기는 하위 등급에 없는 목표를 등급 상승으로 달성한 것으로 계산하지 않는다", () => {
+  const goal = { stage: 4, mainStat: "STR", targetType: "boss-damage", target: 1 };
+  for (const grade of ["rare", "epic"]) {
+    const result = calculateSoulPotentialExpected({ ...goal, grade });
+    assert.equal(result.probability, 0);
+    assert.equal(result.expectedResets, Infinity);
+    assert.equal(result.expectedCost, Infinity);
+  }
+  assert.ok(calculateSoulPotentialExpected({ ...goal, grade: "legendary" }).probability > 0);
+  assert.throws(() => calculateSoulPotentialExpected({ ...goal, grade: "normal" }), /등급과 증폭 단계/);
+});
+
+test("공식 소울 잠재 옵션표는 공개됐지만 초기 부여 및 등업 직후 통합 모델은 보류한다", () => {
+  assert.ok(SOUL_REFORM_2026_09_17.potential.optionTypeWeights.snapshot);
+  assert.deepEqual(SOUL_REFORM_2026_09_17.potential.optionValuesByAmplificationStage.stages, [1, 2, 3, 4]);
+  assert.doesNotThrow(() => assertSoulPotentialOptionTablesReady());
+  assert.throws(() => assertSoulPotentialOptionTablesReady({ forInitialCreation: true }), /initialGradeAtStageOne/);
+  assert.throws(() => assertSoulPotentialOptionTablesReady({ forRankUp: true }), /rankUpResultRollOrder/);
 });
 
 test("소울 증폭·잠재 천장 진행 입력 범위를 검증한다", () => {

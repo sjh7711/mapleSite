@@ -10,12 +10,13 @@ export const POTENTIAL_GRADES = {
 };
 
 export const POTENTIAL_SYSTEMS = {
+  soul: { label: "소울 잠재능력", officialPage: "https://maplestory.nexon.com/Guide/OtherProbability/cube/Soulpotential" },
   regular: {
     label: "잠재능력",
     cubeItemId: "5062010",
     officialPage:
       "https://maplestory.nexon.com/Guide/OtherProbability/cube/black",
-    footerLabel: "잠재능력 재설정/블랙 큐브",
+    footerLabel: "잠재능력 재설정/블큐",
   },
   additional: {
     label: "에디셔널 잠재능력",
@@ -30,7 +31,7 @@ export const POTENTIAL_SYSTEMS = {
 export const POTENTIAL_TABLE_SOURCES = {
   regular: {
     system: "regular",
-    label: "잠재능력 재설정/블랙 큐브",
+    label: "잠재능력 재설정/블큐",
     cubeItemId: "5062010",
     officialPage:
       "https://maplestory.nexon.com/Guide/OtherProbability/cube/black",
@@ -38,7 +39,7 @@ export const POTENTIAL_TABLE_SOURCES = {
   },
   "regular-gold": {
     system: "regular",
-    label: "골드 큐브",
+    label: "골큐",
     cubeItemId: "2711004",
     officialPage:
       "https://maplestory.nexon.com/Guide/OtherProbability/cube/artisan",
@@ -46,7 +47,7 @@ export const POTENTIAL_TABLE_SOURCES = {
   },
   "regular-silver": {
     system: "regular",
-    label: "실버 큐브",
+    label: "실큐",
     cubeItemId: "2711003",
     officialPage:
       "https://maplestory.nexon.com/Guide/OtherProbability/cube/master",
@@ -54,7 +55,7 @@ export const POTENTIAL_TABLE_SOURCES = {
   },
   "regular-occult": {
     system: "regular",
-    label: "수상한 큐브",
+    label: "수큐",
     cubeItemId: "2711000",
     officialPage:
       "https://maplestory.nexon.com/Guide/OtherProbability/cube/strange",
@@ -62,7 +63,7 @@ export const POTENTIAL_TABLE_SOURCES = {
   },
   additional: {
     system: "additional",
-    label: "에디셔널 잠재능력 재설정/화이트 큐브",
+    label: "에디셔널 잠재능력 재설정/화에큐",
     cubeItemId: "5062500",
     officialPage:
       "https://maplestory.nexon.com/Guide/OtherProbability/cube/addi",
@@ -70,7 +71,7 @@ export const POTENTIAL_TABLE_SOURCES = {
   },
   "additional-bronze": {
     system: "additional",
-    label: "브론즈 에디셔널 큐브",
+    label: "브에큐",
     cubeItemId: "2730002",
     officialPage:
       "https://maplestory.nexon.com/Guide/OtherProbability/cube/strangeAddi",
@@ -118,6 +119,12 @@ const ADDITIONAL_BRONZE_LINE_RATES = {
  * 확률이며, `pity`가 없으면 등급 상승 보장 시스템이 없는 큐브다.
  */
 export const POTENTIAL_RESET_METHODS = {
+  soul: { meso: {
+    label: "소울 잠재능력 재설정", shortLabel: "메소", maxGrade: "legendary", usesMeso: true,
+    lineSameGrade: ADDITIONAL_STANDARD_LINE_RATES,
+    rankUp: { rare: 0.015, epic: 0.005875, unique: 0.003322 },
+    pity: { rare: 100, epic: 256, unique: 451 },
+  } },
   regular: {
     meso: {
       label: "메소 재설정",
@@ -130,8 +137,8 @@ export const POTENTIAL_RESET_METHODS = {
       pity: { rare: 10, epic: 42, unique: 107 },
     },
     black: {
-      label: "블랙 큐브",
-      shortLabel: "블랙 큐브",
+      label: "블큐",
+      shortLabel: "블큐",
       maxGrade: "legendary",
       tableSource: "regular",
       usesMeso: false,
@@ -140,8 +147,8 @@ export const POTENTIAL_RESET_METHODS = {
       pity: { rare: 10, epic: 42, unique: 107 },
     },
     gold: {
-      label: "골드 큐브",
-      shortLabel: "골드 큐브",
+      label: "골큐",
+      shortLabel: "골큐",
       maxGrade: "legendary",
       tableSource: "regular-gold",
       usesMeso: false,
@@ -149,9 +156,16 @@ export const POTENTIAL_RESET_METHODS = {
       rankUp: { rare: 0.079994, epic: 0.016959, unique: 0.001996 },
       pity: null,
     },
+    prime: {
+      label: "프큐", shortLabel: "프큐",
+      minGrade: "legendary", maxGrade: "legendary", tableSource: "regular",
+      // 250제 125만 메소 실사용 제보와 사용자 승인에 따라 기존 큐브 비용식을 적용한다.
+      usesMeso: false, fixedFirstLine: true, revealCostBasis: "standard-cube-assumption", lineSameGrade: REGULAR_BLACK_LINE_RATES,
+      rankUp: {}, pity: null,
+    },
     silver: {
-      label: "실버 큐브",
-      shortLabel: "실버 큐브",
+      label: "실큐",
+      shortLabel: "실큐",
       maxGrade: "unique",
       tableSource: "regular-silver",
       usesMeso: false,
@@ -160,8 +174,8 @@ export const POTENTIAL_RESET_METHODS = {
       pity: null,
     },
     occult: {
-      label: "수상한 큐브",
-      shortLabel: "수상한 큐브",
+      label: "수큐",
+      shortLabel: "수큐",
       maxGrade: "epic",
       tableSource: "regular-occult",
       usesMeso: false,
@@ -182,8 +196,8 @@ export const POTENTIAL_RESET_METHODS = {
       pity: { rare: 62, epic: 152, unique: 214 },
     },
     white: {
-      label: "화이트 큐브",
-      shortLabel: "화이트 큐브",
+      label: "화에큐",
+      shortLabel: "화에큐",
       maxGrade: "legendary",
       tableSource: "additional",
       usesMeso: false,
@@ -191,9 +205,15 @@ export const POTENTIAL_RESET_METHODS = {
       rankUp: { rare: 0.047619, epic: 0.019608, unique: 0.007 },
       pity: { rare: 31, epic: 76, unique: 214 },
     },
+    prime: {
+      label: "프에큐", shortLabel: "프에큐",
+      minGrade: "legendary", maxGrade: "legendary", tableSource: "additional",
+      usesMeso: false, fixedFirstLine: true, revealCostBasis: "standard-cube-assumption", lineSameGrade: ADDITIONAL_STANDARD_LINE_RATES,
+      rankUp: {}, pity: null,
+    },
     bronze: {
-      label: "브론즈 에디셔널 큐브",
-      shortLabel: "브론즈 큐브",
+      label: "브에큐",
+      shortLabel: "브에큐",
       maxGrade: "epic",
       tableSource: "additional-bronze",
       usesMeso: false,
@@ -223,7 +243,8 @@ export function getAvailablePotentialResetMethods(system, grade) {
     throw new RangeError("지원하지 않는 잠재 종류 또는 등급입니다.");
   }
   return Object.entries(methods)
-    .filter(([, method]) => gradeIndex(method.maxGrade) >= currentGradeIndex)
+    .filter(([, method]) => gradeIndex(method.maxGrade) >= currentGradeIndex &&
+      currentGradeIndex >= gradeIndex(method.minGrade ?? "rare"))
     .map(([id, method]) => ({ id, ...method }));
 }
 
@@ -236,7 +257,8 @@ export function getPotentialRankUpInfo({
   const config = getPotentialResetMethod(system, method);
   const currentGradeIndex = gradeIndex(grade);
   const maxGradeIndex = gradeIndex(config.maxGrade);
-  if (currentGradeIndex === -1 || currentGradeIndex > maxGradeIndex) {
+  if (currentGradeIndex === -1 || currentGradeIndex > maxGradeIndex ||
+      currentGradeIndex < gradeIndex(config.minGrade ?? "rare")) {
     throw new RangeError("선택한 등급에는 이 재설정 수단을 사용할 수 없습니다.");
   }
   const nextGrade = POTENTIAL_GRADE_ORDER[currentGradeIndex + 1] ?? null;
@@ -1383,9 +1405,12 @@ export function getPotentialResetCost(
   if (currentGradeIndex === -1 || !POTENTIAL_SYSTEMS[system]) {
     throw new RangeError("지원하지 않는 잠재 종류 또는 등급입니다.");
   }
-  if (currentGradeIndex > gradeIndex(resetMethod.maxGrade)) {
+  if (currentGradeIndex > gradeIndex(resetMethod.maxGrade) ||
+      currentGradeIndex < gradeIndex(resetMethod.minGrade ?? "rare")) {
     throw new RangeError("선택한 등급에는 이 재설정 수단을 사용할 수 없습니다.");
   }
+  if (resetMethod.revealCostVerified === false) return null;
+  if (system === "soul") return [20_000_000, 40_000_000, 65_000_000, 88_000_000][currentGradeIndex];
   if (!resetMethod.usesMeso) return getPotentialCubeRevealCost(itemLevel);
 
   const costTable =
@@ -1901,6 +1926,105 @@ export function calculatePotentialOptionStatEquivalent(options) {
   });
 }
 
+/**
+ * 목표를 만족하는 실제 옵션 조합을 표시용으로 열거한다.
+ * 확률 계산과 같은 누적·목표 확장·중복 제한을 사용한다. 목표에 기여하지
+ * 않는 줄은 생략하며, 성공한 조합에 유효 옵션이 더 붙는 상위 조합도 남긴다.
+ * 프라임의 표시에는 호출자가 고정 첫 줄을 제외한 두 줄 표를 전달한다.
+ */
+export function getPotentialSuccessCombinations({
+  tables,
+  targets,
+  mainStat,
+  subStat = getDefaultSubStat(mainStat),
+  subStats,
+  attackType = getDefaultAttackType(mainStat),
+  characterLevel,
+  statEquivalence = STAT_EQUIVALENCE,
+  enemyDefense = 380,
+  limit = 100,
+  sortDirection = "asc",
+}) {
+  const context = {
+    mainStat, subStat: subStat === "none" ? null : subStat, subStats,
+    attackType, characterLevel, statEquivalence, enemyDefense,
+  };
+  if (!Array.isArray(targets) || targets.length === 0) {
+    throw new RangeError("하나 이상의 성공 조건이 필요합니다.");
+  }
+  for (const condition of targets) validateCalculationOptions({ ...context, ...condition });
+  const conditions = expandAllStatTargetConditions(targets);
+  const scoresFor = (state) => conditions.map(({ targetType }) =>
+    getTargetScore({ ...context, state, targetType })
+  );
+  const compareScores = (left, right) => {
+    for (let index = 0; index < left.length; index += 1) {
+      if (left[index] !== right[index]) return left[index] - right[index];
+    }
+    return 0;
+  };
+  const compareNames = (left, right) => left.localeCompare(right, "ko");
+  const lines = tables.map((line) => {
+    const seen = new Set();
+    return enrichTable(line.filter((option) => {
+      if (!(option.probability > 0) || seen.has(option.name)) return false;
+      seen.add(option.name);
+      return true;
+    })).map((option) => ({
+      ...option,
+      scores: scoresFor(addMetrics(createState(), option.metrics, option.name)),
+    })).filter(({ scores }) => scores.some((score) => score > Number.EPSILON));
+  });
+  const combinations = new Map();
+  function visit(lineIndex, state, restrictions, options) {
+    if (lineIndex === lines.length) {
+      if (!options.length) return;
+      const scores = scoresFor(state);
+      if (!conditions.every(({ target }, index) => scores[index] + Number.EPSILON >= target)) return;
+      const names = options.map(({ name }) => name).toSorted(compareNames);
+      const key = JSON.stringify(names);
+      if (combinations.has(key)) return;
+      combinations.set(key, {
+        options: options.toSorted((left, right) =>
+          compareScores(right.scores, left.scores) || compareNames(left.name, right.name)
+        ).map(({ name }) => ({ name })),
+        scores,
+        nameKey: names.join("\u0000"),
+      });
+      return;
+    }
+    visit(lineIndex + 1, state, restrictions, options);
+    for (const option of lines[lineIndex]) {
+      const restriction = option.restriction;
+      if (restriction && (restrictions[restriction.key] ?? 0) >= restriction.max) continue;
+      visit(
+        lineIndex + 1,
+        addMetrics(state, option.metrics, option.name),
+        restriction
+          ? { ...restrictions, [restriction.key]: (restrictions[restriction.key] ?? 0) + 1 }
+          : restrictions,
+        [...options, option],
+      );
+    }
+  }
+  visit(0, createState(), {}, []);
+  const direction = sortDirection === "desc" ? -1 : 1;
+  const ordered = [...combinations.values()].toSorted((left, right) =>
+    direction * compareScores(left.scores, right.scores) ||
+    left.options.length - right.options.length ||
+    compareNames(left.nameKey, right.nameKey)
+  );
+  const maximum = Number.isFinite(Number(limit)) ? Math.max(0, Math.floor(Number(limit))) : 100;
+  const visible = ordered.slice(0, maximum).map(({ nameKey, ...combination }) => combination);
+  return {
+    conditions,
+    combinations: visible,
+    totalCount: ordered.length,
+    hiddenCount: ordered.length - visible.length,
+    truncated: ordered.length > visible.length,
+  };
+}
+
 /** 1회 성공 확률로 목표 누적 확률에 도달하는 최소 재설정 횟수를 계산한다. */
 export function calculateResetsForChance(probability, chance) {
   const successProbability = Number(probability);
@@ -1922,8 +2046,19 @@ export function calculateResetsForChance(probability, chance) {
   );
 }
 
+/** 프라임 큐브의 고정 첫 줄도 전체 목표와 중복 제한에 참여한다. */
+export function getFixedFirstPotentialTables(tables, fixedFirstOption) {
+  const option = tables?.[0]?.find((entry) => entry.name === fixedFirstOption);
+  if (!option) throw new RangeError("현재 첫 번째 옵션을 입력해 주세요.");
+  return [[{ ...option, probability: 1 }], ...tables.slice(1)];
+}
+
 export function calculatePotentialExpected({
   tables,
+  fixedFirstOption = null,
+  lineTargets = null,
+  lineTargetSets = null,
+  ignoreFirstLine = false,
   target,
   targetType = "stat-percent",
   targets,
@@ -1942,7 +2077,14 @@ export function calculatePotentialExpected({
 }) {
   if (subStat === "none") subStat = null;
   let rawConditionSets;
-  if (targetSets !== undefined) {
+  const lineConditionSets = lineTargets !== null ? [lineTargets] : lineTargetSets;
+  if (lineConditionSets !== null) {
+    if (!Array.isArray(lineConditionSets) || !lineConditionSets.length || lineConditionSets.some((set) =>
+      !Array.isArray(set) || set.length !== 2 || !set.some(Boolean))) {
+      throw new RangeError("둘째·셋째 줄에 하나 이상의 목표를 입력해 주세요.");
+    }
+    rawConditionSets = lineConditionSets.map((set) => set.filter(Boolean));
+  } else if (targetSets !== undefined) {
     if (!Array.isArray(targetSets) || !targetSets.length) {
       throw new RangeError("하나 이상의 옵션 세트를 입력해 주세요.");
     }
@@ -1974,15 +2116,23 @@ export function calculatePotentialExpected({
   }
   const conditionSets = rawConditionSets.map(expandAllStatTargetConditions);
 
-  const enriched = tables.map(enrichTable);
+  const methodConfig = getPotentialResetMethod(system, resetMethod);
+  if (methodConfig.fixedFirstLine && grade !== "legendary") {
+    throw new RangeError("프라임 큐브는 레전드리 등급에만 사용할 수 있습니다.");
+  }
+  const effectiveTables = methodConfig.fixedFirstLine
+    ? getFixedFirstPotentialTables(tables, fixedFirstOption)
+    : tables;
+  const enriched = effectiveTables.map(enrichTable);
   let successProbability = 0;
   let totalProbability = 0;
   let failureRepeatWeight = 0;
+  let failureCollision = 0;
 
-  function visit(lineIndex, probability, state, restrictions) {
+  function visit(lineIndex, probability, state, restrictions, lineMatches = lineConditionSets?.map(() => true)) {
     if (lineIndex === enriched.length) {
       totalProbability += probability;
-      const success = conditionSets.some((conditions) => {
+      const success = lineConditionSets ? lineMatches.some(Boolean) : conditionSets.some((conditions) => {
         const scores = new Map();
         return conditions.every((condition) => {
           if (!scores.has(condition.targetType)) {
@@ -2007,6 +2157,7 @@ export function calculatePotentialExpected({
       if (success) successProbability += probability;
       else if (probability > 0 && probability < 1) {
         failureRepeatWeight += probability / (1 - probability);
+        failureCollision += probability ** 2;
       }
       return;
     }
@@ -2031,8 +2182,16 @@ export function calculatePotentialExpected({
       visit(
         lineIndex + 1,
         probability * (option.probability / availableWeight),
-        addMetrics(state, option.metrics, option.name),
+        ignoreFirstLine && lineIndex === 0 ? state : addMetrics(state, option.metrics, option.name),
         nextRestrictions,
+        lineConditionSets?.map((conditions, index) => {
+          const condition = conditions[lineIndex - 1];
+          return lineMatches[index] && (!condition || getTargetScore({
+            state: addMetrics(createState(), option.metrics, option.name),
+            targetType: condition.targetType,
+            mainStat, subStat, subStats, attackType, characterLevel, statEquivalence, enemyDefense,
+          }) + Number.EPSILON >= condition.target);
+        }),
       );
     }
   }
@@ -2040,7 +2199,7 @@ export function calculatePotentialExpected({
   visit(0, 1, createState(), {});
   const rawProbability =
     totalProbability > 0 ? successProbability / totalProbability : 0;
-  const probability = adjustedNextResultProbability({
+  let probability = adjustedNextResultProbability({
     successProbability: rawProbability,
     failureRepeatWeight,
   });
@@ -2050,18 +2209,62 @@ export function calculatePotentialExpected({
     system,
     resetMethod,
   );
-  const expectedResets = probability > 0 ? 1 / probability : Infinity;
-  const expectedCost = resetCost === null ? null : expectedResets * resetCost;
+  const averageCurrentResult = methodConfig.fixedFirstLine || system === "soul";
+  const expectedResets = averageCurrentResult && rawProbability > 0
+    ? (1 - (rawProbability < 1 ? failureCollision / totalProbability ** 2 / (1 - rawProbability) : 0)) / rawProbability
+    : probability > 0 ? 1 / probability : Infinity;
+  if (averageCurrentResult) probability = expectedResets > 0 ? Math.min(1, 1 / expectedResets) : rawProbability;
+  const expectedCost = resetCost === null ? null
+    : Number.isFinite(expectedResets) ? expectedResets * resetCost : Infinity;
 
   return {
     probability,
     rawProbability,
+    averageCurrentResult,
     sameResultExcluded: true,
     expectedResets,
     expectedCost,
     resetCost,
     resets50: calculateResetsForChance(probability, 0.5),
     resets95: calculateResetsForChance(probability, 0.95),
+  };
+}
+
+/**
+ * First-line-free Prime UI: aggregate targets apply to the second and third lines.
+ * Explicit lineTargets/lineTargetSets remain available for line-specific callers.
+ * Unknown fixed first lines are grouped by their official duplicate restrictions.
+ * If those restrictions change the result, return bounds instead of inventing a
+ * probability distribution for the user's current first line.
+ */
+export function calculatePrimePotentialExpected(options) {
+  const { tables, lineTargets } = options;
+  const representatives = new Map();
+  for (const entry of tables?.[0] ?? []) {
+    const restriction = getRestriction(entry.name);
+    const key = restriction ? `${restriction.key}:${restriction.max}` : "none";
+    if (!representatives.has(key)) representatives.set(key, entry.name);
+  }
+  if (!representatives.size) throw new RangeError("공식 첫 줄 확률표가 없습니다.");
+  const variants = [...representatives.values()].map((fixedFirstOption) => calculatePotentialExpected({
+    ...options, resetMethod: "prime", fixedFirstOption, ignoreFirstLine: true, lineTargets,
+  }));
+  const bounds = (key) => [Math.min(...variants.map((value) => value[key])), Math.max(...variants.map((value) => value[key]))];
+  const expectedResetsRange = bounds("expectedResets");
+  const expectedCostRange = variants[0].resetCost === null ? null : bounds("expectedCost");
+  const probabilityRange = bounds("probability");
+  const rawProbabilityRange = bounds("rawProbability");
+  const [min, max] = expectedResetsRange;
+  const dependsOnFirstLine = min !== max && (!Number.isFinite(max) || Math.abs(max - min) > 1e-9 * Math.max(1, max));
+  return {
+    ...variants[0], dependsOnFirstLine, expectedResetsRange, expectedCostRange, probabilityRange, rawProbabilityRange,
+    expectedResets: dependsOnFirstLine ? null : variants[0].expectedResets,
+    expectedCost: dependsOnFirstLine ? null : variants[0].expectedCost,
+    probability: dependsOnFirstLine ? null : variants[0].probability,
+    rawProbability: dependsOnFirstLine ? null : variants[0].rawProbability,
+    resets50: dependsOnFirstLine ? null : variants[0].resets50,
+    resets95: dependsOnFirstLine ? null : variants[0].resets95,
+    variants,
   };
 }
 

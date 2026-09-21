@@ -32,9 +32,10 @@ test("모든 계산기 폭과 상단 글꼴은 스타포스 기준을 공유한�
 });
 
 test("계산기 탐색은 1280px부터 아이콘 레일, 더 좁으면 제목 옆 서랍을 제공한다", async () => {
-  const [shell, css] = await Promise.all([
+  const [shell, css, nav] = await Promise.all([
     read("../src/shared/shell.js"),
     read("../src/style.css"),
+    read("../src/shared/tool-nav.js"),
   ]);
 
   assert.match(shell, /const TOOLNAV_DESKTOP_QUERY = "\(min-width: 1280px\)"/);
@@ -47,13 +48,13 @@ test("계산기 탐색은 1280px부터 아이콘 레일, 더 좁으면 제목 �
   assert.match(css, /@media \(min-width: 1280px\)[\s\S]*?\.toolnav\s*{/);
   assert.match(css, /@media \(min-width: 1700px\)[\s\S]*?\.toolnav\s*{/);
   assert.match(shell, /classList\.add\("toolnav__icon"\)/);
-  assert.match(shell, /potential:\s*"tool-icons\/black-cube\.png"/);
-  assert.match(shell, /additional:\s*"tool-icons\/white-additional-cube\.png"/);
-  assert.doesNotMatch(shell, /\{ id: "additional", name: "에디셔널"/u);
-  assert.match(shell, /"add-option":\s*"tool-icons\/black-rebirth-flame\.png"/);
-  assert.match(shell, /scroll:\s*"tool-icons\/spell-trace\.png"/);
-  assert.match(shell, /ability:\s*"tool-icons\/large-boss-medal\.png"/);
-  assert.match(shell, /pet:\s*"tool-icons\/wisp-wonderberry\.png"/);
+  assert.match(nav, /potential:\s*"tool-icons\/black-cube\.png"/);
+  assert.match(nav, /additional:\s*"tool-icons\/white-additional-cube\.png"/);
+  assert.doesNotMatch(nav, /\{ id: "additional", name: "에디셔널"/u);
+  assert.match(nav, /"add-option":\s*"tool-icons\/black-rebirth-flame\.png"/);
+  assert.match(nav, /scroll:\s*"tool-icons\/spell-trace\.png"/);
+  assert.match(nav, /ability:\s*"tool-icons\/large-boss-medal\.png"/);
+  assert.match(nav, /pet:\s*"tool-icons\/wisp-wonderberry\.png"/);
   assert.match(shell, /icon\.src = `\$\{root\}\$\{itemIconPath\}`/);
   assert.match(css, /\.toolnav__icon--starforce\s*{[^}]*fill:\s*#ffd928/s);
   assert.match(css, /\.toolnav__icon--item\s*{[^}]*image-rendering:\s*pixelated/s);
@@ -134,9 +135,10 @@ test("계산기 페이지 제목 아래의 장식 설명을 표시하지 않는�
 });
 
 test("통합 잠재 계산기는 장비 등급 위에서 잠재 종류를 바꾸고 목표 카드와 나란히 배치한다", async () => {
-  const [source, css] = await Promise.all([
+  const [source, css, form] = await Promise.all([
     read("../src/shared/potential-page.js"),
     read("../src/calculator.css"),
+    read("../src/shared/potential-form-ui.js"),
   ]);
 
   assert.match(
@@ -149,8 +151,9 @@ test("통합 잠재 계산기는 장비 등급 위에서 잠재 종류를 바꾸
   );
   assert.match(source, /chip\("윗잠", system === "regular"/u);
   assert.match(source, /chip\("아랫잠", system === "additional"/u);
-  assert.match(source, /const setup = element\("div", "potential-setup-grid"\)/);
-  assert.match(source, /setup\.append\(equipment, targets\)/);
+  assert.match(source, /potentialCalculatorLayout\(\{/);
+  assert.match(form, /const setup = element\("div", "potential-setup-grid"\)/);
+  assert.match(form, /setup\.append\(equipment, targets\)/);
   assert.match(
     css,
     /\.page--calculator \.potential-setup-grid\s*{[^}]*grid-template-columns:\s*minmax\(280px, 0\.8fr\) minmax\(360px, 1\.2fr\);/s,

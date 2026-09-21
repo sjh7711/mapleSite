@@ -1,3 +1,9 @@
+import soulTables from "./data/soul-potential-2026-09-17.json" with { type: "json" };
+import { calculatePotentialExpected } from "./potential.js";
+export {
+  calculateSoulAmplificationReachForChance,
+  calculateSoulPotentialRankUpReachForChance,
+} from "./soul-reach.js";
 import {
   SOUL_REFORM_2026_09_17,
   assertReform20260917Ready,
@@ -110,6 +116,7 @@ export function calculateSoulAmplificationExpected({
       reachProbability,
       successProbabilityGivenAttempt,
       successProbability,
+      costMeso: attempt * config.mesoPerAttempt + Math.max(0, attempt - stock) * etherPrice,
     });
     survival *= 1 - successProbabilityGivenAttempt;
   }
@@ -458,3 +465,21 @@ export function getSoulReapplicationEligibility({
 }
 
 export { SOUL_REFORM_2026_09_17 };
+
+/** Official option tables are selected by soul amplification stage, never weapon level. */
+export function getSoulPotentialTables({ grade = "legendary", stage } = {}) {
+  const gradeId = GRADE_ORDER.indexOf(grade) + 1;
+  const tables = soulTables.tables[`${gradeId}:${stage}`];
+  if (!tables) throw new RangeError("소울 잠재 등급과 증폭 단계(1~4)를 확인해 주세요.");
+  return structuredClone(tables);
+}
+
+export function calculateSoulPotentialExpected({ stage, grade = "legendary", ...options } = {}) {
+  // 사용자가 선택한 등급을 고정해 옵션만 재설정한다.
+  // 등급 상승 확률·천장·상위 등급 옵션은 이 계산에 섞지 않는다.
+  assertSoulPotentialOptionTablesReady();
+  return calculatePotentialExpected({
+    ...options, tables: getSoulPotentialTables({ grade, stage }),
+    system: "soul", resetMethod: "meso", grade, itemLevel: 200,
+  });
+}

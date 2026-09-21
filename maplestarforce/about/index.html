@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>사이트 소개·문의·이용 안내 | Maple Starforce</title>
+    <meta name="description" content="Maple Starforce는 메이플스토리 강화 비용과 확률을 비교하는 비공식 계산기입니다. 제공 기능, 기댓값 해석, 오류 신고 방법을 안내합니다." />
+    <link rel="canonical" href="https://starforce.pages.dev/about/" />
+    <link rel="icon" type="image/svg+xml" href="../tool-icons/starforce-star.svg" />
+    <link rel="stylesheet" href="../src/style.css" />
+    <link rel="stylesheet" href="../src/site-info.css" />
+  </head>
+  <body class="page--info">
+    <main class="page">
+      <header class="info-header">
+        <a class="info-home" href="/">← Maple Starforce 계산기</a>
+        <h1>소개·문의·이용 안내</h1>
+        <p>강화하기 전에, 목표와 비용을 비교해 보세요.</p>
+      </header>
+      <nav class="info-nav" aria-label="사이트 안내">
+        <a href="/about/" aria-current="page">소개·문의</a>
+        <a href="/privacy/">개인정보처리방침</a>
+        <a href="/sources/">데이터·확률 출처</a>
+      </nav>
+      <article class="info-content" aria-label="사이트 소개와 이용 안내">
+        <section>
+          <h2>Maple Starforce는 어떤 사이트인가요?</h2>
+          <p>메이플스토리의 장비 강화와 확률형 시스템에서 목표를 정하고 예상 비용을 비교할 수 있도록 만든 무료 계산기입니다. 장비 여러 개의 스타포스 계획을 합산하거나, 목표 옵션과 재료 가격을 바꾸면서 선택에 따른 비용 차이를 살펴볼 수 있습니다.</p>
+          <p>Maple Starforce 운영자가 관리하는 비공식 팬 서비스입니다. 넥슨이 운영하거나 제휴·보증하는 서비스가 아닙니다.</p>
+        </section>
+        <section>
+          <h2>제공하는 계산기</h2>
+          <dl>
+            <dt><a href="/">스타포스</a></dt>
+            <dd>여러 장비의 시작·목표 성수, 스페어 가격, 이벤트와 할인 조건을 반영해 평균 강화 비용을 비교합니다.</dd>
+            <dt><a href="/potential/">잠재능력·에디셔널</a></dt>
+            <dd>장비와 등급, 목표 옵션 조합에 따른 재설정 기댓값을 계산합니다. 캐릭터 정보를 이용한 능력치 환산도 지원합니다.</dd>
+            <dt><a href="/ability/">어빌리티</a></dt>
+            <dd>목표 옵션, 등급과 잠금 조건에 따라 명성치·서큘레이터 소모량을 비교합니다.</dd>
+            <dt><a href="/add-option/">추가옵션</a></dt>
+            <dd>장비와 목표 추옵을 설정해 환생의 불꽃별 성공 확률과 예상 비용을 살펴봅니다.</dd>
+            <dt><a href="/scroll/">주문서</a></dt>
+            <dd>주문의 흔적 강화와 복구·초기화 조건을 조합해 비용과 다음 행동을 비교합니다.</dd>
+            <dt><a href="/pet/">자석펫</a></dt>
+            <dd>원더베리, 루나 크리스탈 합성과 경매장 재료 조달 비용을 반영해 루나 쁘띠 획득 기댓값을 계산합니다.</dd>
+            <dt><a href="/soul/">소울</a></dt>
+            <dd>소울 증폭과 등급 업, 목표 잠재능력에 필요한 평균 횟수와 비용을 계산합니다.</dd>
+          </dl>
+        </section>
+        <section id="usage">
+          <h2>이용 안내: 결과를 이렇게 읽어 주세요</h2>
+          <p><strong>기댓값은 같은 조건을 매우 많이 반복했을 때의 평균입니다.</strong> 예를 들어 계산 결과가 평균 10회여도 10회 안에 반드시 성공한다는 뜻은 아닙니다. 실제 시도에서는 평균보다 적게 들거나 훨씬 많이 들 수 있습니다.</p>
+          <ul>
+            <li>게임·장비 조건과 이벤트 적용 여부를 먼저 확인해 주세요. 화면에서 선택한 규칙을 기준으로 계산합니다.</li>
+            <li>재료·스페어·회수 가격은 결과에 영향을 줍니다. 기본값이 현재 경매장 가격과 같다고 가정하지 말고 직접 확인해 입력해 주세요.</li>
+            <li>패치, 확률표 변경, API 지연 또는 지원하지 않는 장비 조건 때문에 게임과 차이가 생길 수 있습니다. 실제 강화 전에 공식 안내와 게임 화면을 함께 확인해 주세요.</li>
+            <li>캐릭터 조회에 장애가 있을 때는 조회 결과가 갱신되지 않거나 이전 캐시를 사용할 수 있습니다. 표시된 장비와 조건을 확인해 주세요.</li>
+          </ul>
+          <p>기능과 계산 기준은 오류 수정이나 게임 변경에 따라 갱신될 수 있습니다. 확률·이미지·외부 자료의 근거는 <a href="/sources/">출처 안내</a>에서 확인할 수 있습니다.</p>
+        </section>
+        <section id="contact">
+          <h2>문의와 오류 신고</h2>
+          <p>운영자 문의: <a href="mailto:apfhd159862@naver.com">apfhd159862@naver.com</a></p>
+          <p>계산 결과가 이상하다면 아래 정보를 보내 주세요. 같은 조건으로 재현할 수 있어야 원인을 확인하기 쉽습니다.</p>
+          <ul>
+            <li>사용한 계산기의 주소와 문제가 발생한 시각</li>
+            <li>장비·등급·목표·가격·이벤트 등 입력 조건</li>
+            <li>실제 나온 결과와 예상한 결과, 비교한 공식 자료가 있다면 해당 링크</li>
+            <li>화면 문제라면 브라우저 종류와 모바일·PC 여부</li>
+          </ul>
+          <p>스크린샷에는 계정 정보 등 불필요한 개인정보를 가려 주세요. 보낸 이메일과 첨부 자료의 처리는 <a href="/privacy/">개인정보처리방침</a>에서 안내합니다.</p>
+        </section>
+        <section>
+          <h2>최근 사이트 안내 변경</h2>
+          <p><time datetime="2026-09-16">2026년 9월 16일</time>: 사이트 소개, 개인정보처리방침, 데이터·확률 출처와 공통 안내 링크를 추가했습니다. 이 날짜는 사이트 안내의 변경일이며 모든 게임 데이터의 기준일을 뜻하지 않습니다.</p>
+        </section>
+      </article>
+      <!-- site-footer -->
+    </main>
+  </body>
+</html>

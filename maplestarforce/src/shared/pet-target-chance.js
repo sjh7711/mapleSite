@@ -139,7 +139,7 @@ export function calculatePetTargetChanceProjection(result, chancePercent) {
     );
     const purchaseUnitLabel =
       bundlePurchase?.policy?.purchaseUnitLabel ?? "묶음";
-    const wonderBlackEvent = bundlePurchase?.wonderBlackEvent === true;
+    const wonderBlackEvent = bundlePurchase?.wonderBlackEvent ?? false;
     const purchasedBundles = bundlesForTargetChance(
       targetCount,
       requestedChance,

@@ -21,6 +21,25 @@ declare module "maple-core/stat-profile" {
 }
 
 declare module "maple-core/stat-efficiency" {
+  export function equipmentSoulOptionLines(item: Record<string, unknown>): string[];
+  export function characterBaselineSkillSummary(
+    skillData: Array<Record<string, unknown>>,
+  ): Array<{
+    name: string;
+    level: number;
+    kind: "event" | "common-passive";
+    includedInBaseline: boolean;
+    effects: {
+      attack: number;
+      magic: number;
+      allStat: number;
+      damage: number;
+      bossDamage: number;
+      criticalRate: number;
+      criticalDamage: number;
+      ignoreDefenseSources: number[];
+    };
+  }>;
   export type StatEquivalenceByStat = Record<string, number>;
 
   export type StatEquivalenceResult = Record<

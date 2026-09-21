@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test, { after, before } from "node:test";
@@ -438,7 +438,7 @@ test("환산 계약 버전으로 이전 단일 부스탯 캐시와 키를 분리
     versionedUrl.searchParams.get("conversionVersion"),
     characterConversionCacheVersion,
   );
-  assert.equal(characterConversionCacheVersion, "combat-profile-v65");
+  assert.equal(characterConversionCacheVersion, "combat-profile-v67");
   const freshSnapshotKey = createSnapshotCacheKey(request, "테스트", "fresh");
   const staleSnapshotKey = createSnapshotCacheKey(request, "테스트", "stale");
   assert.equal(characterSnapshotCacheVersion, "character-snapshot-v2");
@@ -563,7 +563,7 @@ test("manual 정책을 적용하고 선택 장비의 환산 요약만 응답한�
   // 있으면 알려진 장비군은 선택 프리셋 기준으로 다시 계산한다.
   assert.deepEqual(body.warnings, []);
   assert.equal(body.equipmentSummary.presetNo, 2);
-  assert.equal(body.equipmentSummary.version, 11);
+  assert.equal(body.equipmentSummary.version, 12);
   assert.equal(body.equipmentSummary.items[0].name, "테스트 프리셋 모자");
   assert.equal(body.equipmentSummary.items[0].potentialGrade, "레전드리");
   assert.ok(body.equipmentSummary.items[0].potentialMainStatPercent > 0);
@@ -691,6 +691,12 @@ test("/id 후 공개 스냅샷을 제한 속도·4개 이하 동시성으로 조
     },
     soulName: null,
     soulOption: null,
+    soulActive: null,
+    soulAttack: null,
+    soulMagic: null,
+    soulPotentialGrade: null,
+    soulAmplification: null,
+    soulPotentialLines: [],
   });
   assert.equal(body.equipmentSummary.items[0].potentialMainStatPercent, 100);
   assert.ok(body.equipmentSummary.items[0].additionalMainStatPercent > 0);
@@ -1507,4 +1513,52 @@ test("잘못된 캐릭터명과 cross-origin 요청은 NEXON 호출 전에 거�
     null,
   );
   assert.equal(calls, 0);
+});
+
+test('공식 API의 새 소울 필드를 장비 툴팁에 전달한다', async () => {
+  const response=await handleCharacterConversion(createContext(apiRequest()),{
+    cache:null,sleep:async()=>{},fetchImpl:async input=>{
+      const url=new URL(input),payload=nexonPayload(url);
+      if(url.pathname.endsWith('/character/item-equipment')) Object.assign(payload.item_equipment.find(item=>item.item_equipment_slot==='무기'),{
+        soul_name:'위대한 루시드의 소울 적용',soul_option:'공격력 +3%',soul_active:'1',
+        soul_pad:'20',soul_mad:'0',soul_potential_grade:'레전드리',soul_potential_amplified_grade:2,
+        soul_potential_option_1:'공격력 +4%',soul_potential_option_2:'공격력 +3%',soul_potential_option_3:'공격력 +3%',
+      });
+      return Response.json(payload);
+    },
+  });
+  assert.equal(response.status,200);
+  const body=await response.json(),tooltip=body.equipmentSummary.items.find(item=>item.slot==='무기').tooltip;
+  assert.equal(tooltip.soulActive,true);
+  assert.equal(tooltip.soulAttack,20);
+  assert.equal(tooltip.soulAmplification,2);
+  assert.equal(tooltip.soulPotentialGrade,'레전드리');
+  assert.deepEqual(tooltip.soulPotentialLines,['공격력 +4%','공격력 +3%','공격력 +3%']);
+  assert.equal(body.profiles.fullBoss.details.attackPercent,50+12+13);
+});
+
+
+test("현재 이벤트 두 개와 신규 공용 패시브 내역을 기본·풀도핑 응답에 함께 전달한다", async () => {
+  const fixture = JSON.parse(await readFile(new URL('../../maple-core/test/fixtures/skills-20260919.json', import.meta.url), 'utf8'));
+  const wanted = ['훈련 일지', '아르고 호의 가호', '스파이더 인 미러', '크레스트 오브 더 솔라', '쓸만한 홀리 파운틴'];
+  const response = await handleCharacterConversion(createContext(apiRequest()), {
+    cache: null,
+    fetchImpl: async input => {
+      const url = new URL(input);
+      if (url.pathname.endsWith('/character/skill')) {
+        const grade = url.searchParams.get('character_skill_grade');
+        return Response.json({character_skill: fixture.skills.filter(s=>wanted.includes(s.skill_name) && s.grade===grade)});
+      }
+      return Response.json(nexonPayload(url));
+    },
+    sleep: async () => {},
+  });
+  const body = await response.json();
+  assert.equal(response.status,200,JSON.stringify(body));
+  for (const profile of [body.profiles.base,body.profiles.fullBoss]) {
+    const entries=profile.details.baselineSkills;
+    assert.equal(entries.length,5);
+    assert.deepEqual(entries.filter(s=>s.kind==='event').map(s=>s.effects.bossDamage),[40,20]);
+    assert.ok(entries.every(s=>s.includedInBaseline));
+  }
 });

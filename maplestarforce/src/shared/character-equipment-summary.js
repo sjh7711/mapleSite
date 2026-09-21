@@ -1233,7 +1233,17 @@ export function getCharacterEquipmentTooltipModel(item, lineGrades = null) {
     },
     exceptional: tooltipExceptionalModel(raw, sourceOptions),
     scroll,
-    soul: [raw.soulName, raw.soulOption]
+    soul: [
+      raw.soulName,
+      raw.soulActive === false ? "소울 비활성" : null,
+      raw.soulOption,
+      Number(raw.soulAttack) > 0 ? `공격력 +${raw.soulAttack}` : null,
+      Number(raw.soulMagic) > 0 ? `마력 +${raw.soulMagic}` : null,
+      Number(raw.soulAmplification) > 0
+        ? `소울 증폭 ${raw.soulAmplification}단계${raw.soulPotentialGrade ? ` · ${raw.soulPotentialGrade}` : ""}`
+        : null,
+      ...(Array.isArray(raw.soulPotentialLines) ? raw.soulPotentialLines : []),
+    ]
       .filter((value) => typeof value === "string" && value.trim())
       .map((value) => value.trim()),
   };
@@ -1421,7 +1431,7 @@ function renderEquipmentTooltip(tooltip, item, lineGrades = null) {
     }
     stars.setAttribute("aria-label", `${model.stars}성`);
     header.append(stars);
-    if (visibleStars >= 22) header.dataset.sparkle = "true";
+    if (visibleStars >= 23) header.dataset.sparkle = "true";
   }
   const title = element("strong", "profile-equipment-tooltip__name", model.name);
   header.append(title);
@@ -1584,17 +1594,15 @@ function createEquipmentTooltipController(grid, board, inlineReference) {
   tooltip.setAttribute("role", "tooltip");
   tooltip.hidden = true;
   let activeSlot = null;
-  let hideTimer = 0;
+  let pinnedSlot = null;
   let renderRevision = 0;
-
-  const cancelScheduledHide = () => {
-    if (!hideTimer) return;
-    clearTimeout(hideTimer);
-    hideTimer = 0;
-  };
 
   const position = () => {
     if (!activeSlot || tooltip.hidden) return;
+    if (!activeSlot.isConnected) {
+      hide();
+      return;
+    }
     const anchor = activeSlot.getBoundingClientRect();
     const equipment = grid.getBoundingClientRect();
     const protectedArea = inlineReference.getBoundingClientRect();
@@ -1641,8 +1649,16 @@ function createEquipmentTooltipController(grid, board, inlineReference) {
     close.addEventListener("click", () => hide());
     tooltip.append(close);
   };
-  const show = (item, slot) => {
-    cancelScheduledHide();
+  const show = (item, slot, { pin = false } = {}) => {
+    // 고정 중에는 다른 장비에 마우스를 올려도 상세 정보가 바뀌지 않는다.
+    if (pinnedSlot && !pin) return false;
+    if (pin) {
+      pinnedSlot = slot;
+      document.addEventListener("click", dismissOutside, true);
+    }
+    // 좁은 화면에서 떠 있는 상세 정보가 장비의 마우스 이벤트를 가로채지 않는다.
+    tooltip.style.pointerEvents = pin ? "auto" : "none";
+    if (activeSlot === slot && !tooltip.hidden) return true;
     activeSlot = slot;
     const revision = ++renderRevision;
     draw(item);
@@ -1657,32 +1673,41 @@ function createEquipmentTooltipController(grid, board, inlineReference) {
       position();
       requestAnimationFrame(position);
     });
+    return true;
   };
   const hide = (slot) => {
     if (slot && activeSlot !== slot) return;
-    cancelScheduledHide();
+    document.removeEventListener("click", dismissOutside, true);
     renderRevision += 1;
     tooltip.hidden = true;
     activeSlot = null;
+    pinnedSlot = null;
     if (board.isConnected && inlineReference.parentElement === board) {
       board.insertBefore(tooltip, inlineReference);
     } else {
       tooltip.remove();
     }
   };
-  const scheduleHide = (slot) => {
-    cancelScheduledHide();
-    hideTimer = window.setTimeout(() => {
-      hideTimer = 0;
-      if (tooltip.matches(":hover") || activeSlot === document.activeElement) {
-        return;
-      }
-      hide(slot);
-    }, 120);
+  const dismissOutside = (event) => {
+    if (activeSlot?.contains(event.target) || tooltip.contains(event.target)) {
+      return;
+    }
+    hide();
   };
-  tooltip.addEventListener("pointerenter", cancelScheduledHide);
-  tooltip.addEventListener("pointerleave", () => scheduleHide(activeSlot));
-  return { tooltip, show, hide, scheduleHide, position };
+  const togglePinned = (item, slot) => {
+    if (pinnedSlot === slot) {
+      hide(slot);
+    } else {
+      show(item, slot, { pin: true });
+    }
+  };
+  const hideUnlessPinned = (slot) => {
+    if (!pinnedSlot) hide(slot);
+  };
+  tooltip.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") hide();
+  });
+  return { tooltip, show, hide, togglePinned, hideUnlessPinned, position };
 }
 
 function equipmentSlot(
@@ -1786,36 +1811,29 @@ function bindEquipmentSlotInteraction(
   slot.setAttribute("aria-label", description);
   slot.setAttribute("aria-describedby", tooltipController.tooltip.id);
   let hovered = false;
-  let focused = false;
   const activate = () => onActivate(item, slot);
   slot.addEventListener("pointerenter", (event) => {
     if (event.pointerType === "touch") return;
     hovered = true;
-    activate();
-    tooltipController.show(item, slot);
+    if (tooltipController.show(item, slot)) activate();
   });
   slot.addEventListener("pointerleave", (event) => {
     if (event.pointerType === "touch") return;
     hovered = false;
-    if (!focused) tooltipController.scheduleHide(slot);
+    tooltipController.hideUnlessPinned(slot);
   });
   slot.addEventListener("focus", () => {
-    focused = true;
-    activate();
-    tooltipController.show(item, slot);
+    if (tooltipController.show(item, slot)) activate();
   });
   slot.addEventListener("blur", () => {
-    focused = false;
-    if (!hovered) tooltipController.scheduleHide(slot);
+    if (!hovered) tooltipController.hideUnlessPinned(slot);
   });
   slot.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") tooltipController.hide(slot);
+    if (event.key === "Escape") tooltipController.hide();
   });
-  slot.addEventListener("click", (event) => {
+  slot.addEventListener("click", () => {
+    tooltipController.togglePinned(item, slot);
     activate();
-    if (event.detail > 0 && window.matchMedia?.("(hover: none)").matches) {
-      tooltipController.show(item, slot);
-    }
   });
 }
 

@@ -12,7 +12,7 @@ test("자석펫 페이지가 멀티 페이지 빌드와 공용 내비게이션�
   const [html, vite, shell] = await Promise.all([
     read("../pet/index.html"),
     read("../vite.config.js"),
-    read("../src/shared/shell.js"),
+    read("../src/shared/tool-nav.js"),
   ]);
   assert.match(html, /page--calculator page--pet/);
   assert.match(html, /src\/pages\/pet\.js/);
@@ -22,14 +22,15 @@ test("자석펫 페이지가 멀티 페이지 빌드와 공용 내비게이션�
   assert.doesNotMatch(shell, /icon:/);
 });
 
-test("원더 블랙 이벤트를 저장하고 OFF 9.96%와 ON 11.952%로 전환한다", async () => {
+test("원더 블랙 이벤트를 저장하고 증가율 입력을 계산에 전달한다", async () => {
   const source = await read("../src/pages/pet.js");
   assert.match(source, /wonderBlackEvent: false/);
   assert.match(source, /\{ \.\.\.defaults, \.\.\.saved \}/);
   assert.doesNotMatch(source, /\{ \.\.\.defaults, \.\.\.saved, wonderBlackEvent: false \}/);
   assert.match(source, /원더 블랙 이벤트/);
   assert.doesNotMatch(source, /원더 블랙 확률 증가 이벤트/);
-  assert.match(source, /ON 11\.952%/);
+  assert.match(source, /wonderBlackEventIncreasePercent: 20/);
+  assert.match(source, /wonderBlackEventIncreasePercent: state\.wonderBlackEventIncreasePercent/);
   assert.match(source, /OFF 9\.96%/);
   assert.doesNotMatch(source, /2026-06-25 10:00 이후 확률/);
   assert.match(source, /chip\("OFF"/);
@@ -89,7 +90,7 @@ test("뽑기 설정에서 자석펫 1·2·3마리 목표를 선택한다", async
   );
   assert.match(
     css,
-    /@media \(max-width: 620px\)[\s\S]*\.page--pet \.pet-draw-settings,[\s\S]*\.page--pet \.pet-exchange-rates \.settings--row\s*\{[\s\S]*grid-template-columns: minmax\(0, 1fr\)/,
+    /@media \(max-width: 620px\)[\s\S]*\.page--pet \.pet-draw-settings,[\s\S]*\.page--pet \.pet-cost-grid--rates\s*\{[\s\S]*grid-template-columns: minmax\(0, 1fr\)/,
   );
 });
 
@@ -159,16 +160,16 @@ test("공식 가격과 경매장 원더베리 11개 묶음 시세를 비교할 �
   assert.match(source, /lunaCrystalMaplePoints: 3_900/);
   assert.match(source, /mesoMarketMaplePointsPerEok: 2_000/);
   assert.match(source, /cashWonPerEok: ""/);
-  assert.match(source, /원더베리 11개 묶음 캐시샵 가격/);
-  assert.match(source, /원더베리 11개 묶음 경매장 시세 \(억 메소\)/);
-  assert.match(source, /num\("wonderBerryAuctionBundleEokPrice",[\s\S]*step: "0\.01"/);
-  assert.match(source, /루나 크리스탈 1개 \(메이플포인트\)/);
-  assert.match(source, /메소마켓 1억 메소 시세 \(메이플포인트\)/);
+  assert.match(source, /원더베리 11개 \(캐시\)/);
+  assert.match(source, /원더베리 11개 경매장 \(억 메소\)/);
+  assert.match(source, /price\("원더베리 11개 경매장 \(억 메소\)", "wonderBerryAuctionBundleEokPrice", \{ step: "0\.01" \}\)/);
+  assert.match(source, /루나 크리스탈 1개 \(메포\)/);
+  assert.match(source, /메소마켓 1억 메소 \(메포\)/);
   assert.match(source, /1억 메소 시세 \(원\)/);
   assert.doesNotMatch(source, /환산 시세/);
   assert.match(
     source,
-    /return cardWithHead\([\s\S]*?"비용 설정",\s*resetButton\(\),\s*exchangeRates,\s*recoveryFields,\s*maplePointPrices,\s*auctionPrices,/,
+    /return cardWithHead\([\s\S]*?"비용 설정",\s*resetButton\(\),[\s\S]*?exchangeRates,\s*purchasePrices,\s*auctionPrices,/,
   );
   assert.match(source, /maplestarforce:pet:v3/);
   assert.match(source, /LEGACY_STORAGE_KEY = "maplestarforce:pet:v2"/);
@@ -187,28 +188,28 @@ test("공식 가격과 경매장 원더베리 11개 묶음 시세를 비교할 �
   assert.doesNotMatch(source, /타월드 구매의 추가 메이플포인트 수수료는 포함하지 않습니다/);
   assert.match(
     css,
-    /\.page--pet \.pet-cost-grid--auction\s*\{[\s\S]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/,
+    /\.page--pet \.pet-cost-grid--auction\s*\{[\s\S]*grid-template-columns: repeat\(4, minmax\(0, 1fr\)\)/,
   );
   assert.match(
     css,
-    /\.page--pet \.pet-cost-grid--purchase\s*\{[\s\S]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/,
+    /\.page--pet \.pet-cost-grid--purchase\s*\{[\s\S]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/,
   );
   assert.match(
     css,
-    /\.page--pet \.pet-cost-grid--recovery\s*\{[\s\S]*grid-template-columns: repeat\(3, minmax\(0, 1fr\)\)/,
+    /\.page--pet \.pet-cost-grid--rates\s*\{[^}]*grid-template-columns: minmax\(0, 1.35fr\)/,
   );
   assert.match(
     css,
-    /@media \(max-width: 620px\)[\s\S]*\.page--pet \.pet-cost-grid--recovery,[\s\S]*grid-template-columns: minmax\(0, 1fr\)/,
+    /@media \(max-width: 620px\)[\s\S]*\.page--pet \.pet-cost-grid--rates[\s\S]*grid-template-columns: minmax\(0, 1fr\)/,
   );
 });
 
 test("드림·키 경매장 시세와 수수료 및 원더 펫 페이백을 반영한다", async () => {
   const source = await read("../src/pages/pet.js");
-  assert.match(source, /루나 드림 경매장 시세/);
-  assert.match(source, /루나 크리스탈 키 시세/);
-  assert.match(source, /경매장 판매 수수료/);
-  assert.doesNotMatch(source, /경매장 판매 수수료 \(교가만\)/);
+  assert.match(source, /루나 드림 \(억 메소\)/);
+  assert.match(source, /루크키 \(억 메소\)/);
+  assert.match(source, /판매 수수료/);
+  assert.doesNotMatch(source, /판매 수수료 \(교가만\)/);
   assert.match(source, /chip\("5%"/);
   assert.match(source, /chip\("3%"/);
   assert.doesNotMatch(source, /판매 금액과 540메포 페이백 중 큰 값/);
@@ -234,8 +235,8 @@ test("드림·키 시세에 0.8 같은 소수를 입력하는 동안 입력칸�
     source,
     /state\[key\] = value;[\s\S]*save\(\);[\s\S]*refreshResult\(\);/,
   );
-  assert.match(source, /num\("lunaDreamEokPrice",[\s\S]*step: "0\.1"/);
-  assert.match(source, /num\("lunaKeyEokPrice",[\s\S]*step: "0\.1"/);
+  assert.match(source, /price\([^\n]*"lunaDreamEokPrice"\)/);
+  assert.match(source, /price\([^\n]*"lunaKeyEokPrice"\)/);
 });
 
 test("자석펫 결과는 평균으로 시작하고 확률 입력 시 목표 확률 기준으로 전체 갱신한다", async () => {
@@ -385,8 +386,8 @@ test("평균·목표 확률 묶음 결과와 블랙·스윗 경매장 비교를 
   assert.match(source, /\$\{metricPrefix\} 루나 크리스탈/);
   assert.match(source, /\$\{metricPrefix\} 총 합성/);
   assert.match(source, /lunaSweetEokPrice: ""/);
-  assert.match(source, /num\("lunaSweetEokPrice"/);
-  assert.match(source, /루나 스윗 1마리 \(억 메소\)/);
+  assert.match(source, /price\([^\n]*"lunaSweetEokPrice"/);
+  assert.match(source, /루나 스윗 \(억 메소\)/);
   assert.match(source, /블랙·스윗 구매 기준/);
   assert.match(source, /원더 블랙 1마리/);
   assert.match(source, /루나 스윗 1마리/);
@@ -665,7 +666,7 @@ test("경매장 시세 비교를 비용 설정의 경매장 입력 바로 아래
   );
   assert.match(
     source,
-    /"비용 설정",\s*resetButton\(\),\s*exchangeRates,\s*recoveryFields,\s*maplePointPrices,\s*auctionPrices,\s*purchaseGuideSlot/,
+    /"비용 설정",\s*resetButton\(\),[\s\S]*?exchangeRates,\s*purchasePrices,\s*auctionPrices,\s*purchaseGuideSlot/,
   );
   assert.match(
     source,
@@ -708,33 +709,13 @@ test("자석펫 결과는 데스크톱 고정 2열과 모바일 1열을 지원�
   assert.doesNotMatch(source, /pet-setup-grid/);
   assert.match(
     css,
-    /@media \(max-width: 620px\)[\s\S]*\.page--pet \.pet-draw-settings,[\s\S]*\.page--pet \.pet-exchange-rates \.settings--row\s*\{[\s\S]*grid-template-columns: minmax\(0, 1fr\)/,
+    /@media \(max-width: 620px\)[\s\S]*\.page--pet \.pet-draw-settings,[\s\S]*\.page--pet \.pet-cost-grid--rates\s*\{[\s\S]*grid-template-columns: minmax\(0, 1fr\)/,
   );
 });
 
-test("비용 설정은 부산물 제목과 접기 UI 없이 판매 입력을 항상 표시한다", async () => {
-  const [source, css] = await Promise.all([
-    read("../src/pages/pet.js"),
-    read("../src/calculator.css"),
-  ]);
-  assert.match(source, /const recoveryFields = row\(/);
-  assert.match(
-    source,
-    /recoveryFields\.classList\.add\("pet-cost-grid", "pet-cost-grid--recovery"\)/,
-  );
-  assert.match(
-    source,
-    /exchangeRates,\s*recoveryFields,\s*maplePointPrices/,
-  );
+test("비용 설정은 환율·구매·펫 시세 순으로 입력을 항상 표시한다", async () => {
+  const source = await read("../src/pages/pet.js");
+  assert.match(source, /exchangeRates,\s*purchasePrices,\s*auctionPrices/);
   assert.doesNotMatch(source, /"부산물 판매·페이백"/);
   assert.doesNotMatch(source, /\bdetails\s*\(/);
-  assert.doesNotMatch(source, /recovery\.open\s*=/);
-  assert.match(
-    css,
-    /\.page--pet \.pet-exchange-rates \+ \.pet-cost-grid--recovery\s*\{[^}]*margin-top:\s*18px;/s,
-  );
-  assert.match(
-    css,
-    /\.page--pet \.pet-cost-grid--recovery \+ \.pet-cost-grid--purchase\s*\{[^}]*margin-top:\s*18px;/s,
-  );
 });

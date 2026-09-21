@@ -1,4 +1,7 @@
-/sitemap.xml/  /sitemap.xml  301
+# Search Console에 제출된 끝 슬래시 주소도 리다이렉트 없이 XML을 제공한다.
+/sitemap.xml/  /sitemap.xml  200
 /googlec0e3679d0a117faa.html  /googlec0e3679d0a117faa  200
+# 네이버 소유 확인 파일은 지정된 .html 주소에서 바로 응답한다.
+/naver6526b7604fe109e188978032cf9d98cc.html  /naver6526b7604fe109e188978032cf9d98cc  200
 /additional/  /potential/?system=additional  301
 /additional  /potential/?system=additional  301

@@ -11,6 +11,7 @@
     "./scroll-economy": "./src/scroll-economy.js",
     "./pet": "./src/pet.js",
     "./ability": "./src/ability.js",
+    "./ability-route-reach": "./src/ability-route-reach.js",
     "./ability-reform": "./src/ability-reform.js",
     "./soul": "./src/soul.js",
     "./reform-2026-09-17": "./src/reform-2026-09-17.js",

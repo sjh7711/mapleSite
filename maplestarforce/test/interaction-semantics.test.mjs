@@ -43,8 +43,8 @@ test("금액과 보유 수량 입력은 의미를 명확히 표시한다", async
   assert.match(scroll, /보유 순백 100% \(장\)/u);
   assert.match(scroll, /실패 시 횟수 보호율 \(%\)/u);
   assert.doesNotMatch(scroll, /\(만\)"/u);
-  assert.match(pet, /원더베리 11개 묶음 캐시샵 가격/u);
-  assert.match(pet, /메소마켓 1억 메소 시세 \(메이플포인트\)/u);
+  assert.match(pet, /원더베리 11개 \(캐시\)/u);
+  assert.match(pet, /메소마켓 1억 메소 \(메포\)/u);
 });
 
 test("모든 목표 도달 확률 조절기는 평균 상태와 평균으로 보기 동작을 구분한다", async () => {
@@ -62,7 +62,7 @@ test("모든 목표 도달 확률 조절기는 평균 상태와 평균으로 보
   assert.match(reachControl, /reach-control__mode/u);
   assert.match(reachControl, /modeStatus\.hidden = !averageMode/u);
   assert.match(reachControl, /reset\.hidden = averageMode/u);
-  assert.match(ability, /state\.method === "honor" \? "목표 도달 명성치" : "목표 도달 서큘레이터"/u);
+  assert.match(ability, /\["honor", "advanced"\]\.includes\(state\.method\) \? "목표 도달 명성치" : "목표 도달 서큘레이터"/u);
   assert.doesNotMatch(ability, /도달 재화/u);
 });
 

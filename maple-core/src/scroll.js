@@ -25,19 +25,11 @@ export const DEXTERITY_BONUS = 10;
 export const DEXTERITY_MAX_LEVEL = 100;
 export const GUILD_BONUS = 4;
 
-/**
- * 주문의 흔적 성공 확률. 0~1 로 돌려준다.
- * 100% 주문서는 보정을 더해도 100%를 넘지 않는다.
- *
- * 손재주는 만렙이면 10%p를 더한다. 레벨을 숫자로 넘기면
- * 5레벨당 0.5%p씩 더한다.
- */
-export function traceSuccessRate(
-  rate,
-  { fever = false, dexterity = false, guild = false } = {},
+// 손재주·길드 보정 대상으로 확인된 주문서에서만 사용한다.
+function modifiedScrollSuccessRate(
+  basePercent,
+  { dexterity = false, guild = false } = {},
 ) {
-  const table = TRACE_RATES[rate];
-  if (!table) throw new RangeError("지원하지 않는 주문의 흔적 확률입니다.");
   /* 손재주는 5레벨당 0.5%p씩 붙는다. 5레벨 단위로만 올라가므로
      중간 레벨은 아래 5배수로 내려서 셈한다. */
   const dexterityBonus =
@@ -48,9 +40,30 @@ export function traceSuccessRate(
       : dexterity
         ? DEXTERITY_BONUS
         : 0;
-  const percent =
-    (fever ? table.fever : table.base) + dexterityBonus + (guild ? GUILD_BONUS : 0);
+  const percent = basePercent + dexterityBonus + (guild ? GUILD_BONUS : 0);
   return Math.min(100, percent) / 100;
+}
+
+/** 주문의 흔적 성공 확률(0~1). 피버 확률에 손재주·길드 %p를 더한다. */
+export function traceSuccessRate(
+  rate,
+  { fever = false, dexterity = false, guild = false } = {},
+) {
+  const table = TRACE_RATES[rate];
+  if (!table) throw new RangeError("지원하지 않는 주문의 흔적 확률입니다.");
+  return modifiedScrollSuccessRate(fever ? table.fever : table.base, {
+    dexterity,
+    guild,
+  });
+}
+
+/**
+ * 귀 장식 지력 주문서 10%는 손재주·길드 보정 시 최대 24%다.
+ * 전용 주문서이므로 피버타임은 적용하지 않는다.
+ * 공식 검증표: https://archive.maplestory.nexon.com/News/ProbabilityResult/MonthData
+ */
+export function earringSuccessRate(options = {}) {
+  return modifiedScrollSuccessRate(10, options);
 }
 
 /* 놀라운 긍정의 혼돈 주문서가 성공했을 때 오르는 수치의 분포.
@@ -1630,6 +1643,7 @@ export function calculateMagicalReturnCraft({
   target = 11,
   scrollPrice,
   returnPrice,
+  returnCurrency = "maplePoints",
   resetCost,
   resetRate = 1,
   resetStock = 0,
@@ -1681,7 +1695,8 @@ export function calculateMagicalReturnCraft({
       magicalMeso,
       resetMeso,
       otherMeso: magicalMeso + resetMeso,
-      returnMaplePoints: returnScrolls * returnPrice,
+      returnMaplePoints: returnCurrency === "meso" ? 0 : returnScrolls * returnPrice,
+      returnMeso: returnCurrency === "meso" ? returnScrolls * returnPrice : 0,
     },
   };
 }
@@ -1699,6 +1714,7 @@ export function calculateMagicalReturnCraftProgress({
   target = 11,
   scrollPrice,
   returnPrice,
+  returnCurrency = "maplePoints",
   resetCost = 0,
   resetRate = 1,
   resetStock = 0,
@@ -1724,6 +1740,7 @@ export function calculateMagicalReturnCraftProgress({
         target,
         scrollPrice,
         returnPrice,
+        returnCurrency,
         resetCost,
         resetRate,
         resetStock,
@@ -1759,7 +1776,8 @@ export function calculateMagicalReturnCraftProgress({
       magicalMeso: magicalScrolls * scrollPrice,
       resetMeso: 0,
       otherMeso: magicalScrolls * scrollPrice,
-      returnMaplePoints: returnScrolls * returnPrice,
+      returnMaplePoints: returnCurrency === "meso" ? 0 : returnScrolls * returnPrice,
+      returnMeso: returnCurrency === "meso" ? returnScrolls * returnPrice : 0,
     },
   };
 }

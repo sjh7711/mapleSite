@@ -184,11 +184,14 @@ export function mountCombinedPotentialSystem({ onSystemChange }) {
     ].join(":");
   }
 
-  function allowedTypesForRow(index) {
+  function allowedTypesForRow(index, { includeProfileTargets = false } = {}) {
     const previousTypes = new Set(
       state.targets.slice(0, index).map((target) => target.type).filter(Boolean),
     );
-    return availableTargetTypes.filter((type) => !previousTypes.has(type));
+    const hasProfile = includeProfileTargets || Boolean(getActiveProfile({ capability: "potentialEquivalence" }));
+    return availableTargetTypes.filter((type) =>
+      !previousTypes.has(type) && (type !== "stat-equivalent" || hasProfile)
+    );
   }
 
   function normalizeTargets() {
@@ -329,14 +332,20 @@ export function mountCombinedPotentialSystem({ onSystemChange }) {
 
   function targetControl(target, index) {
     const allowedTypes = allowedTypesForRow(index);
+    const visibleTypes = allowedTypesForRow(index, { includeProfileTargets: true });
     const options = [
       { value: "", label: "없음" },
-      ...allowedTypes.map((type) => ({
+      ...visibleTypes.map((type) => ({
         value: type,
         label: getPotentialTargetInfo(type)?.label ?? type,
+        disabled: !allowedTypes.includes(type),
+        disabledReason: type === "stat-equivalent" && !allowedTypes.includes(type)
+          ? "내 캐릭터 정보를 불러오면 사용할 수 있습니다."
+          : "",
       })),
     ];
     const select = searchableSelect(options, target.type, (value) => {
+      if (value && !allowedTypes.includes(value)) return;
       update(() => {
         target.type = value;
         target.value = "";
@@ -362,7 +371,7 @@ export function mountCombinedPotentialSystem({ onSystemChange }) {
         allowDecimalDraft: target.type === "stat-equivalent",
       },
     );
-    value.disabled = !target.type;
+    value.disabled = !allowedTypes.includes(target.type);
     value.setAttribute("aria-label", `통합 목표 ${index + 1}번째 최소 수치`);
     const valueControl = element("span", "target-value");
     valueControl.append(value, element("span", "target-value__unit", info?.unit ?? ""));
@@ -765,13 +774,15 @@ export function mountCombinedPotentialSystem({ onSystemChange }) {
 
   const unsubscribe = subscribeCharacterProfile(() => {
     if (disposed) return;
+    let changed = availableTargetTypes.length > 0 && normalizeTargets();
     if (
       state.showEquivalence &&
       !getActiveProfile({ capability: "potentialEquivalence" })
     ) {
       state.showEquivalence = false;
-      persist();
+      changed = true;
     }
+    if (changed) persist();
     render();
   });
   persist();

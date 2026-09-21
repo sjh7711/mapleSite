@@ -1,9 +1,85 @@
-import { readdir, readFile, rm } from "node:fs/promises";
+import { appendFile, readdir, readFile, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, loadEnv } from "vite";
+import { renderStaticToolNav } from "./src/shared/tool-nav.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// 모든 계산기와 안내 페이지에 같은 테마 전환을 제공한다.
+function sharedTheme() {
+  return {
+    name: "shared-theme",
+    transformIndexHtml: {
+      order: "pre",
+      async handler(html) {
+        if (!html.includes('class="page"')) return html;
+        const [bootstrap, toggle] = await Promise.all([
+          readFile(resolve(__dirname, "src/shared/theme.js"), "utf8"),
+          readFile(resolve(__dirname, "partials/theme-toggle.html"), "utf8"),
+        ]);
+        return html
+          .replace(/(<meta charset="utf-8"\s*\/>)/u, `$1\n<script>${bootstrap}</script>`)
+          .replace("</header>", `${toggle}\n</header>`);
+      },
+    },
+  };
+}
+
+// Google이 JavaScript 렌더링 전에도 계산기 링크를 발견하도록 한다.
+function staticToolNav({ itemMarketEnabled }) {
+  return {
+    name: "static-tool-nav",
+    transformIndexHtml: {
+      order: "pre",
+      handler(html, context) {
+        if (!html.includes('id="toolnav"')) return html;
+        const page = Object.entries(pages).find(([, filename]) => filename === context.filename)?.[0];
+        if (!page) throw new Error(`계산기 메뉴의 페이지를 확인하지 못했습니다: ${context.filename}`);
+        const current = page === "main" ? "starforce" : page === "additional" ? "potential" : page;
+        return html.replace(
+          /(<nav\b[^>]*\bid="toolnav"[^>]*>)[\s\S]*?(<\/nav>)/u,
+          (_, open, close) => `${open}\n${renderStaticToolNav(current, { itemMarketEnabled })}\n${close}`,
+        );
+      },
+    },
+  };
+}
+
+// 다른 URL에서 동일한 XML을 비교한다. 원본만 관리해 두 파일의 차이를 막는다.
+function sitemapComparisonFile() {
+  return {
+    name: "sitemap-comparison-file",
+    apply: "build",
+    async generateBundle() {
+      this.emitFile({
+        type: "asset",
+        fileName: "sitemap-pages.xml",
+        source: await readFile(resolve(__dirname, "public/sitemap.xml")),
+      });
+    },
+  };
+}
+
+// 빌드된 HTML에 안내 링크를 넣어 JavaScript 없이도 읽을 수 있게 한다.
+function sharedSiteFooter() {
+  return {
+    name: "shared-site-footer",
+    transformIndexHtml: {
+      order: "pre",
+      async handler(html, context) {
+        if (!html.includes("<!-- site-footer -->")) return html;
+        const footer = await readFile(
+          resolve(__dirname, "partials/site-footer.html"), "utf8",
+        );
+        const copyButton = context.filename === resolve(__dirname, "index.html")
+          ? ' <button id="contact-copy" class="page__copy" type="button" aria-label="문의 이메일 주소 복사">복사</button>'
+          : "";
+        return html.replace("<!-- site-footer -->", footer.replace("<!-- contact-copy -->", copyButton));
+      },
+    },
+  };
+}
 
 function pruneItemMarketDeploymentData({ enabled }) {
   return {
@@ -17,6 +93,12 @@ function pruneItemMarketDeploymentData({ enabled }) {
         // 100MB대 매물 자료를 정적 배포물에 남겨 두지 않는다.
         await rm(releasesRoot, { recursive: true, force: true });
         await rm(resolve(marketRoot, "manifest.json"), { force: true });
+        await rm(resolve(marketRoot, "index.html"), { force: true });
+        // 비활성 주소는 JavaScript 실행 없이도 홈으로 이동한다.
+        await appendFile(
+          resolve(__dirname, "dist/_redirects"),
+          "\n# 비활성 장비 시세 페이지\n/item-market / 302\n/item-market/ / 302\n",
+        );
         console.log("item-market: 비활성 빌드에서 시세 데이터 제외");
         return;
       }
@@ -61,8 +143,12 @@ const pages = {
   "add-option": resolve(__dirname, "add-option/index.html"),
   scroll: resolve(__dirname, "scroll/index.html"),
   pet: resolve(__dirname, "pet/index.html"),
+  soul: resolve(__dirname, "soul/index.html"),
   "item-market": resolve(__dirname, "item-market/index.html"),
   "sitemap-submit": resolve(__dirname, "sitemap-submit/index.html"),
+  about: resolve(__dirname, "about/index.html"),
+  privacy: resolve(__dirname, "privacy/index.html"),
+  sources: resolve(__dirname, "sources/index.html"),
 };
 
 export default defineConfig(({ mode }) => {
@@ -70,7 +156,13 @@ export default defineConfig(({ mode }) => {
   const itemMarketEnabled = env.VITE_ITEM_MARKET_ENABLED !== "false";
   return {
     base: "./",
-    plugins: [pruneItemMarketDeploymentData({ enabled: itemMarketEnabled })],
+    plugins: [
+      sharedTheme(),
+      staticToolNav({ itemMarketEnabled }),
+      sharedSiteFooter(),
+      sitemapComparisonFile(),
+      pruneItemMarketDeploymentData({ enabled: itemMarketEnabled }),
+    ],
     build: {
       outDir: "dist",
       emptyOutDir: true,

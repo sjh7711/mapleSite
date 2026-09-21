@@ -76,12 +76,20 @@
             Search Console에서 <strong>https://starforce.pages.dev/</strong> 속성을
             선택합니다.
           </li>
-          <li><strong>새 사이트맵 추가</strong>에 <code>sitemap.xml</code>을 입력합니다.</li>
+          <li><strong>새 사이트맵 추가</strong>에 <code>sitemap.xml</code>을 입력합니다. 앞뒤에 <code>/</code>를 붙이지 마세요.</li>
           <li>Google 화면의 <strong>제출</strong> 버튼을 누릅니다.</li>
+          <li>기존 항목이 <strong>가져올 수 없음</strong>이면 위 주소로 다시 제출한 뒤 마지막으로 읽은 날짜와 상태를 확인합니다.</li>
+          <li>사이트맵을 읽은 뒤에는 홈페이지를 <strong>URL 검사 → 실제 URL 테스트 → 색인 생성 요청</strong> 순서로 확인합니다.</li>
         </ol>
+        <p class="sitemap-submit__note">
+          이 페이지는 현재 브라우저에서 파일을 읽을 수 있는지 확인합니다.
+          Google의 접근 여부와 색인 상태는 Search Console에서 확인해야 합니다.
+          사이트맵을 읽는 것과 검색 결과에 페이지가 등록되는 것은 별도 과정입니다.
+        </p>
       </section>
 
       <p id="sitemap-action-message" class="sitemap-submit__message" aria-live="polite"></p>
+      <!-- site-footer -->
     </main>
     <script type="module" src="../src/pages/sitemap-submit.js"></script>
   </body>

@@ -3,35 +3,14 @@
 
 import { ITEM_MARKET_ENABLED } from "./features.js";
 import { installMobileResultBar } from "./mobile-result-bar.js";
+import { getTools, rootPrefix, TOOL_ITEM_ICONS, TOOL_VECTOR_ICONS } from "./tool-nav.js";
 
-const TOOLS = [
-  { id: "starforce", name: "스타포스", href: "" },
-  { id: "potential", name: "잠재능력", href: "potential/" },
-  { id: "add-option", name: "추가옵션", href: "add-option/" },
-  { id: "scroll", name: "주문서", href: "scroll/" },
-  { id: "ability", name: "어빌리티", href: "ability/" },
-  { id: "pet", name: "자석펫", href: "pet/" },
-  { id: "item-market", name: "장비 시세", href: "item-market/" },
-].filter((tool) => ITEM_MARKET_ENABLED || tool.id !== "item-market");
+const TOOLS = getTools({ itemMarketEnabled: ITEM_MARKET_ENABLED });
 
 const TOOLNAV_DESKTOP_QUERY = "(min-width: 1280px)";
 const TOOL_PREFETCH_DELAY_MS = 120;
 const prefetchedToolPages = new Set();
 const prefetchedToolResources = new Set();
-
-const TOOL_ITEM_ICONS = {
-  potential: "tool-icons/black-cube.png",
-  additional: "tool-icons/white-additional-cube.png",
-  "add-option": "tool-icons/black-rebirth-flame.png",
-  scroll: "tool-icons/spell-trace.png",
-  ability: "tool-icons/large-boss-medal.png",
-  pet: "tool-icons/wisp-wonderberry.png",
-};
-
-const TOOL_VECTOR_ICONS = {
-  starforce: '<path d="m12 2.8 2.78 5.63 6.22.9-4.5 4.39 1.06 6.2L12 17l-5.56 2.92 1.06-6.2L3 9.33l6.22-.9L12 2.8Z"/>',
-  "item-market": '<path d="M4 7h16l-1 13H5zM8 7a4 4 0 0 1 8 0"/>',
-};
 
 function toolIcon(tool, root) {
   const itemIconPath = TOOL_ITEM_ICONS[tool.id];
@@ -52,11 +31,6 @@ function toolIcon(tool, root) {
   icon.setAttribute("aria-hidden", "true");
   icon.innerHTML = TOOL_VECTOR_ICONS[tool.id] ?? TOOL_VECTOR_ICONS["item-market"];
   return icon;
-}
-
-/** 하위 폴더 페이지에서는 한 단계 위가 사이트 뿌리다. */
-function rootPrefix(current) {
-  return current === "starforce" ? "./" : "../";
 }
 
 function prefetchResource(url, kind) {

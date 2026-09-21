@@ -27,16 +27,16 @@ test("잠재 페이지가 선택한 큐브의 공식 표와 등업 정보를 함
   assert.match(source, /평균 총비용/);
   assert.match(source, /rankUpReachChanceSection\(plan, methodInfo\)/);
   assert.match(source, /calculationMode: "options"/);
-  assert.match(source, /potential-selector-group__label", "현재 등급"/);
-  assert.match(source, /potential-selector-group__label", "목표"/);
+  assert.match(source, /potentialSelectorGroup\("현재 등급", gradePicker\)/);
+  assert.match(source, /potentialSelectorGroup\("목표", calculationModePicker, "target"\)/);
   assert.ok(
-    source.indexOf('potential-selector-group__label", "현재 등급"')
+    source.indexOf('potentialSelectorGroup("현재 등급"')
       < source.indexOf('potential-reset-method__label", "재설정 방식"'),
     "현재 등급 제목은 재설정 방식보다 위에 있어야 합니다.",
   );
   assert.ok(
     source.indexOf('potential-reset-method__label", "재설정 방식"')
-      < source.indexOf('potential-selector-group__label", "목표"'),
+      < source.indexOf('potentialSelectorGroup("목표"'),
     "목표 제목은 재설정 방식보다 아래에 있어야 합니다.",
   );
   assert.ok(
@@ -77,8 +77,9 @@ test("메소 재설정과 블랙·화이트 큐브를 별도 방식으로 표시
       .map(({ id, shortLabel }) => [id, shortLabel]),
     [
       ["meso", "메소"],
-      ["black", "블랙 큐브"],
-      ["gold", "골드 큐브"],
+      ["black", "블큐"],
+      ["gold", "골큐"],
+      ["prime", "프큐"],
     ],
   );
   assert.deepEqual(
@@ -86,7 +87,8 @@ test("메소 재설정과 블랙·화이트 큐브를 별도 방식으로 표시
       .map(({ id, shortLabel }) => [id, shortLabel]),
     [
       ["meso", "메소"],
-      ["white", "화이트 큐브"],
+      ["white", "화에큐"],
+      ["prime", "프에큐"],
     ],
   );
 });
@@ -119,10 +121,10 @@ test("목표 프리셋은 계산 결과 아래에서 저장·불러오기·삭�
   assert.match(source, /현재 목표 저장/);
   assert.match(source, /저장된 목표 프리셋/);
   assert.match(source, /저장 당시 기댓값/);
-  assert.match(source, /state\.targetSets = targetSets/);
+  assert.match(source, /state\[targetSetsKey\(\)\] = targetSets/);
   assert.match(source, /savedTargetPresets = savedTargetPresets\.filter/);
-  assert.match(source, /results\.append\(resultCard\(\)\)/);
-  assert.match(source, /state\.calculationMode === "options"[\s\S]*results\.append\(savedTargetPresetCard\(\)\)/);
+  assert.match(source, /const results = \[resultCard\(\)\]/);
+  assert.match(source, /state\.calculationMode === "options"[\s\S]*results\.push\(savedTargetPresetCard\(\)\)/);
   assert.match(css, /\.target-preset-library__list\s*\{/);
   assert.match(css, /max-height: 340px/);
   assert.match(css, /overflow-y: auto/);
@@ -136,8 +138,8 @@ test("윗잠 장신구 정옵션은 -3%와 드메 포함을 독립 전환한다"
 
   assert.match(source, /presetIncludeNearOptimal: false/u);
   assert.match(source, /presetIncludeDropMeso: true/u);
-  assert.match(source, /-3% 포함 ON/u);
-  assert.match(source, /드메 포함 ON/u);
+  assert.match(source, /"-3% 포함"/u);
+  assert.match(source, /"드메 포함"/u);
   assert.match(source, /정옵션 -3%/u);
   assert.match(source, /정옵션 -3%까지 포함합니다/u);
   assert.match(source, /Lv\.250은 30%, Lv\.200은 27% 이상/u);

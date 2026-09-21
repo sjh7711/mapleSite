@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>개인정보처리방침 | Maple Starforce</title>
+    <meta name="description" content="Maple Starforce의 브라우저 저장, 캐릭터 정보 조회, 접속 기록, 문의 이메일 처리와 이용자의 삭제 방법을 안내합니다." />
+    <link rel="canonical" href="https://starforce.pages.dev/privacy/" />
+    <link rel="icon" type="image/svg+xml" href="../tool-icons/starforce-star.svg" />
+    <link rel="stylesheet" href="../src/style.css" />
+    <link rel="stylesheet" href="../src/site-info.css" />
+  </head>
+  <body class="page--info">
+    <main class="page">
+      <header class="info-header">
+        <a class="info-home" href="/">← Maple Starforce 계산기</a>
+        <h1>개인정보처리방침</h1>
+        <p>최종 수정일: <time datetime="2026-09-16">2026년 9월 16일</time></p>
+      </header>
+      <nav class="info-nav" aria-label="사이트 안내">
+        <a href="/about/">소개·문의</a>
+        <a href="/privacy/" aria-current="page">개인정보처리방침</a>
+        <a href="/sources/">데이터·확률 출처</a>
+      </nav>
+      <article class="info-content" aria-label="개인정보 처리 안내">
+        <section id="operator">
+          <h2>1. 운영자와 적용 범위</h2>
+          <p>Maple Starforce 운영자는 starforce.pages.dev에서 메이플스토리 계산기를 제공합니다. 개인정보 관련 문의는 <a href="mailto:apfhd159862@naver.com">apfhd159862@naver.com</a>으로 보내 주세요.</p>
+          <p>계산기는 회원가입 없이 이용할 수 있습니다. 아래에서는 계산할 때 기기에 저장되는 정보와 캐릭터 조회·사이트 접속·이메일 문의 과정에서 처리되는 정보를 안내합니다.</p>
+        </section>
+        <section id="browser-storage">
+          <h2>2. 계산 설정과 브라우저 저장</h2>
+          <p>설정과 입력을 다시 사용할 수 있도록 선택한 장비·가격·목표·옵션·프리셋, 저장한 캐릭터 이름과 조회한 캐릭터 정보를 브라우저의 로컬 저장소(localStorage)에 저장합니다. 스타포스 장비 목록에는 현재 탭의 세션 저장소(sessionStorage)도 사용합니다.</p>
+          <p>로컬 저장소에는 자동 만료 기한이 설정되어 있지 않습니다. 브라우저에서 사이트 데이터를 삭제하거나 해당 기능의 저장값을 변경·삭제할 때까지 남을 수 있습니다. 세션 저장소는 탭의 세션에 연결되며 브라우저의 탭 복원 설정에 따라 복원될 수 있습니다.</p>
+          <p>기기에 저장하는 동작 자체가 운영자에게 해당 저장소 전체를 전송하는 것은 아닙니다. 캐릭터 조회를 실행하면 다음 항목의 통신이 발생합니다.</p>
+        </section>
+        <section id="character-lookup">
+          <h2>3. 캐릭터 조회와 임시 저장</h2>
+          <p>캐릭터 이름으로 조회하면 이름과 선택한 조회 조건이 이 사이트의 서버에 전송됩니다. 서버는 NEXON Open API에 캐릭터 이름 또는 캐릭터 식별자를 보내 공개된 장비·스탯 등 계산에 필요한 정보를 조회합니다. 조회 결과는 장비 입력과 캐릭터별 능력치 계산에 사용됩니다.</p>
+          <p>반복 요청을 줄이기 위한 응답 캐시의 유효기간은 기본 10분입니다. 캐릭터 환산 조회에는 일시적인 API 장애에 대비해 최대 6시간 동안 재사용할 수 있도록 설정한 캐시도 있습니다. 이 시간은 캐시를 사용할 수 있는 기간이며, 접속 기록이나 외부 사업자가 처리하는 정보까지 같은 시점에 삭제된다는 의미는 아닙니다.</p>
+          <p>조회 결과의 캐릭터·장비 이미지를 표시할 때는 브라우저가 NEXON의 이미지 서버에 요청할 수 있습니다. 이 과정에서 IP 주소와 브라우저 요청 정보가 해당 서버에 전달될 수 있습니다.</p>
+        </section>
+        <section id="service-providers">
+          <h2>4. 접속 기록과 외부 서비스</h2>
+          <p>사이트의 전송·보안·캐시와 캐릭터 조회 서버를 위해 Cloudflare를 사용합니다. 사이트 접속 시 IP 주소, 요청 URL·시각, 브라우저 및 통신 관련 정보가 처리될 수 있습니다. 캐릭터 조회 URL에는 입력한 캐릭터 이름이 포함됩니다. 서버 오류 진단에는 오류 종류와 API 응답 상태 등의 기록을 사용합니다.</p>
+          <p>호스팅 사업자의 접속·보안 기록은 해당 서비스의 설정과 처리방침에 따라 보관됩니다. Cloudflare는 해외 사업자이며 글로벌 네트워크를 통해 정보를 처리하므로, 접속 정보가 한국 외 지역에서 처리될 수 있습니다.</p>
+          <dl>
+            <dt>Cloudflare — 호스팅·전송·보안·캐시</dt>
+            <dd><a href="https://www.cloudflare.com/privacypolicy/">Cloudflare 개인정보처리방침</a></dd>
+            <dt>NEXON — 공개 캐릭터 정보와 게임 이미지</dt>
+            <dd><a href="https://member.nexon.com/policy/privacy.aspx">넥슨 개인정보처리방침</a> · <a href="https://openapi.nexon.com/ko/support/terms/">NEXON Open API 이용약관</a></dd>
+            <dt>NAVER — 운영자 문의 이메일 수신</dt>
+            <dd><a href="https://policy.naver.com/policy/privacy.html">네이버 개인정보처리방침</a></dd>
+          </dl>
+          <p>외부 링크를 열어 방문한 웹사이트에는 해당 사이트의 개인정보처리방침이 적용됩니다.</p>
+        </section>
+        <section id="email-inquiries">
+          <h2>5. 이메일 문의</h2>
+          <p>문의처는 운영자의 개인 이메일 주소입니다. 이 사이트에는 별도의 문의 입력 폼이 없습니다. 이메일로 문의하면 발신 이메일 주소, 표시 이름, 문의 내용과 직접 첨부한 자료를 받습니다. 이 정보는 문의 확인·답변과 오류 재현에 사용하며 운영자의 이메일함에서 관리합니다.</p>
+          <p>보관 중인 문의의 삭제나 개인정보 처리에 관한 요청은 같은 문의 주소로 보내 주세요. 문의를 식별할 수 있는 발신 주소와 발송 시점을 함께 알려 주시면 확인에 도움이 됩니다. 비밀번호, 인증 코드 또는 불필요한 개인정보는 보내지 마세요.</p>
+        </section>
+        <section id="advertising-consent">
+          <h2>6. 쿠키와 광고</h2>
+          <h3>현재 광고 제공 상태</h3>
+          <p class="info-note">계산기 페이지에는 Google AdSense 광고 코드가 연결되어 있습니다. 페이지를 열면 Google의 스크립트를 불러오며, 이 과정에서 IP 주소와 브라우저·기기 정보 등이 Google에 전달될 수 있습니다. 실제 광고 표시는 Google의 사이트 승인, 광고 설정, 방문 지역과 동의 선택 등에 따라 달라집니다. Google Analytics는 사용하지 않습니다.</p>
+          <h3>광고 서비스에서 처리되는 정보</h3>
+          <p>Google 및 제3자 광고 사업자는 쿠키나 유사한 식별자를 사용하여 이 사이트 또는 다른 웹사이트의 이전 방문 기록을 바탕으로 광고를 게재할 수 있습니다. 이 과정에서 IP 주소, 브라우저·기기 정보, 방문 기록과 광고 노출·클릭 등의 정보가 광고 제공, 개인 맞춤 광고, 효과 측정, 부정 이용 방지에 사용될 수 있습니다.</p>
+          <p>광고를 제공하는 사업자는 해외에서 정보를 처리할 수 있습니다. Google의 정보 처리와 보관 기준은 아래 Google 안내에서 확인할 수 있으며, 실제 참여하는 광고 파트너와 데이터 사용 목적은 동의 메시지의 업체·목적 목록에서 확인할 수 있습니다.</p>
+          <ul>
+            <li>Google의 정보 처리: <a href="https://policies.google.com/technologies/partner-sites?hl=ko">Google 서비스를 사용하는 사이트에서 수집하는 정보</a></li>
+            <li>Google의 보관·삭제 기준: <a href="https://policies.google.com/technologies/retention?hl=ko">Google에서 데이터를 보관하는 방법</a></li>
+            <li>Google 맞춤 광고 선택: <a href="https://myadcenter.google.com/">내 광고 센터</a></li>
+            <li>참여하는 제3자 사업자의 맞춤 광고 거부: <a href="https://www.aboutads.info/choices/">YourAdChoices</a></li>
+          </ul>
+          <h3>광고 동의·거부와 선택 변경</h3>
+          <p>Google 광고를 제공할 때 유럽경제지역(EEA), 영국, 스위스 등 동의가 필요한 방문자에게는 Google의 동의 관리 메시지를 통해 쿠키 사용과 개인 맞춤 광고에 관한 선택을 안내합니다. 메시지가 표시되면 'Do not consent(동의하지 않음)', 'Consent(동의)', 'Manage options(옵션 관리)'에서 선택하거나 사용 목적과 업체별 설정을 확인할 수 있습니다. Google의 유럽 규정 메시지는 한국어를 지원하지 않아 영어 등 지원 언어로 표시됩니다.</p>
+          <p>동의 메시지가 제공되는 계산기 페이지에서는 Google이 페이지 하단에 제공하는 개인정보·쿠키 설정 링크를 통해 선택을 변경하거나 철회할 수 있습니다. 이 링크는 사이트 승인과 동의 메시지 제공 조건이 충족된 경우에 표시되며, 모든 방문자에게 항상 표시되는 것은 아닙니다.</p>
+          <p>Google의 개인 맞춤 광고 설정은 <a href="https://myadcenter.google.com/">내 광고 센터</a>에서도 관리할 수 있습니다. 개인 맞춤 광고를 거부해도 문맥 등에 따른 일반 광고가 표시될 수 있습니다. 브라우저의 쿠키 차단·삭제 설정은 해당 브라우저에서 별도로 관리하며, Google 계정의 광고 설정이나 문의 이메일을 삭제하는 기능과는 다릅니다.</p>
+        </section>
+        <section id="data-deletion">
+          <h2>7. 저장 정보 삭제와 문의 방법</h2>
+          <ol>
+            <li>사용 중인 브라우저의 설정에서 개인정보 또는 사이트 데이터 관리 화면을 엽니다.</li>
+            <li><strong>starforce.pages.dev</strong>를 찾아 사이트 데이터를 삭제합니다. 해당 기기의 계산 설정·저장한 이름·캐릭터 정보가 초기화될 수 있습니다.</li>
+            <li>다른 기기나 브라우저를 사용했다면 각각 삭제합니다. 브라우저 저장을 차단하면 계산 설정을 다음 방문에 유지하지 못할 수 있습니다.</li>
+          </ol>
+          <p>브라우저 데이터 삭제는 이미 보낸 문의 이메일이나 외부 서비스의 기록까지 삭제하지 않습니다. 운영자가 처리하는 정보의 열람·정정·삭제·처리 정지를 원하시면 <a href="mailto:apfhd159862@naver.com">apfhd159862@naver.com</a>으로 요청해 주세요.</p>
+        </section>
+        <section id="policy-changes">
+          <h2>8. 방침 변경</h2>
+          <p>기능, 외부 서비스 또는 정보 처리 방식이 바뀌면 이 페이지에 변경 내용을 반영하고 수정일을 표시합니다.</p>
+          <p><time datetime="2026-09-16">2026년 9월 16일</time>: 브라우저 저장, 캐릭터 조회, 외부 서비스와 개인 이메일 문의의 처리 내용을 정리했습니다. Google 광고 코드 연결에 따른 정보 처리와 동의·거부·선택 변경 방법을 안내했습니다.</p>
+        </section>
+      </article>
+      <!-- site-footer -->
+    </main>
+  </body>
+</html>

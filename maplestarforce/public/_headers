@@ -1,7 +1,22 @@
 # Cloudflare Pages 전용 캐시 규칙. nginx에 걸어 둔 것과 같은 정책을 옮겼다.
 
+# 광고 판매자 정보는 텍스트로 제공하고 계정 변경 시 다시 확인한다.
+/ads.txt
+  Content-Type: text/plain; charset=utf-8
+  Cache-Control: no-cache
+  X-Content-Type-Options: nosniff
+
 # 검색엔진과 검증기가 사이트맵을 HTML로 오인하지 않도록 MIME을 고정한다.
 /sitemap.xml
+  Content-Type: application/xml
+  X-Content-Type-Options: nosniff
+
+/sitemap.xml/
+  Content-Type: application/xml
+  X-Content-Type-Options: nosniff
+
+# 기존 사이트맵과 같은 내용·헤더로 새 URL의 처리 상태를 비교한다.
+/sitemap-pages.xml
   Content-Type: application/xml
   X-Content-Type-Options: nosniff
 

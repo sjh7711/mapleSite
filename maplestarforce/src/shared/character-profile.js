@@ -28,7 +28,7 @@ import { characterEquipmentSummaryBoard } from "./character-equipment-summary.js
 const STORAGE_KEY = "maplestarforce:character-profile:v2";
 const LEGACY_STORAGE_KEY = "maplestarforce:character-profile:v1";
 const SAVED_NAMES_STORAGE_KEY = "maplestarforce:character-names:v1";
-const EQUIPMENT_TOOLTIP_SUMMARY_VERSION = 11;
+const EQUIPMENT_TOOLTIP_SUMMARY_VERSION = 12;
 const HIDDEN_CHARACTER_WARNING_PREFIXES = Object.freeze([
   "샤프 아이즈 계열과 직업 보정을 포함한 보스전 크리티컬 확률이",
   "샤프 아이즈 계열과 보스 대상 보정을 포함한 기본 크리티컬 확률이",
@@ -114,6 +114,10 @@ export function needsEquipmentTooltipRefresh(summary) {
 export function needsCashEquipmentDisplayRefresh(profile) {
   const cashEquipment = profile?.details?.externalComponents?.cashEquipment;
   return !cashEquipment || !Array.isArray(cashEquipment.displayItems);
+}
+
+export function needsBaselineSkillRefresh(profile) {
+  return Boolean(profile && !Array.isArray(profile.details?.baselineSkills));
 }
 
 export function shouldShowCharacterProfileWarning(warning) {
@@ -441,7 +445,7 @@ function fullBossDopingSummary(profile) {
   ].filter(Boolean).join(" · ");
 }
 
-function combatRingSummary(profile) {
+export function combatRingSummary(profile) {
   const rings = Array.isArray(profile.details?.combatRings)
     ? profile.details.combatRings
     : [];
@@ -461,8 +465,14 @@ function combatRingSummary(profile) {
         `${ring.weaponPuffStat} 평균 +${format(ring.averageFlatStat)}`,
       );
     }
+    const minutes = format((Number(profile.details?.combatDurationSeconds) || 360) / 60);
+    const coverage = ring.activationMode === "battle-practice-damage-weighted"
+      ? `반지 적용 구간 피해 비중 ${(Number(ring.damageCoverage) * 100).toFixed(1)}%`
+      : ring.activationMode === "boss-entry-maintained"
+        ? "보스전 상시 유지"
+        : `${minutes}분 기준 시간 가동률 ${(Number(ring.timeUptime ?? ring.uptime) * 100).toFixed(1)}%`;
     return `${ring.name}${ring.level ? ` Lv.${ring.level}` : ""} · ` +
-      `6분 평균 가동 ${(Number(ring.uptime) * 100).toFixed(1)}%` +
+      coverage +
       (effects.length ? ` · ${effects.join(" · ")}` : "");
   }).join("\n");
 }
@@ -561,6 +571,26 @@ function classAlwaysOnCombatSummary(profile) {
   ].filter(Boolean).join(" · ");
 }
 
+export function baselineSkillSummary(skill) {
+  const effects = skill.effects ?? {};
+  const parts = [];
+  if (Number(effects.attack) > 0 && effects.attack === effects.magic) {
+    parts.push(`공·마 +${effects.attack}`);
+  } else {
+    if (Number(effects.attack) > 0) parts.push(`공격력 +${effects.attack}`);
+    if (Number(effects.magic) > 0) parts.push(`마력 +${effects.magic}`);
+  }
+  if (Number(effects.allStat) > 0) parts.push(`올스탯 +${effects.allStat}`);
+  for (const [key, label] of [["bossDamage", "보공"], ["damage", "데미지"],
+    ["criticalRate", "크확"], ["criticalDamage", "크뎀"]]) {
+    if (Number(effects[key]) > 0) parts.push(`${label} +${effects[key]}%`);
+  }
+  for (const value of effects.ignoreDefenseSources ?? []) {
+    if (Number(value) > 0) parts.push(`방무 ${value}%`);
+  }
+  return `${skill.name}${parts.length ? ` (${parts.join(", ")})` : ""}`;
+}
+
 function fullBossDopingDetails(profile, conventionalAddOption, collapsed = false) {
   if (conventionalAddOption) return null;
   const panel = element(collapsed ? "details" : "section", "profile-doping");
@@ -574,6 +604,13 @@ function fullBossDopingDetails(profile, conventionalAddOption, collapsed = false
     content.append(element("strong", "profile-doping__title", FULL_BOSS_DOPING.label));
   }
   content.append(element("p", "profile-doping__totals", fullBossDopingSummary(profile)));
+  const baselineSkills = Array.isArray(profile.details?.baselineSkills)
+    ? profile.details.baselineSkills : [];
+  const eventSkills = baselineSkills.filter((skill) => skill.kind === "event");
+  if (eventSkills.length) {
+    content.append(element("p", "profile-doping__class",
+      `현재 이벤트 스킬 · ${eventSkills.map(baselineSkillSummary).join(" · ")} (기본 능력치에 포함)`));
+  }
   const alwaysOnSummary = classAlwaysOnCombatSummary(profile);
   if (alwaysOnSummary) {
     content.append(
@@ -864,13 +901,15 @@ function scheduleEquipmentTooltipRefresh(characterName) {
   const profile = saved?.profiles?.fullBoss;
   const needsTooltip = needsEquipmentTooltipRefresh(summary);
   const needsCashEquipment = needsCashEquipmentDisplayRefresh(profile);
-  if (!needsTooltip && !needsCashEquipment) return;
+  const needsSkills = needsBaselineSkillRefresh(profile);
+  if (!needsTooltip && !needsCashEquipment && !needsSkills) return;
   const attemptKey = [
     characterName,
     summary?.version ?? "legacy",
     summary?.presetNo ?? "current",
     saved?.dataFreshness?.fetchedAt ?? "unknown",
     needsCashEquipment ? "cash-equipment-display" : "tooltip-only",
+    needsSkills ? "baseline-skills" : "current-skills",
   ].join(":");
   if (equipmentTooltipRefreshAttempts.has(attemptKey)) return;
   equipmentTooltipRefreshAttempts.add(attemptKey);
@@ -880,7 +919,8 @@ function scheduleEquipmentTooltipRefresh(characterName) {
       saved?.character?.name !== characterName ||
       (
         !needsEquipmentTooltipRefresh(saved?.equipmentSummary) &&
-        !needsCashEquipmentDisplayRefresh(saved?.profiles?.fullBoss)
+        !needsCashEquipmentDisplayRefresh(saved?.profiles?.fullBoss) &&
+        !needsBaselineSkillRefresh(saved?.profiles?.fullBoss)
       )
     ) {
       return;

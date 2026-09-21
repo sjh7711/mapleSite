@@ -274,7 +274,6 @@ test("첫작놀긍 선택과 목표 입력은 놀긍 설정 카드 안에 표시
   assert.match(chaosCardSource, /"목표 스탯 합"/);
   assert.match(chaosCardSource, /method\.kind === "return"[\s\S]*"첫작 목표 공·마"/);
   assert.match(chaosCardSource, /"첫작 목표 스탯 합"/);
-  assert.match(chaosCardSource, /놀긍 첫작 설정은 이미 적용한 작 수가 0일 때만 사용합니다/);
   assert.doesNotMatch(chaosCardSource, /choice\("returnFirstRate"/);
   assert.doesNotMatch(chaosCardSource, /첫작 놀긍 60%|첫작 놀긍 100%/);
   assert.match(chaosCardSource, /isStandaloneFirst \|\| usesChaosFirst/);
@@ -291,7 +290,6 @@ test("첫작놀긍 선택과 목표 입력은 놀긍 설정 카드 안에 표시
   assert.match(renderSource, /const showsChaosSettings = method\.kind === "slot" \|\| usesChaos/);
   assert.match(source, /toggle\("chaosFirst", "첫작놀긍"\)/);
   assert.match(source, /"놀긍 첫작",[\s\S]*!disabled && state\.returnFirst/);
-  assert.match(source, /사용할 주문서는 현재 장비 상태와 입력한 시세·보유량에 맞춰 자동 계산/);
   assert.match(source, /delete state\.returnFirstRate/);
   assert.doesNotMatch(source, /황금망치/);
   assert.doesNotMatch(source, /card\(\s*"첫 작 놀긍"/);
@@ -431,7 +429,7 @@ test("기존 놀긍떡작 저장값은 설정을 잃지 않고 독립 놀긍첫�
     source.indexOf("} catch"),
   );
 
-  assert.match(source, /const SCROLL_SETTINGS_VERSION = 6/);
+  assert.match(source, /const SCROLL_SETTINGS_VERSION = 7/);
   assert.match(
     migrationSource,
     /if \(savedVersion < 3\) \{[\s\S]*state\.preserveStarforce = false;[\s\S]*state\.halfPrice = false;/,
@@ -513,7 +511,7 @@ test("놀긍첫작은 목표와 첫작 비용·보유량만 입력받는다", as
   assert.match(costSource, /"보유 아크 이노센트 100% \(장\)"[\s\S]*"arkInnocentStock"/);
   assert.match(costSource, /"보유 이노센트 100% \(장\)"[\s\S]*"innocentStock"/);
   assert.match(costSource, /toggle\(\s*"halfPrice",\s*"주흔 반값 썬데이"/);
-  assert.match(costSource, /isStandaloneFirst[\s\S]*toggle\("preserveStarforce", "아크 이노 사용"\)/);
+  assert.match(costSource, /isStandaloneFirst[\s\S]*resetModeSelector\("preserveStarforce"/);
 
   assert.doesNotMatch(source, /choice\("chaosRate"|pickChaosRate|scroll-chaos-rates/);
   assert.doesNotMatch(costSource, /isStandaloneFirst[\s\S]*"순백 10%|isStandaloneFirst[\s\S]*"순백 5%/);
@@ -600,7 +598,7 @@ test("매지컬리턴은 완료 횟수에 따라 첫작 이노와 남은 리턴�
   assert.equal((magicalResultSource.match(/한 번에 뜰 확률/g) ?? []).length, 0);
   assert.doesNotMatch(renderSource, /choice\("magicalTarget"/);
   assert.doesNotMatch(renderSource, /\[9, 10, 11\]/);
-  assert.match(renderSource, /toggle\("magicalFirstStarforced", "아크 이노 사용"\)/);
+  assert.match(renderSource, /resetModeSelector\("magicalFirstStarforced"\)/);
   assert.match(source, /첫작은 \(아크\) 이노센트, 나머지는 리턴/);
 });
 
@@ -704,7 +702,7 @@ test("순백 5/10% 허용을 끄면 입력을 유지한 채 계산 후보에서 
   assert.match(source, /clean5Price[\s\S]*disabled: !state\.useCleanScrolls/);
   assert.match(
     source,
-    /toggle\("useInnocent", "이노센트 허용"\)[\s\S]*toggle\("useCleanScrolls", "순백 5\/10% 허용"\)[\s\S]*toggle\("preserveStarforce", "아크 이노 사용"\)[\s\S]*"주흔 반값 썬데이"/,
+    /resetModeSelector\("preserveStarforce"[\s\S]*toggle\("useCleanScrolls", "순백 5\/10% 허용"\)[\s\S]*"주흔 반값 썬데이"/,
   );
   assert.match(source, /보유 순백 100%를 먼저 사용하고, 모두 소진되면 주흔 순백 100%로 복구합니다/);
   assert.match(source, /현재 전략에서 사용 안 함/);
@@ -723,7 +721,7 @@ test("작 방식을 상단에 두고 장비·놀긍과 비용을 하단 두 열�
 
   assert.match(renderSource, /const methodCard = settingsSection\(\s*"작 방식",\s*"method"/);
   assert.match(renderSource, /equipmentSettingsCard = method\.kind === "return"/);
-  assert.match(renderSource, /chaosSettingsCard = settingsSection\(\s*"놀긍 설정",\s*"chaos"/);
+  assert.match(renderSource, /chaosSettingsCard = settingsSection\(\s*method\.kind === "return" \? "" : "놀긍 설정",\s*"chaos"/);
   assert.match(renderSource, /costSettingsCard = settingsSection\(\s*"비용 설정",\s*"cost"/);
   assert.match(
     renderSource,
@@ -923,7 +921,7 @@ test("첫작놀긍 전에는 실제 장비 상태와 첫작을 안내하고 정�
   assert.match(slotResultSource, /firstActionName: first\?\.nextAction/);
 });
 
-test("놀긍 설정 용어를 간결하게 하고 반값·아크 이노는 기본 OFF로 둔다", async () => {
+test("놀긍 설정 용어를 간결하게 하고 반값 OFF·일반 이노를 기본으로 둔다", async () => {
   const source = await readFile(
     new URL("../src/pages/scroll.js", import.meta.url),
     "utf8",
@@ -937,10 +935,10 @@ test("놀긍 설정 용어를 간결하게 하고 반값·아크 이노는 기�
   assert.match(stateSource, /preserveStarforce:\s*false/);
   assert.match(source, /element\("p", "section-note", "목표 스탯"\)/);
   assert.doesNotMatch(source, /"함께 판정할 스탯"/);
-  assert.match(source, /toggle\("preserveStarforce", "아크 이노 사용"\)/);
+  assert.match(source, /resetModeSelector\("preserveStarforce"/);
   assert.match(
     source,
-    /toggle\(\s*"returnFirstStarforced",\s*"아크 이노 사용"/,
+    /resetModeSelector\("returnFirstStarforced"/,
   );
   assert.doesNotMatch(source, /스타포스 보존\(아크 이노\)|스타포스 적용됨 \(아크 이노\)/);
 });
@@ -979,42 +977,13 @@ test("놀긍 100%와 아크 이노센트 100% 보유분을 별도로 입력하�
   assert.match(source, /resetStock\(state\.returnFirstStarforced\)/);
 });
 
-test("리턴 결과는 1억당 2,000 메이플포인트로 메포·메소 표시를 전환한다", async () => {
-  const source = await readFile(
-    new URL("../src/pages/scroll.js", import.meta.url),
-    "utf8",
-  );
-  const stateSource = source.slice(
-    source.indexOf("const state ="),
-    source.indexOf("try {"),
-  );
-  const returnResultSource = source.slice(
-    source.indexOf("function returnResult()"),
-    source.indexOf("function render()"),
-  );
-
-  assert.match(stateSource, /maplePointsPerEok:\s*2000/);
-  assert.match(stateSource, /returnResultUnit:\s*"maplePoints"/);
-  assert.match(
-    source,
-    /field\(\s*"1억 메소당 메이플포인트",\s*num\("maplePointsPerEok"/,
-  );
-  assert.match(source, /choice\("returnResultUnit", "maplePoints", "메포"\)/);
-  assert.match(source, /choice\("returnResultUnit", "meso", "메소"\)/);
-  assert.match(source, /state\.returnResultUnit === "won"[\s\S]*"maplePoints"/);
-  assert.match(returnResultSource, /result\.costs\.maplePoints/);
-  assert.match(returnResultSource, /state\.maplePointsPerEok/);
-  assert.match(returnResultSource, /result\.costs\.equivalent\.cashAsMeso/);
-  assert.match(returnResultSource, /result\.costs\.equivalent\.totalMeso/);
-  assert.match(returnResultSource, /"예상 필요 메소"/);
-  assert.match(
-    returnResultSource,
-    /metric\("리턴 구매에 필요한 예상 메소", eokMeso\(cashAsMeso\)\)/,
-  );
-  assert.match(returnResultSource, /metric\("그 외 예상 메소", eokMeso\(mesoTotal\)\)/);
-  assert.doesNotMatch(returnResultSource, /현금 환산 메소|환산 포함 총 메소/);
-  assert.match(returnResultSource, /"예상 필요 메포"/);
-  assert.match(returnResultSource, /maplePoints\(result\.costs\.maplePoints\)/);
+test("리턴은 실제 메소 가격을 사용하고 메포 환산 입력을 표시하지 않는다", async () => {
+  const source = await readFile(new URL("../src/pages/scroll.js", import.meta.url), "utf8");
+  assert.match(source, /returnMeso: state\.returnPrice \* MAN/);
+  assert.match(source, /returnCurrency: "meso"/);
+  assert.match(source, /리턴 스크롤 1회 \(만 메소\)/);
+  assert.doesNotMatch(source, /field\(\s*"1억 메소당 메이플포인트"/);
+  assert.match(source, /result\.costs\.breakdown\.returnMeso/);
 });
 
 test("놀긍리턴 결과는 단일 첫 행동 대신 조건별 전체 진행 흐름을 설명한다", async () => {
@@ -1190,7 +1159,7 @@ test("놀긍리턴은 첫작 즉시 초기화와 누적 목표 전략을 함께 
   assert.doesNotMatch(resultSource, /returnFirstRate/);
   assert.match(resultSource, /returnWork: \{ chaosRate: 60 \}/);
   assert.match(resultSource, /arkInnocent100Meso: reset\?\.cost \?\? 0/);
-  assert.match(resultSource, /returnMaplePoints: state\.returnPrice/);
+  assert.match(resultSource, /returnMeso: state\.returnPrice \* MAN/);
   assert.match(resultSource, /"평균 초기화 횟수"/);
   assert.match(resultSource, /result\.expected\.ownedArkInnocent100Used/);
   assert.match(
@@ -1434,7 +1403,7 @@ test("놀긍리턴 상단 요약에서 1회 확률과 공마 최소 환산 박�
   assert.doesNotMatch(resultSource, /metric\("공·마 최소 환산"/);
 });
 
-test("놀긍리턴은 메포 지출을 강조하고 평균 목표와 중복 없는 지출 내역을 표시한다", async () => {
+test("놀긍리턴은 메소 지출을 강조하고 평균 목표와 중복 없는 지출 내역을 표시한다", async () => {
   const source = await readFile(
     new URL("../src/pages/scroll.js", import.meta.url),
     "utf8",
@@ -1444,8 +1413,8 @@ test("놀긍리턴은 메포 지출을 강조하고 평균 목표와 중복 없�
     source.indexOf("function render()"),
   );
 
-  assert.match(resultSource, /"예상 필요 메포"/);
-  assert.match(resultSource, /maplePoints\(result\.costs\.maplePoints\)/);
+  assert.match(resultSource, /"예상 필요 메소"/);
+  assert.match(resultSource, /eokMeso\(totalMeso\)/);
   assert.match(resultSource, /metric\("리턴 구매에 필요한 예상 메소", eokMeso\(cashAsMeso\)\)/);
   assert.match(resultSource, /metric\("그 외 예상 메소", eokMeso\(mesoTotal\)\)/);
   assert.match(resultSource, /metric\("평균 놀긍 사용량", sheets\(result\.expected\.chaosScrolls\)\)/);

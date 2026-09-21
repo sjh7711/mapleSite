@@ -1,3 +1,4 @@
+import { VERIFIED_SOUL_DOMAINS } from "./reform-live-verification-2026-09-17.js";
 /**
  * 2026-09-17 강화 개편의 공식 규칙 스냅샷.
  *
@@ -14,6 +15,8 @@ function deepFreeze(value) {
 }
 
 export const REFORM_2026_09_17_SOURCES = deepFreeze({
+  liveUpdate: { title: "클라이언트 1.2.419 업데이트", url: "https://maplestory.nexon.com/news/update/813", publishedDate: "2026-09-17" },
+  soulPotentialProbability: { title: "소울 잠재능력 공식 확률", url: "https://maplestory.nexon.com/Guide/OtherProbability/cube/Soulpotential", capturedDate: "2026-09-17" },
   testworldUpdate: {
     title: "클라이언트 1.2.206 릴리즈(이벤트, 컨텐츠, 개선사항 및 오류 수정)",
     url: "https://maplestory.nexon.com/testworld/news/all/199",
@@ -437,9 +440,9 @@ export const ABILITY_REFORM_2026_09_17 = deepFreeze({
 export const SOUL_REFORM_2026_09_17 = deepFreeze({
   id: "soul-2026-09-17",
   effectiveDate: "2026-09-17",
-  evidenceStatus: "official-testworld-partial",
-  calculationReadiness: "amplification-and-rank-up-ready-options-pending",
-  sources: ["testworldUpdate", "soulGuide", "miracleTimeGuide"],
+  evidenceStatus: "official-live-update-and-probability-page",
+  calculationReadiness: "amplification-rank-up-and-fixed-grade-options-ready",
+  sources: ["liveUpdate", "soulPotentialProbability", "soulGuide", "miracleTimeGuide"],
   eligibility: {
     minimumWeaponLevel: 200,
     requiredSoulType: "magnificent",
@@ -534,11 +537,11 @@ export const SOUL_REFORM_2026_09_17 = deepFreeze({
         lower: { legendary: 0.004975, unique: 0.995025 },
       },
     },
-    optionTypeWeights: null,
-    optionValuesByAmplificationStage: null,
+    optionTypeWeights: { snapshot: "data/soul-potential-2026-09-17.json" },
+    optionValuesByAmplificationStage: { snapshot: "data/soul-potential-2026-09-17.json", stages: [1, 2, 3, 4] },
     initialGradeAtStageOne: null,
-    optionDuplicatePolicy: null,
-    identicalResultPolicy: null,
+    optionDuplicatePolicy: { cappedOptionTypesInPublishedTables: [] },
+    identicalResultPolicy: "exclude-completely-identical-result",
     rankUpResultRollOrder: null,
   },
   persistence: {
@@ -584,11 +587,7 @@ export const SOUL_REFORM_2026_09_17 = deepFreeze({
     dropRates: null,
   },
   pendingOfficialFields: [
-    "potential.optionTypeWeights",
-    "potential.optionValuesByAmplificationStage",
     "potential.initialGradeAtStageOne",
-    "potential.optionDuplicatePolicy",
-    "potential.identicalResultPolicy",
     "potential.rankUpResultRollOrder",
     "ether.dropRates",
   ],
@@ -620,10 +619,9 @@ export const REFORM_2026_09_17_READINESS = deepFreeze({
     pendingOfficialFields: [],
   },
   soulPotentialOptions: {
-    ready: false,
-    pendingOfficialFields: SOUL_REFORM_2026_09_17.pendingOfficialFields.filter(
-      (field) => field.startsWith("potential."),
-    ),
+    ready: true,
+    pendingOfficialFields: [],
+    scope: "fixed-grade-reroll-at-user-selected-amplification-stage",
   },
   soulPotentialAutomaticEnhancement: {
     ready: false,
@@ -692,6 +690,7 @@ export const REFORM_2026_09_17_PRODUCTION_ACTIVATION = deepFreeze({
         { sourceKey: "soulPotentialProbability", url: null },
       ],
     ),
+    ...VERIFIED_SOUL_DOMAINS,
   },
 });
 

@@ -36,11 +36,11 @@ test("개편 규칙은 정식 서버 적용일 전후를 구분한다", () => {
       domain: "soulAmplification",
       maintenanceCompleted: true,
     }),
-    false,
+    true,
   );
   assert.equal(
     REFORM_2026_09_17_PRODUCTION_ACTIVATION.domains.soulAmplification.liveVerified,
-    false,
+    true,
   );
   assert.throws(
     () => isReform20260917Effective("2026/09/17", { domain: "scroll" }),
@@ -167,10 +167,10 @@ test("고급 재설정은 명성치와 메소를 별도 비용으로 유지한�
   );
 });
 
-test("증폭과 등업은 준비됐지만 미공개 옵션 기댓값은 차단한다", () => {
+test("정식 소울 확률로 검증한 영역만 활성화하고 미확인 자동 강화는 보류한다", () => {
   assert.equal(getReform20260917Readiness("soulAmplification").ready, true);
   assert.equal(getReform20260917Readiness("soulPotentialRankUp").ready, true);
-  assert.equal(getReform20260917Readiness("soulPotentialOptions").ready, false);
+  assert.equal(getReform20260917Readiness("soulPotentialOptions").ready, true);
   assert.equal(
     getReform20260917Readiness("soulPotentialAutomaticEnhancement").ready,
     false,
@@ -187,7 +187,7 @@ test("증폭과 등업은 준비됐지만 미공개 옵션 기댓값은 차단�
   );
   assert.throws(
     () => assertReform20260917Ready("soulPotentialOptions"),
-    /아직 운영 계산에 사용할 수 없습니다/,
+    /점검 완료 및 해당 영역 공식 스냅샷 재검증 전/,
   );
   assert.doesNotThrow(() =>
     assertReform20260917Ready("soulAmplification", {

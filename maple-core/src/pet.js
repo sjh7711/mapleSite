@@ -35,7 +35,7 @@ export const PET_PROBABILITIES = Object.freeze({
 
 export const PET_PAYBACK_POINTS = 540;
 
-export const PET_PROBABILITY_SNAPSHOT_DATE = "2026-08-31";
+export const PET_PROBABILITY_SNAPSHOT_DATE = "2026-09-17";
 
 export const PET_SOURCE_URLS = Object.freeze({
   wonderBerry:
@@ -293,16 +293,32 @@ export function optimizeWonderBerryProcurement(options = {}) {
   };
 }
 
+/** true는 공식 20% 증가 이벤트, 숫자는 계산 경로에 전달하는 실제 확률이다. */
+function resolveWonderBlackEvent(options) {
+  if (typeof options.wonderBlackEvent === "number") {
+    getWonderBlackProbability(options.wonderBlackEvent);
+    return options.wonderBlackEvent;
+  }
+  if (options.wonderBlackEvent !== true) return false;
+  const increase = finiteNonNegative(options.wonderBlackEventIncreasePercent ?? 20, "이벤트 확률 증가");
+  const probability = PET_PROBABILITIES.wonderBlack.normal * (1 + increase / 100);
+  getWonderBlackProbability(probability);
+  return probability;
+}
+
 export function getWonderBlackProbability(event = false) {
-  return event
-    ? PET_PROBABILITIES.wonderBlack.event
-    : PET_PROBABILITIES.wonderBlack.normal;
+  if (typeof event === "number") {
+    if (!Number.isFinite(event) || event <= 0 || event > 1 - PET_PROBABILITIES.wonderConsumable) {
+      throw new RangeError("이벤트 확률 증가값이 허용 범위를 넘었습니다.");
+    }
+    return event;
+  }
+  return event ? PET_PROBABILITIES.wonderBlack.event : PET_PROBABILITIES.wonderBlack.normal;
 }
 
 export function getWonderUpperPetProbability(event = false) {
-  return event
-    ? PET_PROBABILITIES.wonderUpperPet.event
-    : PET_PROBABILITIES.wonderUpperPet.normal;
+  // 공식 이벤트와 동일하게 소모품 비중을 유지하고 원더 펫 비중에서 차감한다.
+  return 1 - PET_PROBABILITIES.wonderConsumable - getWonderBlackProbability(event);
 }
 
 /** 한 번의 경로(B+B, 스윗이면 S+B)에서 쁘띠를 얻을 확률. */
@@ -1121,7 +1137,7 @@ const HYBRID_BUNDLE_KERNEL_CACHE = new Map();
 const HYBRID_UNLIMITED_SOLUTION_CACHE = new Map();
 
 function hybridKernelCacheKey(targetCount, wonderBlackEvent, bundleSize) {
-  return `${targetCount}:${wonderBlackEvent ? 1 : 0}:${bundleSize}`;
+  return `${targetCount}:${getWonderBlackProbability(wonderBlackEvent)}:${bundleSize}`;
 }
 
 function getWonderBerryBundleKernel({
@@ -2179,7 +2195,7 @@ export function probabilityOfTargetWithinBundles(
   const validated = validateBundleInputs(target, bundleSize);
   const kernel = getWonderBerryBundleKernel({
     ...validated,
-    wonderBlackEvent: event === true,
+    wonderBlackEvent: event,
   });
   return probabilityWithinBundleKernel(kernel, bundles);
 }
@@ -2198,7 +2214,7 @@ export function bundlesForTargetChance(
   }
   const kernel = getWonderBerryBundleKernel({
     ...validated,
-    wonderBlackEvent: event === true,
+    wonderBlackEvent: event,
   });
   return bundleCountForTargetChance(kernel, wanted);
 }
@@ -2244,7 +2260,7 @@ export function calculateWonderBerryTargetProcurement(options = {}) {
   if (!(requestedChance > 0 && requestedChance < 1)) {
     throw new RangeError("목표 확률은 0보다 크고 1보다 작아야 합니다.");
   }
-  const wonderBlackEvent = options.wonderBlackEvent === true;
+  const wonderBlackEvent = resolveWonderBlackEvent(options);
   const requiredWonderBerries = wonderBerriesForTargetChance(
     targetCount,
     requestedChance,
@@ -2323,7 +2339,7 @@ export function calculateWonderBerryPercentileCompletionExpectation(
   if (!(requestedChance > 0 && requestedChance < 1)) {
     throw new RangeError("목표 확률은 0보다 크고 1보다 작아야 합니다.");
   }
-  const wonderBlackEvent = options.wonderBlackEvent === true;
+  const wonderBlackEvent = resolveWonderBlackEvent(options);
   const bundleSize = positiveInteger(
     options.wonderBerryBundleSize ?? 11,
     "원더베리 묶음 개수",
@@ -3913,7 +3929,7 @@ export function calculateWonderBerryBundleExpectation(options = {}) {
     options.targetCount ?? 1,
     options.wonderBerryBundleSize ?? 11,
   );
-  const wonderBlackEvent = options.wonderBlackEvent === true;
+  const wonderBlackEvent = resolveWonderBlackEvent(options);
   const wonderBerryBundleMaplePoints = finiteNonNegative(
     options.wonderBerryBundleMaplePoints ??
       options.wonderBerryBundlePrice ??
@@ -4618,10 +4634,10 @@ export function calculatePetExpectation(options = {}) {
   const second = PET_PROBABILITIES.dreamSynthesis;
   const routeSuccessProbability = getPetiteRouteProbability();
   const wonderBlackProbability = getWonderBlackProbability(
-    options.wonderBlackEvent === true,
+    resolveWonderBlackEvent(options),
   );
   const wonderUpperPetProbability = getWonderUpperPetProbability(
-    options.wonderBlackEvent === true,
+    resolveWonderBlackEvent(options),
   );
 
   const routeAttempts = targetCount / routeSuccessProbability;
@@ -4680,7 +4696,7 @@ export function calculatePetExpectation(options = {}) {
 
   const bundlePurchase = calculateWonderBerryBundleExpectation({
     targetCount,
-    wonderBlackEvent: options.wonderBlackEvent === true,
+    wonderBlackEvent: resolveWonderBlackEvent(options),
     wonderBerryBundlePrice,
     wonderBerryBundleSize,
     wonderBerryAuctionBundleMesoPrice,

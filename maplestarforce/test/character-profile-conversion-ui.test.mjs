@@ -20,6 +20,9 @@ function memoryStorage() {
 const originalStorage = globalThis.localStorage;
 globalThis.localStorage = memoryStorage();
 const {
+  combatRingSummary,
+  baselineSkillSummary,
+  needsBaselineSkillRefresh,
   hasCurrentEquipmentTooltipData,
   needsEquipmentTooltipRefresh,
   shouldShowCharacterProfileWarning,
@@ -29,6 +32,22 @@ const {
 } = await import(
   "../src/shared/character-profile.js?conversion-ui"
 );
+
+test("반지 피해 비중·시간 가동률·상시 유지를 구별해 표시한다", () => {
+  const profile = {
+    attackType: "attack",
+    details: { combatDurationSeconds: 180, combatRings: [
+      { name: "리스트레인트 링", level: 6, activationMode: "battle-practice-damage-weighted", damageCoverage: 0.186534642788, timeUptime: 1 / 6, uptime: 0.186534642788, averageAttackPercent: 15.85544463698 },
+      { name: "컨티뉴어스 링", level: 6, activationMode: "boss-entry-maintained", uptime: 1, averageAttackPercent: 14, averageBossDamage: 54 },
+      { name: "웨폰퍼프 링", activationMode: "cycle-time-fallback", timeUptime: 0.2, uptime: 0.2 },
+    ] },
+  };
+  const summary = combatRingSummary(profile);
+  assert.match(summary, /반지 적용 구간 피해 비중 18\.7% · 공·마 평균 \+15\.86%/u);
+  assert.match(summary, /보스전 상시 유지 · 공·마 평균 \+14% · 보공 평균 \+54%/u);
+  assert.match(summary, /3분 기준 시간 가동률 20\.0%/u);
+  assert.doesNotMatch(summary, /6분 평균 가동/u);
+});
 
 test.after(() => {
   if (originalStorage === undefined) delete globalThis.localStorage;
@@ -134,11 +153,11 @@ test("원본 툴팁이 없는 구형 장비 저장본만 자동 갱신 대상으
     items: [{ name: "고통의 근원", potentialMainStatPercent: 30 }],
   };
   const current = {
-    version: 11,
+    version: 12,
     items: [{ name: "고통의 근원", tooltip: { potentialLines: [] } }],
   };
   const malformedCurrent = {
-    version: 11,
+    version: 12,
     items: [{ name: "고통의 근원" }],
   };
 
@@ -147,7 +166,7 @@ test("원본 툴팁이 없는 구형 장비 저장본만 자동 갱신 대상으
   assert.equal(hasCurrentEquipmentTooltipData(current), true);
   assert.equal(needsEquipmentTooltipRefresh(current), false);
   assert.equal(needsEquipmentTooltipRefresh(malformedCurrent), true);
-  assert.equal(hasCurrentEquipmentTooltipData({ version: 11, items: [] }), true);
+  assert.equal(hasCurrentEquipmentTooltipData({ version: 12, items: [] }), true);
 
   const source = await readFile(
     new URL("../src/shared/character-profile.js", import.meta.url),
@@ -291,4 +310,13 @@ test("두 환산값은 작은 카드 안에서 주값과 비교값으로 구분�
   assert.match(css, /\.profile-coefficients__caption\s*{[^}]*grid-column:\s*1 \/ -1/s);
   assert.match(css, /\.profile-coefficient__equivalents\s*{/);
   assert.match(css, /\.profile-coefficient__comparison\s*{[^}]*font-size:\s*0\.68rem/s);
+});
+
+
+test("현재 이벤트 스킬은 실제 보너스를 표시하고 빈 내역도 갱신 완료로 취급한다", () => {
+  assert.equal(baselineSkillSummary({name:"훈련 일지",effects:{attack:40,magic:40,allStat:80,bossDamage:40,ignoreDefenseSources:[40]}}),
+    "훈련 일지 (공·마 +40, 올스탯 +80, 보공 +40%, 방무 40%)");
+  assert.equal(needsBaselineSkillRefresh({details:{}}),true);
+  assert.equal(needsBaselineSkillRefresh({details:{baselineSkills:[]}}),false);
+  assert.equal(needsBaselineSkillRefresh(null),false);
 });

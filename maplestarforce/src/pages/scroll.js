@@ -1,9 +1,11 @@
+import { SCROLL_PRICE_DEFAULTS, migrateScrollPrices } from "../shared/scroll-price-defaults.js";
 import {
   TRACE_SLOTS,
   calculateMagicalReturnCraftProgress,
   calculateSlotCraft,
   chaosAtLeast,
   chaosSumAtLeast,
+  earringSuccessRate,
   specialTraceCost,
   traceCost,
   traceSuccessRate,
@@ -39,7 +41,7 @@ renderToolNav(document.querySelector("#toolnav"), "scroll");
 
 const METHODS = {
   trace: { name: "주흔작", kind: "slot", description: "주문의 흔적과 순백·이노센트 재고를 반영한 비용 전략" },
-  earring: { name: "귀지작", kind: "slot", fixedRate: 0.1, description: "10% 귀 장식 주문서 완작" },
+  earring: { name: "귀지작", kind: "slot", description: "10% 귀 장식 주문서 완작" },
   firstChaos: { name: "놀긍첫작", kind: "firstChaos", description: "원하는 놀긍 첫작이 붙을 때까지의 평균 비용" },
   chaosReturn: { name: "놀긍리턴", kind: "return", description: "누적 목표에 맞춰 놀긍 결과를 채택하고 리턴" },
   magical: { name: "매지컬리턴", kind: "magical", description: "첫작은 (아크) 이노센트, 나머지는 리턴으로 매지컬 공·마 +11 완작" },
@@ -54,7 +56,7 @@ const TRACE_LEVEL_RANGE = {
   heart: [100, 130],
 };
 const STATS = ["STR", "DEX", "INT", "LUK"];
-const SCROLL_SETTINGS_VERSION = 6;
+const SCROLL_SETTINGS_VERSION = 7;
 const MAX_WORK_COUNT = 12;
 const MAGICAL_TARGET = 11;
 const MAGICAL_TOTAL_WORKS = 10;
@@ -137,14 +139,14 @@ const state = {
   attackTarget: DEFAULT_RETURN_ATTACK_TARGET,
   statTarget: 2,
   stats: { STR: true, DEX: false, INT: false, LUK: false },
-  returnPrice: 6900,
-  magicalPrice: 5000,
+  returnPrice: SCROLL_PRICE_DEFAULTS.returnPrice,
+  magicalPrice: SCROLL_PRICE_DEFAULTS.magicalPrice,
 
-  // 주문서 시세는 만 메소, 리턴 스크롤은 메포 단위로 받는다.
+  // 주문서와 리턴 스크롤 가격은 모두 만 메소 단위로 받는다.
   tracePer1000: 140,
-  earringPrice: 8000,
-  chaos60Price: 3,
-  chaos100Price: 4500,
+  earringPrice: SCROLL_PRICE_DEFAULTS.earringPrice,
+  chaos60Price: SCROLL_PRICE_DEFAULTS.chaos60Price,
+  chaos100Price: SCROLL_PRICE_DEFAULTS.chaos100Price,
   chaos100Stock: 0,
 
   clean10Price: 140,
@@ -158,13 +160,13 @@ const state = {
   innocentStock: 0,
   arkInnocentStock: 0,
   maplePointsPerEok: 2000,
-  returnResultUnit: "maplePoints",
+  returnResultUnit: "meso",
 };
 
 try {
   const saved = JSON.parse(localStorage.getItem("maplestarforce:scroll:v2")) ?? {};
   const savedVersion = Number(saved.settingsVersion) || 0;
-  Object.assign(state, saved);
+  Object.assign(state, migrateScrollPrices(saved));
   state.workCount = normalizeWorkCount(
     Object.hasOwn(saved, "workCount")
       ? saved.workCount
@@ -251,6 +253,8 @@ const maplePoints = (value) => {
 };
 const times = (value) => `${value.toFixed(1)}회`;
 const sheets = (value) => `${value.toFixed(1)}장`;
+const successPercent = (rate) =>
+  `${(rate * 100).toLocaleString("ko-KR", { maximumFractionDigits: 1 })}%`;
 
 function selectedWorkCount(value) {
   const slots = Math.round(Number(value));
@@ -434,10 +438,8 @@ function settingsSection(title, area, ...children) {
     "section",
     `scroll-settings-section scroll-settings-section--${area}`,
   );
-  section.append(
-    element("h2", "", title),
-    ...children.filter(Boolean),
-  );
+  if (title) section.append(element("h2", "", title));
+  section.append(...children.filter(Boolean));
   return section;
 }
 
@@ -486,7 +488,6 @@ function returnFirstWorkOption(disabled = false) {
   const option = element("div", "scroll-chaos-first");
   option.dataset.disabled = String(disabled);
   option.append(
-    element("span", "scroll-chaos-first__label", "첫 작 전략"),
     chipRow([
       toggleChip(
         "놀긍 첫작",
@@ -802,6 +803,32 @@ function toggle(key, label, disabled = false) {
   );
 }
 
+function resetModeSelector(key, { allowNone = false, required = false, disabled = false } = {}) {
+  const selected = allowNone && !state.useInnocent
+    ? "none"
+    : state[key] ? "ark" : "innocent";
+  const options = [
+    ...(allowNone && !required ? [{ value: "none", label: "초기화 안 함", title: "실패한 횟수는 순백으로 복구합니다." }] : []),
+    { value: "innocent", label: "일반 이노", title: "스타포스도 초기화합니다." },
+    { value: "ark", label: "아크 이노", title: "현재 스타포스를 보존합니다." },
+  ];
+  const group = chipRow(options.map(({ value, label, title }) => {
+    const button = chip(label, selected === value, () => {
+      if (allowNone) state.useInnocent = value !== "none";
+      state[key] = value === "ark";
+      render();
+    }, disabled, { key: `scroll-reset-${key}-${value}` });
+    button.title = title;
+    return button;
+  }), "scroll-reset-mode__choices");
+  group.setAttribute("role", "group");
+  group.setAttribute("aria-label", "초기화 방식");
+  group.dataset.key = "scroll-reset-mode";
+  const control = element("div", "field scroll-reset-mode");
+  control.append(element("span", "", "초기화 방식"), group);
+  return control;
+}
+
 function pickSlot(id) {
   return chip(TRACE_SLOTS[id].label, state.slot === id, () => {
     state.slot = id;
@@ -835,8 +862,12 @@ function choice(key, value, label) {
 const statCount = () => STATS.filter((name) => state.stats[name]).length;
 
 function successRate() {
-  const method = METHODS[state.method];
-  if (method.fixedRate) return method.fixedRate;
+  if (state.method === "earring") {
+    return earringSuccessRate({
+      guild: state.guild,
+      dexterity: state.dexterityLevel,
+    });
+  }
   return traceSuccessRate(state.traceRate, {
     fever: state.fever,
     guild: state.guild,
@@ -929,25 +960,22 @@ function supportScrollPurchaseGuide() {
   thead.append(head);
   const tbody = document.createElement("tbody");
   const hasTracePrice = Number(state.tracePer1000) > 0;
-  for (const [name, value, status = ""] of [
+  for (const [name, value] of [
     ["순백 10%", thresholds.clean10],
     ["순백 5%", thresholds.clean5],
     [
       "이노센트 50%",
       thresholds.innocent50,
-      state.preserveStarforce
-        ? "아크 이노 사용 중"
-        : !state.useInnocent
-          ? "이노 전략 꺼짐"
-          : "",
     ],
   ]) {
     const row = document.createElement("tr");
-    const disabled = !state.useCleanScrolls && (name === "순백 10%" || name === "순백 5%");
+    const disabled = name === "이노센트 50%"
+      ? !state.useInnocent || state.preserveStarforce
+      : !state.useCleanScrolls;
     const threshold = disabled
       ? "현재 전략에서 사용 안 함"
       : hasTracePrice
-      ? `${purchasePrice(value)}${status ? ` · ${status}` : ""}`
+      ? purchasePrice(value)
       : "흔적 시세 입력 필요";
     row.append(element("td", "", name), element("td", "", threshold));
     tbody.append(row);
@@ -964,17 +992,17 @@ function supportScrollPurchaseGuide() {
       "scroll-purchase-threshold__note",
     ),
   );
-  if (state.preserveStarforce) {
-    panel.append(
-      note(
-        "아크 이노 사용 중에는 이노센트 50%를 현재 전략에 사용하지 않습니다.",
-        "scroll-purchase-threshold__note",
-      ),
-    );
-  } else if (!state.useInnocent) {
+  if (!state.useInnocent) {
     panel.append(
       note(
         "이노센트 전략이 꺼져 있어 이노센트 50%를 현재 계산에 사용하지 않습니다.",
+        "scroll-purchase-threshold__note",
+      ),
+    );
+  } else if (state.preserveStarforce) {
+    panel.append(
+      note(
+        "아크 이노 사용 중에는 이노센트 50%를 현재 전략에 사용하지 않습니다.",
         "scroll-purchase-threshold__note",
       ),
     );
@@ -1406,10 +1434,9 @@ function slotResult() {
     : calculateSlotCraft({
         slots: craftSlots,
         successRate: rate,
-        slotProtectionRate:
-          state.method === "trace"
-            ? Math.max(0, Math.min(4, Number(state.guildProtection))) / 100
-            : 0,
+        // 주흔·귀지 모두 주문서 강화의 장인 효과를 실패 이후에 적용한다.
+        // 공식 길드 개편: https://maplestory.nexon.com/News/Update/797
+        slotProtectionRate: Math.max(0, Math.min(4, Number(state.guildProtection))) / 100,
         scrollCost: scrollMeso(),
         cleanCost: restore?.cost ?? Number.POSITIVE_INFINITY,
         /* 이노센트는 첫작놀긍까지 지운다. 첫작 비용을 한 번만 낸 채 후속
@@ -1487,7 +1514,7 @@ function slotResult() {
     metricGrid(
       state.method === "trace"
         ? metric("평균 주흔", `${Math.round(expectedTraceCount).toLocaleString("ko-KR")}개`)
-        : metric("성공 확률", `${(rate * 100).toFixed(0)}%`),
+        : metric("성공 확률", successPercent(rate)),
       metric("평균 주문서", times(result.expected.scrolls + (first?.scrolls ?? 0))),
       restore
         ? supportScrollUsageMetric("평균 순백", [
@@ -1569,12 +1596,6 @@ function magicalResult() {
       element("div", "result-empty", "비용 설정에서 첫작 초기화에 사용할 이노센트 시세를 입력해 주세요."),
     );
   }
-  if (remainingSlots > 0 && !(Number(state.maplePointsPerEok) > 0)) {
-    return createResultCard(
-      "계산 결과",
-      element("div", "result-empty", "1억 메소당 메이플포인트를 0보다 크게 입력해 주세요."),
-    );
-  }
   const selectedResetStock = needsFirstWork
     ? Math.min(
         MAX_RETURN_STOCK,
@@ -1588,7 +1609,8 @@ function magicalResult() {
       completedSlots,
       target: MAGICAL_TARGET,
       scrollPrice: state.magicalPrice * MAN,
-      returnPrice: state.returnPrice,
+      returnPrice: state.returnPrice * MAN,
+      returnCurrency: "meso",
       resetCost: reset?.each ?? 0,
       resetRate: reset?.rate ?? 1,
       resetStock: selectedResetStock,
@@ -1598,7 +1620,7 @@ function magicalResult() {
   }
   const cashAsMeso = remainingSlots === 0
     ? 0
-    : (result.costs.returnMaplePoints / state.maplePointsPerEok) * MESO;
+    : result.costs.returnMeso;
   const totalMeso = result.costs.otherMeso + cashAsMeso;
   const resetKind = state.magicalFirstStarforced
     ? "아크 이노센트"
@@ -1645,7 +1667,7 @@ function magicalResult() {
       `${completedSlots}/${MAGICAL_TOTAL_WORKS}작 완료 · 남은 ${remainingSlots}작`,
     ),
     note(
-      `공·마 +${MAGICAL_TARGET} 확률은 ${(result.chance * 100).toFixed(0)}%로, 한 작당 평균 ${result.attemptsPerWork.toFixed(0)}회 시도합니다. 입력한 리턴 메포를 1억 메소=${Number(state.maplePointsPerEok).toLocaleString("ko-KR")}메포로 환산했습니다.`,
+      `공·마 +${MAGICAL_TARGET} 확률은 ${(result.chance * 100).toFixed(0)}%로, 한 작당 평균 ${result.attemptsPerWork.toFixed(0)}회 시도합니다. 리턴 스크롤은 입력한 메소 가격으로 계산합니다.`,
     ),
   );
 }
@@ -1725,7 +1747,8 @@ function returnResult() {
       chaos60Meso: chaosMeso(60),
       chaos100Meso: chaosMeso(100),
       arkInnocent100Meso: reset?.cost ?? 0,
-      returnMaplePoints: state.returnPrice,
+      returnMaplePoints: 0,
+      returnMeso: state.returnPrice * MAN,
     },
     inventory: {
       chaos100Stock: Math.min(
@@ -1759,10 +1782,9 @@ function returnResult() {
     : 0;
   const returnChaosMeso =
     result.expected.remainder.purchasedChaos60 * chaosMeso(60);
-  const mesoTotal = result.costs.meso;
-  const cashAsMeso = result.costs.equivalent.cashAsMeso;
+  const mesoTotal = result.costs.meso - result.costs.breakdown.returnMeso;
+  const cashAsMeso = result.costs.breakdown.returnMeso;
   const totalMeso = result.costs.equivalent.totalMeso;
-  const resultInMeso = state.returnResultUnit === "meso";
   const unprotectedChaosScrolls = result.expected.unprotectedChaosScrolls ?? 0;
   const averageTargetText = [
     `공·마 평균 ${result.goals.averageAttack.toFixed(2).replace(/\.00$/, "")}`,
@@ -1799,8 +1821,9 @@ function returnResult() {
   return createResultCard(
     "계산 결과",
     returnCostHero(
-      resultInMeso ? "예상 필요 메소" : "예상 필요 메포",
-      resultInMeso ? eokMeso(totalMeso) : maplePoints(result.costs.maplePoints),
+      "예상 필요 메소",
+      eokMeso(totalMeso),
+      { showUnitToggle: false },
     ),
     metricGrid(
       metric("리턴 구매에 필요한 예상 메소", eokMeso(cashAsMeso)),
@@ -1873,7 +1896,7 @@ function returnResult() {
           "이미 적용된 주문서와 비용은 제외하고, 현재 장비에서 앞으로 필요한 값만 계산합니다.",
         )
       : null,
-    note("리턴 가격은 메포로 계산합니다. 메포/메소 전환은 리턴 비용의 표시 단위만 바꾸며 전략은 달라지지 않습니다."),
+    note("리턴 스크롤을 포함한 총 메소 비용이 가장 낮은 전략을 계산합니다."),
   );
 }
 
@@ -1889,6 +1912,8 @@ function render() {
   const isStandaloneFirst = method.kind === "firstChaos";
   const usesSlots = method.kind === "slot";
   const usesChaosFirst = isChaosFirstEnabled(method, state.chaosFirst);
+  // 첫작을 반복하는 전략에는 초기화가 필수다. 이전 저장값도 같은 조건으로 맞춘다.
+  if (usesChaosFirst) state.useInnocent = true;
   const usesChaos = isStandaloneFirst || method.kind === "return" || usesChaosFirst;
   const usesChaosTarget = isStandaloneFirst || method.kind === "return" || usesChaosFirst;
   const showsChaosSettings = method.kind === "slot" || usesChaos;
@@ -1927,19 +1952,13 @@ function render() {
 
   if (showsChaosSettings) {
     chaosSettingsCard = settingsSection(
-        "놀긍 설정",
+        method.kind === "return" ? "" : "놀긍 설정",
         "chaos",
         method.kind === "slot" ? firstWorkOption() : null,
         method.kind === "return"
           ? returnFirstWorkOption(hasReturnProgress)
           : null,
-        method.kind === "return"
-          ? note("놀긍 첫작 설정은 이미 적용한 작 수가 0일 때만 사용합니다.")
-          : null,
-        method.kind === "return"
-          ? note("사용할 주문서는 현재 장비 상태와 입력한 시세·보유량에 맞춰 자동 계산합니다.")
-          : null,
-        method.kind === "return" || usesChaosFirst
+        usesChaosFirst
           ? note("주스탯만 선택하세요. 선택한 공·마와 스탯은 장비에 이미 붙어 있어야 합니다.")
           : null,
         usesChaosTarget
@@ -1997,7 +2016,6 @@ function render() {
                 }),
                 "field--inline",
               ),
-              field("리턴 스크롤 1회 (메포)", num("returnPrice", { min: "0", max: "100000" }), "field--inline"),
             )
           : null,
       );
@@ -2076,9 +2094,6 @@ function render() {
             ),
           )
         : null,
-      method.kind === "return"
-        ? note("이미 적용한 작 수를 입력한 뒤, 장비 기본 옵션을 제외하고 놀긍으로 오른 수치만 입력하세요.")
-        : null,
       method.kind === "magical"
         ? note("10작 완작 기준입니다. 이미 공·마 +11로 완료한 주문서 횟수를 입력하세요.")
         : null,
@@ -2102,12 +2117,7 @@ function render() {
         "cost",
         row(
           field("매지컬 1장 (만 메소)", num("magicalPrice", { min: "0", step: "1" }), "field--inline"),
-          field("리턴 스크롤 1회 (메포)", num("returnPrice", { min: "0", max: "100000" }), "field--inline"),
-          field(
-            "1억 메소당 메이플포인트",
-            num("maplePointsPerEok", { min: "1", step: "1" }),
-            "field--inline",
-          ),
+          field("리턴 스크롤 1회 (만 메소)", num("returnPrice", { min: "0", max: "100000" }), "field--inline"),
         ),
         needsMagicalFirstWork
           ? row(
@@ -2121,9 +2131,11 @@ function render() {
             )
           : null,
         needsMagicalFirstWork
+          ? resetModeSelector("magicalFirstStarforced")
+          : null,
+        needsMagicalFirstWork
           ? chipRow([
               toggle("halfPrice", "주흔 반값 썬데이"),
-              toggle("magicalFirstStarforced", "아크 이노 사용"),
             ])
           : null,
       );
@@ -2149,7 +2161,7 @@ function render() {
           ),
           state.preserveStarforce
             ? null
-            : field("이노센트 50% (만 메소)", num("innocent50Price", { min: "0", step: "1" }), "field--inline"),
+            : field("이노센트 50% (만 메소)", num("innocent50Price", { min: "0", step: "1", disabled: !state.useInnocent }), "field--inline"),
         ]
       : isStandaloneFirst
         ? [
@@ -2187,11 +2199,7 @@ function render() {
         ? [
             field("놀긍 60% (만 메소)", num("chaos60Price", { min: "0", step: "1" }), "field--inline"),
             field("놀긍 100% (만 메소)", num("chaos100Price", { min: "0", step: "1" }), "field--inline"),
-            field(
-              "1억 메소당 메이플포인트",
-              num("maplePointsPerEok", { min: "1", step: "1" }),
-              "field--inline",
-            ),
+            field("리턴 스크롤 1회 (만 메소)", num("returnPrice", { min: "0", step: "1" }), "field--inline"),
           ]
         : isStandaloneFirst
           ? [
@@ -2209,8 +2217,8 @@ function render() {
           ? row(
               field("보유 순백 100% (장)", num("cleanStock", { min: "0", max: "999" }), "field--inline"),
               state.preserveStarforce
-                ? field("보유 아크 이노센트 100% (장)", num("arkInnocentStock", { min: "0", max: "100" }), "field--inline")
-                : field("보유 이노센트 100% (장)", num("innocentStock", { min: "0", max: "999" }), "field--inline"),
+                ? field("보유 아크 이노센트 100% (장)", num("arkInnocentStock", { min: "0", max: "100", disabled: !state.useInnocent }), "field--inline")
+                : field("보유 이노센트 100% (장)", num("innocentStock", { min: "0", max: "999", disabled: !state.useInnocent }), "field--inline"),
               usesChaosFirst
                 ? field("보유 놀긍 100% (장)", num("chaos100Stock", { min: "0", max: "100" }), "field--inline")
                 : null,
@@ -2246,19 +2254,14 @@ function render() {
                     ),
               )
             : null,
+        usesSlots || isStandaloneFirst
+          ? resetModeSelector("preserveStarforce", { allowNone: usesSlots, required: usesChaosFirst })
+          : method.kind === "return"
+            ? resetModeSelector("returnFirstStarforced", { disabled: !needsFirstReset })
+            : null,
         usesSlots || isStandaloneFirst || method.kind === "return"
           ? chipRow([
-              usesSlots ? toggle("useInnocent", "이노센트 허용") : null,
               usesSlots ? toggle("useCleanScrolls", "순백 5/10% 허용") : null,
-              isStandaloneFirst
-                ? toggle("preserveStarforce", "아크 이노 사용")
-                : usesSlots
-                ? toggle("preserveStarforce", "아크 이노 사용")
-                : toggle(
-                    "returnFirstStarforced",
-                    "아크 이노 사용",
-                    !needsFirstReset,
-                  ),
               toggle(
                 "halfPrice",
                 "주흔 반값 썬데이",
@@ -2269,12 +2272,12 @@ function render() {
       );
   }
 
-  if (state.method === "trace") {
+  if (state.method === "trace" || state.method === "earring") {
     parts.push(
       card(
         "성공 확률 보정",
         chipRow([
-          toggle("fever", "피버타임"),
+          state.method === "trace" ? toggle("fever", "피버타임") : null,
           toggle("guild", "길드 성공률 +4%p"),
           toggleChip("손재주 만렙", state.dexterityLevel >= 100, () => {
             state.dexterityLevel = state.dexterityLevel >= 100 ? 0 : 100;
@@ -2289,8 +2292,11 @@ function render() {
             "field--inline",
           ),
         ),
-        line("지금 성공 확률", `${(successRate() * 100).toFixed(0)}%`),
-        note("피버타임은 금~일 적용. 성공률 길드 스킬과 실패 시 횟수 미차감 길드 스킬은 서로 다른 효과입니다."),
+        line("지금 성공 확률", successPercent(successRate())),
+        note(state.method === "trace"
+          ? "피버타임은 금~일 적용. 손재주 5레벨마다 +0.5%p, 길드 성공률 +4%p를 더합니다."
+          : "기본 10%에 손재주 5레벨마다 +0.5%p, 길드 성공률 +4%p를 더해 최대 24%입니다. 피버타임은 적용되지 않습니다."),
+        note("실패 시 횟수 보호는 길드 스킬 ‘주문서 강화의 장인’ 효과입니다. 미적용은 0%, 적용은 4%이며 성공 확률과 별도로 계산합니다."),
       ),
     );
   }

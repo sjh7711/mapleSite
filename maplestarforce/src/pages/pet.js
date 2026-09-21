@@ -43,6 +43,7 @@ let percentileRequestId = 0;
 const defaults = {
   targetCount: 1,
   wonderBlackEvent: false,
+  wonderBlackEventIncreasePercent: 20,
   wonderBerryCashPurchaseAllowed: false,
   outputTradeability: "untradeable",
   wonderBerryBundleMaplePoints: 54_000,
@@ -145,6 +146,11 @@ function update(mutator) {
 }
 
 function refreshResult() {
+  const eventDescription = root.querySelector(".pet-black-event__description");
+  if (eventDescription) eventDescription.textContent = state.wonderBlackEvent
+    ? `ON ${(9.96 * (1 + state.wonderBlackEventIncreasePercent / 100)).toFixed(3).replace(/0+$/, "").replace(/\.$/, "")}%`
+    : "OFF 9.96%";
+
   const result = root.querySelector(".calculator-result");
   if (!result) return;
   renderWithFocus(result, [resultCard()]);
@@ -690,7 +696,7 @@ function eventControl() {
       "span",
       "pet-black-event__description",
       state.wonderBlackEvent
-        ? "ON 11.952%"
+        ? `ON ${(9.96 * (1 + state.wonderBlackEventIncreasePercent / 100)).toFixed(3).replace(/0+$/, "").replace(/\.$/, "")}%`
         : "OFF 9.96%",
     ),
   );
@@ -771,109 +777,34 @@ function targetCard() {
 }
 
 function costCard() {
-  const recoveryFields = row(
-    field(
-      "루나 드림 경매장 시세 (억 메소)",
-      num("lunaDreamEokPrice", {
-        min: "0",
-        step: "0.1",
-        allowEmpty: true,
-        placeholder: "경매장 시세",
-      }),
-    ),
-    field(
-      "루나 크리스탈 키 시세 (억 메소)",
-      num("lunaKeyEokPrice", {
-        min: "0",
-        step: "0.1",
-        allowEmpty: true,
-        placeholder: "경매장 시세",
-      }),
-    ),
-    field(
-      "경매장 판매 수수료",
-      chipRow(
-        chip("5%", state.auctionFeeRate === 0.05, () =>
-          setChoice("auctionFeeRate", 0.05)),
-        chip("3%", state.auctionFeeRate === 0.03, () =>
-          setChoice("auctionFeeRate", 0.03)),
-      ),
-    ),
+  const price = (label, key, extra = {}) => field(label, num(key, {
+    min: "0", step: "0.1", allowEmpty: true, placeholder: "경매장 시세", ...extra,
+  }));
+  const exchangeRates = row(
+    field("메소마켓 1억 메소 (메포)", num("mesoMarketMaplePointsPerEok", { min: "1", step: "1" })),
+    field("1억 메소 시세 (원)", num("cashWonPerEok", { min: "1", step: "1", allowEmpty: true, placeholder: "현금 시세 입력" })),
+    field("판매 수수료", chipRow(
+      chip("5%", state.auctionFeeRate === 0.05, () => setChoice("auctionFeeRate", 0.05)),
+      chip("3%", state.auctionFeeRate === 0.03, () => setChoice("auctionFeeRate", 0.03)),
+    )),
+    field("이벤트 확률 증가 (%)", num("wonderBlackEventIncreasePercent", { min: "0", max: "600", step: "1", disabled: !state.wonderBlackEvent })),
   );
-  recoveryFields.classList.add("pet-cost-grid", "pet-cost-grid--recovery");
-
-  const maplePointPrices = row(
-    field(
-      "원더베리 11개 묶음 캐시샵 가격",
-      num("wonderBerryBundleMaplePoints", { min: "0", step: "100" }),
-    ),
-    field(
-      "루나 크리스탈 1개 (메이플포인트)",
-      num("lunaCrystalMaplePoints", { min: "0", step: "100" }),
-    ),
+  exchangeRates.classList.add("pet-cost-grid", "pet-cost-grid--rates");
+  const purchasePrices = row(
+    field("원더베리 11개 (캐시)", num("wonderBerryBundleMaplePoints", { min: "0", step: "100" })),
+    price("원더베리 11개 경매장 (억 메소)", "wonderBerryAuctionBundleEokPrice", { step: "0.01" }),
+    field("루나 크리스탈 1개 (메포)", num("lunaCrystalMaplePoints", { min: "0", step: "100" })),
   );
-  maplePointPrices.classList.add("pet-cost-grid", "pet-cost-grid--purchase");
-
-  const exchangeRates = element("section", "pet-exchange-rates");
-  exchangeRates.append(
-    row(
-      field(
-        "메소마켓 1억 메소 시세 (메이플포인트)",
-        num("mesoMarketMaplePointsPerEok", { min: "1", step: "1" }),
-      ),
-      field(
-        "1억 메소 시세 (원)",
-        num("cashWonPerEok", {
-          min: "1",
-          step: "1",
-          allowEmpty: true,
-          placeholder: "현금 시세 입력",
-        }),
-      ),
-    ),
-  );
-
+  purchasePrices.classList.add("pet-cost-grid", "pet-cost-grid--purchase");
   const auctionPrices = row(
-    field(
-      "원더베리 11개 묶음 경매장 시세 (억 메소)",
-      num("wonderBerryAuctionBundleEokPrice", {
-        min: "0",
-        step: "0.01",
-        allowEmpty: true,
-        placeholder: "경매장 시세",
-      }),
-    ),
-    field(
-      "원더 블랙 1마리 (억 메소)",
-      num("wonderBlackEokPrice", {
-        min: "0",
-        step: "0.1",
-        allowEmpty: true,
-        placeholder: "경매장 시세",
-      }),
-    ),
-    field(
-      "루나 스윗 1마리 (억 메소)",
-      num("lunaSweetEokPrice", {
-        min: "0",
-        step: "0.1",
-        allowEmpty: true,
-        placeholder: "경매장 시세",
-      }),
-    ),
+    price("원더 블랙 (억 메소)", "wonderBlackEokPrice"),
+    price("루나 스윗 (억 메소)", "lunaSweetEokPrice"),
+    price("루나 드림 (억 메소)", "lunaDreamEokPrice"),
+    price("루크키 (억 메소)", "lunaKeyEokPrice"),
   );
   auctionPrices.classList.add("pet-cost-grid", "pet-cost-grid--auction");
   const purchaseGuideSlot = element("div", "pet-purchase-guide-slot");
-
-  return cardWithHead(
-    "비용 설정",
-    resetButton(),
-    exchangeRates,
-    recoveryFields,
-    maplePointPrices,
-    auctionPrices,
-    purchaseGuideSlot,
-  );
+  return cardWithHead("비용 설정", resetButton(), exchangeRates, purchasePrices, auctionPrices, purchaseGuideSlot);
 }
 
 function termGuide() {
@@ -1331,6 +1262,7 @@ function calculateResultContext() {
   const commonOptions = {
     targetCount: Number(state.targetCount),
     wonderBlackEvent: state.wonderBlackEvent,
+    wonderBlackEventIncreasePercent: state.wonderBlackEventIncreasePercent,
     sourceMode: "cheapest",
     wonderBerryBundleMaplePoints: Number(
       state.wonderBerryBundleMaplePoints,

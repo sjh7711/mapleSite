@@ -201,6 +201,7 @@ function normalizedPrices(prices = {}) {
     chaos100Meso: Number(prices.chaos100Meso ?? 0),
     arkInnocent100Meso: Number(prices.arkInnocent100Meso ?? 0),
     returnMaplePoints: Number(prices.returnMaplePoints ?? 0),
+    returnMeso: Number(prices.returnMeso ?? 0),
   };
   for (const [key, value] of Object.entries(result)) {
     assertNonNegative(value, key);
@@ -521,7 +522,7 @@ function createReturnSolver({
         prices.returnMaplePoints / acceptedChance +
         weightedMaplePoints / acceptedOptionChance;
       const candidateMeso =
-        prices.chaos60Meso / acceptedChance +
+        (prices.chaos60Meso + prices.returnMeso) / acceptedChance +
         weightedMeso / acceptedOptionChance;
       const candidateOwnedUsed = weightedOwnedUsed / acceptedOptionChance;
       let compared = compareNumber(candidateMaplePoints, bestPaidMaplePoints);
@@ -559,7 +560,7 @@ function createReturnSolver({
     if (chaos100Stock > 0) {
       const reject = solve(slots, attackNeeded, statNeeded, chaos100Stock - 1);
       let maplePoints = prices.returnMaplePoints;
-      let meso = 0;
+      let meso = prices.returnMeso;
       let ownedUsed = 1;
       let ownedAcceptedChance = 0;
       let ownedAcceptedCount = 0;
@@ -694,7 +695,7 @@ function createReturnSolver({
       metrics = scaledMetrics(weightedContinuation, 1 / optionChance);
       metrics[METRIC.returnPurchasedChaos60] += 1 / acceptedChance;
       metrics[METRIC.returnScrolls] += 1 / acceptedChance;
-      metrics[METRIC.meso] += prices.chaos60Meso / acceptedChance;
+      metrics[METRIC.meso] += (prices.chaos60Meso + prices.returnMeso) / acceptedChance;
       metrics[METRIC.maplePoints] +=
         prices.returnMaplePoints / acceptedChance;
     } else {
@@ -738,6 +739,7 @@ function createReturnSolver({
       metrics[METRIC.returnOwnedChaos100] += 1;
       metrics[METRIC.returnScrolls] += 1;
       metrics[METRIC.maplePoints] += prices.returnMaplePoints;
+      metrics[METRIC.meso] += prices.returnMeso;
     }
     evaluationMemo.set(key, metrics);
     return metrics;
@@ -1085,7 +1087,8 @@ export function maplePointsToMeso(
 /**
  * 보유 놀긍 100%와 보유 아크 이노센트 100%를 함께 배분하는 놀긍리턴
  * 경제 계산. 환산 표시 스위치는 반환된 equivalent 중 어느 값을 보여 줄지만
- * 결정하며, 정책은 항상 리턴 메포 → 메소 순으로 최소화한다.
+ * 결정한다. 메소 리턴 가격은 총 메소를 최소화하며, 기존 메포 가격을
+ * 명시한 호출은 메포 → 메소 우선순위를 유지한다.
  */
 export function calculateChaosReturnEconomy({
   slots,
@@ -1271,6 +1274,7 @@ export function calculateChaosReturnEconomy({
       arkInnocent100Meso:
         expected.purchasedArkInnocent100 * prices.arkInnocent100Meso,
       returnMaplePoints: expected.returnScrolls * prices.returnMaplePoints,
+      returnMeso: expected.returnScrolls * prices.returnMeso,
     },
     equivalent: {
       maplePointsPer100MillionMeso,
@@ -1289,7 +1293,7 @@ export function calculateChaosReturnEconomy({
       averageStat: statGoal / slots,
     },
     objective: {
-      primary: "return-maple-points",
+      primary: prices.returnMaplePoints > 0 ? "return-maple-points" : "meso",
       secondary: "meso",
       conversionAffectsStrategy: false,
     },

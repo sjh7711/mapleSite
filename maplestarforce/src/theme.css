@@ -1,0 +1,181 @@
+/* 다크 테마의 회색 글씨도 본문과 보조 정보의 구분을 유지하며 밝게 한다. */
+:root {
+  --text-strong: #f4f6fa;
+  --text-secondary: #c5cede;
+  --text-disabled: #a1adbf;
+  --text-placeholder: #aab7ca;
+  --surface-disabled: #242a35;
+  --border-disabled: #475268;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f4f5f8;
+  --card: #ffffff;
+  --line: #d4d9e2;
+  --text: #18212f;
+  --muted: #3f4b5d;
+  --accent: #895b00;
+  --accent-soft: rgba(190, 130, 0, 0.10);
+  --surface-input: #ffffff;
+  --surface-soft: #f6f7fa;
+  --surface-hover: #e9edf4;
+  --surface-raised: #ffffff;
+  --surface-wash: rgba(35, 49, 73, 0.035);
+  --surface-overlay: rgba(255, 255, 255, 0.96);
+  --border-soft: rgba(49, 66, 92, 0.16);
+  --border-strong: #b7c1d0;
+  --text-strong: #18212f;
+  --text-secondary: #354154;
+  --text-disabled: #626d7f;
+  --text-placeholder: #526176;
+  --surface-disabled: #edf0f4;
+  --border-disabled: #bfc8d5;
+  --text-gold: #805700;
+  --text-green: #167143;
+  --text-blue: #285eac;
+  --text-purple: #8040b3;
+  --text-red: #b52e3c;
+}
+
+/* 브라우저 기본 placeholder와 중복 opacity 때문에 글씨가 사라지지 않게 한다. */
+:root[data-theme] :is(input, textarea)::placeholder {
+  color: var(--text-placeholder);
+  opacity: 1;
+}
+
+:root[data-theme] .page :is(button, input, select, textarea):disabled,
+:root[data-theme] .page .search-select[data-disabled="true"] .search-select__input {
+  color: var(--text-disabled);
+  opacity: 1;
+}
+
+:root[data-theme] .page :is(input, select, textarea, .chip, .button):disabled,
+:root[data-theme] .page .search-select[data-disabled="true"] .search-select__input {
+  background-color: var(--surface-disabled);
+  border-color: var(--border-disabled);
+}
+
+/* 비활성 표시는 배경과 글자색으로 구분하고, 부모·자식의 투명도를 겹치지 않는다. */
+:root[data-theme] .page--calculator .target-item[data-disabled="true"],
+:root[data-theme] .page--calculator .add-option-equivalence .search-select[data-disabled="true"],
+:root[data-theme] .page--pet .pet-reach-control .reach-control__inputs[data-active="false"] {
+  opacity: 1;
+}
+
+:root[data-theme] .page--ability .ability-strategy-stock__field:has(input:disabled) > span,
+:root[data-theme] .page--scroll .field:has(input:disabled) > span,
+:root[data-theme] .page--scroll .scroll-chaos-first[data-disabled="true"] .scroll-chaos-first__label {
+  color: var(--text-disabled);
+  opacity: 1;
+}
+
+:root[data-theme] :is(.search-select__clear, .profile-saved-character__remove, .starforce-character__clear) {
+  opacity: 1;
+}
+
+:root[data-theme] :is(.hint, .section-note, .fine-print, .result-hero__label, .reach-control__label, .metric > span, .metric > small) {
+  font-weight: 500;
+}
+
+:is(.page__head, .info-header, .sitemap-submit__head):has(> .theme-toggle) {
+  position: relative;
+  min-height: 36px;
+  padding-right: 52px;
+}
+
+.theme-toggle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 36px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--card);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.theme-toggle[hidden] { display: none; }
+.theme-toggle:hover { color: var(--accent); border-color: var(--accent); }
+.theme-toggle svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.theme-toggle__moon { display: none; }
+:root[data-theme="light"] .theme-toggle__sun { display: none; }
+:root[data-theme="light"] .theme-toggle__moon { display: block; }
+
+/* 스타포스의 스크롤 안내와 테마 버튼을 같은 행의 세로 중심에 맞춘다. */
+@media (min-width: 761px) {
+  .page__head:has(> .page__hint):has(> .theme-toggle) {
+    align-items: center;
+    padding-right: 0;
+  }
+
+  .page__head:has(> .page__hint) > .theme-toggle {
+    position: static;
+    flex: none;
+  }
+}
+
+/* 등급별 색상도 밝은 바탕에서 읽을 수 있는 같은 계열의 색으로 바꾼다. */
+:root[data-theme="light"] .search-select__group[data-tone="legendary"],
+:root[data-theme="light"] .search-select__option[data-tone="legendary"]:hover,
+:root[data-theme="light"] .search-select__option[data-tone="legendary"][data-active="true"],
+:root[data-theme="light"] .search-select__option[data-tone="legendary"][aria-selected="true"] { color: var(--text-green); }
+:root[data-theme="light"] .search-select__group[data-tone="unique"],
+:root[data-theme="light"] .search-select__option[data-tone="unique"]:hover,
+:root[data-theme="light"] .search-select__option[data-tone="unique"][data-active="true"],
+:root[data-theme="light"] .search-select__option[data-tone="unique"][aria-selected="true"] { color: var(--text-gold); }
+:root[data-theme="light"] .search-select__group[data-tone="epic"],
+:root[data-theme="light"] .search-select__option[data-tone="epic"]:hover,
+:root[data-theme="light"] .search-select__option[data-tone="epic"][data-active="true"],
+:root[data-theme="light"] .search-select__option[data-tone="epic"][aria-selected="true"] { color: var(--text-purple); }
+:root[data-theme="light"] .search-select__group[data-tone="rare"],
+:root[data-theme="light"] .search-select__option[data-tone="rare"]:hover,
+:root[data-theme="light"] .search-select__option[data-tone="rare"][data-active="true"],
+:root[data-theme="light"] .search-select__option[data-tone="rare"][aria-selected="true"] { color: var(--text-blue); }
+
+:root[data-theme="light"] .button.button--reset:hover:not(:disabled),
+:root[data-theme="light"] .button.button--remove:hover,
+:root[data-theme="light"] .button.button--remove:focus-visible { color: var(--text-red); }
+
+:root[data-theme="light"] .search-select__group[data-tone="mixed"],
+:root[data-theme="light"] .search-select__option[data-tone="mixed"]:hover,
+:root[data-theme="light"] .search-select__option[data-tone="mixed"][data-active="true"] { color: var(--text-secondary); }
+
+:root[data-theme="light"] .page--calculator .add-option-setup-section--market::before,
+:root[data-theme="light"] .page--scroll .scroll-settings-lower::before,
+:root[data-theme="light"] .page--scroll .scroll-settings-column--right::before,
+:root[data-theme="light"] .page--scroll .scroll-settings-section + .scroll-settings-section::before { background: var(--border-soft); }
+
+:root[data-theme="light"] .page--calculator .profile-equipment__slot { border-color: var(--border-strong); }
+
+/* 게임의 장비 툴팁은 원본 등급·강화 색상을 읽기 쉽도록 어두운 패널을 유지한다. */
+:root[data-theme="light"] .profile-equipment-tooltip {
+  color-scheme: dark;
+  --text: #e8eaf0;
+  --muted: #9aa3b5;
+  --accent: #ffc107;
+  --line: #2b303c;
+  --card: #1b1e26;
+}
+
+:root[data-theme="light"] .sitemap-submit__primary { background: #ffc107; color: #29200d; }
+
+@media (max-width: 760px) {
+  .page__head:has(> .menu-button):has(> .theme-toggle) { padding-right: 112px; }
+  .page__head:has(> .menu-button) > .theme-toggle { right: 64px; height: 40px; }
+  .theme-toggle { width: 44px; height: 40px; }
+  .sitemap-submit__head:has(> .theme-toggle) { flex-wrap: wrap; }
+}
+
+@media (max-width: 380px) {
+  .page__head:has(> .menu-button):has(> .theme-toggle) h1 {
+    font-size: 1.25rem;
+    white-space: nowrap;
+  }
+}

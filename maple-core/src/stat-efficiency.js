@@ -108,6 +108,21 @@ function activeEquipment(equipmentData) {
   return equipmentData.item_equipment ?? [];
 }
 
+export function equipmentSoulOptionLines(item) {
+  // soul_active는 옵션 존재 여부와 별개다. 비활성 소울은 기본 옵션,
+  // 상시 공·마 및 증폭 잠재를 모두 제외한다. 구형 응답은 기존처럼 읽는다.
+  return (String(item?.soul_active ?? "1") === "1"
+    ? [
+        item?.soul_option,
+        number(item?.soul_pad) > 0 ? `공격력 +${number(item.soul_pad)}` : null,
+        number(item?.soul_mad) > 0 ? `마력 +${number(item.soul_mad)}` : null,
+        item?.soul_potential_option_1,
+        item?.soul_potential_option_2,
+        item?.soul_potential_option_3,
+      ]
+    : []).filter(Boolean);
+}
+
 function itemPotentialLines(item) {
   return [
     item?.potential_option_1,
@@ -116,7 +131,7 @@ function itemPotentialLines(item) {
     item?.additional_potential_option_1,
     item?.additional_potential_option_2,
     item?.additional_potential_option_3,
-    item?.soul_option,
+    ...equipmentSoulOptionLines(item),
   ].filter(Boolean);
 }
 
@@ -229,23 +244,27 @@ function parseTextBonuses(texts) {
       const destination = match[3] ? result.percent : result.flat;
       destination[stat] += number(match[2]);
     }
-    for (const match of text.matchAll(
+    // 공·마가 하나의 수치를 공유하는 표기는 먼저 소비한다. 쉼표 표기의
+    // 마력만 읽거나, 공유 수치와 개별 마력을 중복 합산하지 않는다.
+    const attackText = text.replace(
+      /공격력\s*(?:과|및|\/|,)\s*마력(?:이)?\s*\+?\s*(\d+(?:\.\d+)?)\s*(%)?/gu,
+      (_match, value, percent) => {
+        result[percent ? "attackPercent" : "flatAttack"] += number(value);
+        result[percent ? "magicPercent" : "flatMagic"] += number(value);
+        return "";
+      },
+    );
+    for (const match of attackText.matchAll(
       /(공격력|마력)(?:이)?\s*\+?\s*(\d+(?:\.\d+)?)%/g,
     )) {
       result[match[1] === "마력" ? "magicPercent" : "attackPercent"] +=
         number(match[2]);
     }
-    for (const match of text.matchAll(
+    for (const match of attackText.matchAll(
       /(?:^|[,\n]\s*)(공격력|마력)(?:이)?\s*\+?\s*(\d+(?:\.\d+)?)(?![\d.]|\s*%)(?:\s*증가)?/g,
     )) {
       result[match[1] === "마력" ? "flatMagic" : "flatAttack"] +=
         number(match[2]);
-    }
-    for (const match of text.matchAll(
-      /(?:공격력과 마력|공격력\/마력)(?:이)?\s*\+?\s*(\d+(?:\.\d+)?)(?![\d.]|\s*%)(?:\s*증가)?/g,
-    )) {
-      result.flatAttack += number(match[1]);
-      result.flatMagic += number(match[1]);
     }
     for (const match of text.matchAll(
       /(?:최대\s*)?HP(?:가|이)?\s*\+?\s*(\d+(?:\.\d+)?)(%)?/g,
@@ -500,7 +519,7 @@ function normalizedSpecialRingName(value) {
 function allCharacterSkills(skillData) {
   const skills = (skillData ?? []).flatMap(
     (grade) => grade.character_skill ?? [],
-  );
+  ).filter((skill) => skill?.skill_level == null || number(skill.skill_level) > 0);
   // 6차 마스터리 스킬은 원본 스킬을 강화하는 동시에 API 응답에는
   // 원본과 VI가 함께 내려온다. 둘을 별도 스킬로 합산하면 액티브와
   // 패시브 효과가 모두 이중 반영되므로 VI가 있으면 원본을 대체한다.
@@ -596,6 +615,7 @@ const ACTIVE_SKILL_CYCLE_EXCLUSIONS = new Set([
 const COMMON_COMBAT_SKILLS = new Set([
   "메이플월드 여신의 축복",
   "여제 시그너스의 축복",
+  "초월자 시그너스의 축복",
   "이계 여신의 축복",
   "그란디스 여신의 축복",
   "오라 웨폰",
@@ -611,6 +631,7 @@ const COMMON_COMBAT_SKILLS = new Set([
 // 자동 파서에 통과시킨다. 공격기 자체의 추가 크확·방무·최종 데미지를
 // 문장 모양만 보고 캐릭터 스탯으로 오인하지 않도록 하는 안전 경계다.
 const VERIFIED_TIMED_SELF_BUFF_SKILLS = new Set([
+  "초월 : 최초의 유산",
   "에픽 어드벤쳐",
   "글로리 오브 가디언즈",
   "히어로즈 오쓰",
@@ -620,6 +641,7 @@ const VERIFIED_TIMED_SELF_BUFF_SKILLS = new Set([
   "퀸 오브 투모로우",
   "메이플월드 여신의 축복",
   "여제 시그너스의 축복",
+  "초월자 시그너스의 축복",
   "이계 여신의 축복",
   "오라 웨폰",
   "얼티밋 다크 사이트",
@@ -677,45 +699,44 @@ const VERIFIED_TIMED_SELF_BUFF_SKILLS = new Set([
   "콤보 인스팅트",
   "마스테리안 그릿",
   "체인 커맨드",
+  "프로페셔널 에이전트",
+  "프로페셔널 에이전트 VI",
 ]);
 
 const MAINTAINED_HIGH_POINT_MODIFIERS = Object.freeze({
-  "블리딩 톡신": Object.freeze({ flatAttack: 50 }),
-  "히든 블레이드": Object.freeze({ damage: 10 }),
-  "히든 블레이드 VI": Object.freeze({ damage: 10 }),
-  "포틱 메디테이션": Object.freeze({ flatAttack: 40 }),
-  "다크 크레센도": Object.freeze({ damage: 40 }),
-  "이그니스 로어": Object.freeze({ finalDamage: 20 }),
-  "엘비쉬 블레싱": Object.freeze({ flatAttack: 80 }),
+  "블리딩 톡신": Object.freeze(["flatAttack"]),
+  "히든 블레이드": Object.freeze(["damage"]),
+  "히든 블레이드 VI": Object.freeze(["damage"]),
+  "포틱 메디테이션": Object.freeze(["flatAttack"]),
+  "다크 크레센도": Object.freeze(["damage"]),
+  "이그니스 로어": Object.freeze(["finalDamage"]),
+  "엘비쉬 블레싱": Object.freeze(["flatAttack"]),
   // 재사용 대기시간 없이 200초 동안 유지되는 메르세데스 자가 버프다.
   // 영구 패시브가 아니므로 Nexon 최종 스탯에는 반영되지 않는다.
-  "앤시언트 스피릿": Object.freeze({ attackPercent: 30 }),
-  "인커리지": Object.freeze({ flatAttack: 30 }),
-  "바이퍼지션": Object.freeze({ attackPercent: 15 }),
-  "오펜스 폼": Object.freeze({ damage: 27 }),
-  "아케인 에임": Object.freeze({ damage: 40 }),
-  "스노우 차지": Object.freeze({ damage: 10 }),
-  "블레싱 마하": Object.freeze({ flatAttack: 30 }),
-  "메디테이션": Object.freeze({ flatAttack: 30 }),
-  "교감": Object.freeze({ damage: 20 }),
-  "오닉스의 축복": Object.freeze({ flatAttack: 40 }),
-  "소울 게이즈": Object.freeze({ criticalDamage: 20 }),
-  "어피니티 IV": Object.freeze({ damage: 25 }),
-  "하울링": Object.freeze({ attackPercent: 10 }),
-  "약화": Object.freeze({ damage: 20 }),
-  "인클라인 파워": Object.freeze({ flatAttack: 30 }),
-  "인피니트 레조넌스": Object.freeze({ flatAttack: 50 }),
-  "위크포인트 컨버징 어택": Object.freeze({
-    criticalRate: 14,
-    criticalDamage: 77,
-  }),
-  "블레싱 아머": Object.freeze({ flatAttack: 20 }),
-  "저지먼트": Object.freeze({ criticalRate: 20 }),
-  "엘리멘트 : 플레임 IV": Object.freeze({ flatAttack: 40 }),
-  "스피릿 블레이드": Object.freeze({ flatAttack: 30 }),
-  "인사이징": Object.freeze({ damage: 25 }),
-  "인사이징 VI": Object.freeze({ damage: 26 }),
-  "커스 트랜지션": Object.freeze({ criticalDamage: 10 }),
+  "앤시언트 스피릿": Object.freeze(["attackPercent"]),
+  "인커리지": Object.freeze(["flatAttack"]),
+  "바이퍼지션": Object.freeze(["attackPercent"]),
+  "오펜스 폼": Object.freeze(["damage"]),
+  "아케인 에임": Object.freeze(["damage"]),
+  "스노우 차지": Object.freeze(["damage"]),
+  "블레싱 마하": Object.freeze(["flatAttack"]),
+  "메디테이션": Object.freeze(["flatAttack"]),
+  "교감": Object.freeze(["damage"]),
+  "오닉스의 축복": Object.freeze(["flatAttack"]),
+  "소울 게이즈": Object.freeze(["criticalDamage"]),
+  "어피니티 IV": Object.freeze(["damage"]),
+  "하울링": Object.freeze(["attackPercent"]),
+  "약화": Object.freeze(["damage"]),
+  "인클라인 파워": Object.freeze(["flatAttack"]),
+  "인피니트 레조넌스": Object.freeze(["flatAttack"]),
+  "위크포인트 컨버징 어택": Object.freeze(["criticalRate", "criticalDamage"]),
+  "블레싱 아머": Object.freeze(["flatAttack"]),
+  "저지먼트": Object.freeze(["criticalRate"]),
+  "엘리멘트 : 플레임 IV": Object.freeze(["flatAttack"]),
+  "스피릿 블레이드": Object.freeze(["flatAttack"]),
+  "인사이징": Object.freeze(["damage"]),
+  "인사이징 VI": Object.freeze(["damage"]),
+  "커스 트랜지션": Object.freeze(["criticalDamage"]),
 });
 
 function directDamageIncrease(effect) {
@@ -760,7 +781,7 @@ function directAttackIncrease(effect, attackType, percent) {
   if (direct > 0) return direct;
   const paired = text.match(
     new RegExp(
-      `공격력(?:과|\\/|,\\s*)마력(?:이)?\\s*` +
+      `공격력\\s*(?:과|및|\\/|,)\\s*마력(?:이)?\\s*` +
         `(\\d+(?:\\.\\d+)?)${suffix}` +
         `${percent ? "" : "(?!\\s*%)"}\\s*(?:증가|(?=,))`,
       "u",
@@ -966,6 +987,28 @@ function grandisGoddessEvent({
     /재사용 대기시간\s*:?\s*(\d+(?:\.\d+)?)초/u,
   );
   const modifiers = emptyCycleModifiers();
+  const race = GRANDIS_NOVA_CLASSES.has(characterClass) ? "노바"
+    : GRANDIS_LEF_CLASSES.has(characterClass) ? "레프"
+    : GRANDIS_ANIMA_CLASSES.has(characterClass) ? "아니마"
+    : null;
+  const raceEffect = race
+    ? effect.match(new RegExp(`${race}\\s*:[\\s\\S]*?(?=\\n(?:노바|레프|아니마)\\s*:|$)`, "u"))?.[0]
+    : null;
+  const reformedFinalDamage = percentFromEffect(
+    raceEffect,
+    /최종 데미지\s*(\d+(?:\.\d+)?)%\s*증가/u,
+  );
+  if (reformedFinalDamage > 0) {
+    // 1.2.419 공식 API는 종족별 최종 데미지를 반환한다. 특정 공격만
+    // 강화하는 아니마 부가 효과와 카이저 상시 패시브는 전역 버프에 합산하지 않는다.
+    return {
+      name,
+      model: "grandis-goddess-final-damage",
+      duration,
+      cooldown,
+      modifiers: { finalDamage: reformedFinalDamage },
+    };
+  }
   if (GRANDIS_NOVA_CLASSES.has(characterClass)) {
     modifiers.damage = percentFromEffect(
       effect,
@@ -983,8 +1026,12 @@ function grandisGoddessEvent({
       effect,
       /공격력과 마력\s*(\d+(?:\.\d+)?)\s*증가/u,
     );
-    modifiers.flatAttack =
-      fixedAttack + grandisLefConvertedAttack(equipmentData, attackType);
+    // 1.2.419에서 장비 반대 공·마 전환이 삭제됐다. 전환 문구가 있는
+    // 이전 스냅샷에만 적용하여 새 설명에 과거 효과를 되살리지 않는다.
+    const hasEquipmentConversion = /착용[\s\S]*?(?:공격력|마력)[\s\S]*?전환/u.test(effect);
+    modifiers.flatAttack = fixedAttack + (hasEquipmentConversion
+      ? grandisLefConvertedAttack(equipmentData, attackType)
+      : 0);
   } else if (GRANDIS_ANIMA_CLASSES.has(characterClass)) {
     modifiers.damage = percentFromEffect(
       effect,
@@ -1261,6 +1308,10 @@ function specialCycleEvents({
       baseFlat,
       modifiers: {
         flatAttack: directAttackIncrease(effect, attackType, false),
+        criticalDamage: percentFromEffect(
+          effect,
+          /크리티컬 데미지\s*(\d+(?:\.\d+)?)%/u,
+        ),
         ignoreDefense: percentFromEffect(
           effect,
           /몬스터 방어율 무시\s*(\d+(?:\.\d+)?)%/u,
@@ -1336,13 +1387,17 @@ function maintainedHighPointModifiers(name, effect, attackType, characterClass) 
   if (name === "저지먼트" && characterClass !== "팬텀") return null;
   const configured = MAINTAINED_HIGH_POINT_MODIFIERS[name];
   if (!configured) return null;
-  if (name === "오펜스 폼") {
-    return {
-      ...configured,
-      damage: directDamageIncrease(effect),
-    };
+  // 이름표는 전신 버프의 범위만 제한한다. 실제 수치는 최신 API의
+  // 현재 스킬 레벨 설명에서 읽으며 삭제된 효과는 이전 값으로 대체하지 않는다.
+  const current = directCycleSkillModifiers(effect, attackType);
+  const result = Object.fromEntries(
+    configured.map((key) => [key, number(current[key])]),
+  );
+  if (name === "아케인 에임" || name === "다크 크레센도") {
+    const stacks = percentFromEffect(effect, /최대\s*(\d+)\s*(?:회|번)(?:까지)?/u);
+    result.damage *= Math.max(1, stacks);
   }
-  return { ...configured };
+  return Object.values(result).some((value) => value > 0) ? result : null;
 }
 
 function skillEnhancementOverride(skillName, skills, duration, modifiers) {
@@ -1824,6 +1879,43 @@ function skillBonuses(skillData) {
   return parseTextBonuses(passiveSkillTexts(skillData));
 }
 
+// 공개 API에서 확인한 공용 패시브와 이벤트 스킬의 표시용 내역이다.
+// 실제 환산은 final_stat을 기준으로 하므로 이 값을 다시 더하지 않는다.
+export function characterBaselineSkillSummary(skillData) {
+  const commonPassives = new Set([
+    "스파이더 인 미러", "크레스트 오브 더 솔라",
+    "에르다 퍼미에이션", "쓸만한 홀리 파운틴",
+  ]);
+  const eventSkills = new Set(["훈련 일지", "아르고 호의 가호"]);
+  return allCharacterSkills(skillData).flatMap((skill) => {
+    const name = String(skill?.skill_name ?? "").trim();
+    const event = eventSkills.has(name);
+    if (!event && !commonPassives.has(name)) return [];
+    const effect = String(skill?.skill_effect ?? "");
+    const texts = event ? [effect] : [...effect.matchAll(
+      /\[패시브 효과\s*:\s*([^\]]+)\]/gu,
+    )].map((match) => match[1]);
+    if (!texts.length || !texts.some((text) => text.trim())) return [];
+    const bonuses = parseTextBonuses(texts);
+    return [{
+      name,
+      level: number(skill.skill_level),
+      kind: event ? "event" : "common-passive",
+      includedInBaseline: true,
+      effects: {
+        attack: bonuses.flatAttack,
+        magic: bonuses.flatMagic,
+        allStat: bonuses.flat.STR,
+        damage: bonuses.damage,
+        bossDamage: bonuses.bossDamage,
+        criticalRate: bonuses.criticalRate,
+        criticalDamage: bonuses.criticalDamage,
+        ignoreDefenseSources: bonuses.ignoreDefenseSources,
+      },
+    }];
+  });
+}
+
 function learnedSkillNames(skillData) {
   return new Set(
     allCharacterSkills(skillData)
@@ -2042,11 +2134,15 @@ export function calculateConditionalLinkCycleBonuses(linkSkillData) {
       const initial = percentFromEffect(effect, /발동 시 데미지\s*(\d+(?:\.\d+)?)%/u);
       const perStack = percentFromEffect(effect, /중첩당 데미지\s*(\d+(?:\.\d+)?)%/u);
       const stacks = percentFromEffect(effect, /최대\s*(\d+(?:\.\d+)?)회 중첩/u);
-      damage = initial + perStack * stacks;
+      damage = /중첩/u.test(effect)
+        ? initial + perStack * stacks
+        : percentFromEffect(effect, /데미지\s*(\d+(?:\.\d+)?)%\s*증가/u);
     } else if (name === "전투의 흐름") {
       const perStack = percentFromEffect(effect, /각 중첩당 데미지\s*(\d+(?:\.\d+)?)%/u);
       const stacks = percentFromEffect(effect, /최대\s*(\d+(?:\.\d+)?)회 중첩/u);
-      damage = perStack * stacks;
+      damage = /중첩/u.test(effect)
+        ? perStack * stacks
+        : percentFromEffect(effect, /데미지\s*(\d+(?:\.\d+)?)%\s*증가/u);
     } else if (name === "임피리컬 널리지") {
       const perStackDamage = percentFromEffect(effect, /중첩 당 데미지\s*(\d+(?:\.\d+)?)%/u);
       const perStackIgnore = percentFromEffect(effect, /방어율 무시\s*(\d+(?:\.\d+)?)%/u);
@@ -2479,6 +2575,7 @@ function stableEquipmentSignature(items) {
         item?.additional_potential_option_1,
         item?.additional_potential_option_2,
         item?.additional_potential_option_3,
+        JSON.stringify(equipmentSoulOptionLines(item)),
         JSON.stringify(item?.item_total_option ?? {}),
       ]
         .map((value) => String(value ?? ""))

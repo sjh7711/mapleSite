@@ -4,6 +4,7 @@ import {
   calculateCombatRingBonuses,
   calculateConditionalLinkCycleBonuses,
   calculateGuildNoblesseBonuses,
+  equipmentSoulOptionLines,
   resolveCharacterExternalBonuses,
   resolveClassAlwaysOnCombatAdjustment,
   resolveClassDamageChannels,
@@ -126,7 +127,7 @@ function equipmentOptionLines(equipmentData: JsonObject): string[] {
       item.additional_potential_option_1,
       item.additional_potential_option_2,
       item.additional_potential_option_3,
-      item.soul_option,
+      ...equipmentSoulOptionLines(item),
     ].map(text).filter(Boolean),
   );
 }
@@ -301,7 +302,8 @@ function otherStatPercentBonuses(otherStatData: JsonObject): PercentBonuses {
 
 function passiveSkillTexts(skillData: JsonObject[]): string[] {
   const result: string[] = [];
-  const rawSkills = skillData.flatMap((grade) => objects(grade.character_skill));
+  const rawSkills = skillData.flatMap((grade) => objects(grade.character_skill))
+    .filter((skill) => skill.skill_level == null || number(skill.skill_level) > 0);
   const viBaseNames = new Set(
     rawSkills
       .map((skill) => text(skill.skill_name).trim())

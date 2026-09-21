@@ -407,7 +407,7 @@ test("주스탯%급은 캐릭터 정보가 있을 때 첫 줄에만 허용한다
   );
 });
 
-test("주스탯 %급 성공 조건은 같은 행에서 오름차순과 내림차순을 선택한다", async () => {
+test("모든 성공 조건은 같은 행에서 오름차순과 내림차순을 선택한다", async () => {
   const [source, css] = await Promise.all([
     readFile(new URL("../src/shared/potential-page.js", import.meta.url), "utf8"),
     readFile(new URL("../src/calculator.css", import.meta.url), "utf8"),
@@ -419,9 +419,9 @@ test("주스탯 %급 성공 조건은 같은 행에서 오름차순과 내림차
     /!\["asc", "desc"\]\.includes\(state\.statEquivalentSortDirection\)[\s\S]*state\.statEquivalentSortDirection = "asc"/u,
   );
   assert.match(source, /sortDirection: state\.statEquivalentSortDirection/u);
-  assert.match(source, /if \(!hasStatEquivalentTarget\) return node;/u);
+  assert.doesNotMatch(source, /if \(!hasStatEquivalentTarget\) return node;/u);
   assert.match(source, /chip\(\s*"오름차순"[\s\S]*chip\(\s*"내림차순"/u);
-  assert.match(source, /aria-label", "주스탯 %급 성공 조건 정렬"/u);
+  assert.match(source, /aria-label", "성공 조건 정렬"/u);
   assert.match(source, /panel\.append\(node, sortControls\)/u);
   assert.match(
     css,

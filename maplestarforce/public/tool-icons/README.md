@@ -12,3 +12,6 @@ on a third-party request at runtime. The source item IDs are:
 
 The PNGs were retrieved from the MapleStory.io KMS item API. MapleStory game
 assets are copyright NEXON Korea Corporation.
+
+`soul.webp` is the user-provided **찬란한 흉성의 소울** image, copied unchanged
+from `찬란한 흉성의 소울.webp`. It is used by the soul navigation entry and favicon.

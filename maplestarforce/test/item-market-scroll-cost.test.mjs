@@ -218,7 +218,71 @@ test("귀 장식 INT +3·마력 +5 벡터는 귀지 10%로 계산한다", () => 
   assert.equal(result.status, "calculated");
   assert.equal(result.method, "earring_scroll");
   assert.equal(result.confidence, "high");
+  assert.equal(result.evidence.success_rate, 0.24);
   assert.ok(result.expected_cost_meso > 0);
+});
+
+test("귀지 제작비는 손재주·길드 설정에 따라 달라지고 피버에는 변하지 않는다", () => {
+  const item = target({
+    category: "귀고리",
+    requiredJob: "마법사",
+    level: 140,
+    maximum: 7,
+    scroll: { int_flat: 21, magic_attack_flat: 35 },
+  });
+  const estimate = (settings) => calculateAutomaticScrollExpectedCost({
+    target: item,
+    settings,
+  });
+  const plain = estimate({ dexterityLevel: 0, guild: false, fever: false });
+  const halfStep = estimate({ dexterityLevel: 5, guild: false, fever: false });
+  const full = estimate({ dexterityLevel: 100, guild: true, fever: false });
+  const fever = estimate({ dexterityLevel: 100, guild: true, fever: true });
+  assert.equal(plain.evidence.success_rate, 0.1);
+  assert.equal(halfStep.evidence.success_rate, 0.105);
+  assert.equal(full.evidence.success_rate, 0.24);
+  assert.ok(full.expected_cost_meso < halfStep.expected_cost_meso);
+  assert.ok(halfStep.expected_cost_meso < plain.expected_cost_meso);
+  assert.deepEqual(full, fever);
+});
+
+test("귀지 실패 보호는 성공률을 유지하고 소모된 슬롯의 복구 비용만 줄인다", () => {
+  const item = target({
+    category: "귀고리",
+    requiredJob: "마법사",
+    level: 140,
+    maximum: 1,
+    scroll: { int_flat: 3, magic_attack_flat: 5 },
+  });
+  for (const [dexterityLevel, guild, success] of [[0, false, 0.1], [100, true, 0.24]]) {
+    const estimate = (guildProtection) => calculateAutomaticScrollExpectedCost({
+      target: item,
+      settings: {
+        dexterityLevel,
+        guild,
+        guildProtection,
+        earringPrice: 8_000,
+        tracePer1000: 140,
+        clean10Price: 1_000,
+        clean5Price: 1_000,
+        useInnocent: false,
+        halfPrice: false,
+      },
+    });
+    const withoutProtection = estimate(0);
+    const protectedResult = estimate(4);
+    assert.equal(protectedResult.evidence.success_rate, success);
+    assert.equal(withoutProtection.evidence.success_rate, success);
+    assert.equal(protectedResult.evidence.slot_protection_rate, 0.04);
+    assert.equal(withoutProtection.evidence.slot_protection_rate, 0);
+    // 성공 1회당 주문서 1/p장, 순백은 (1-p) * (1-보호율) / p회.
+    const expectedCost = (80_000_000 + (1 - success) * 0.96 * 28_000_000) / success;
+    assert.ok(Math.abs(protectedResult.expected_cost_meso - expectedCost) < 0.001);
+    const savedRestorationCost = (1 - success) * 0.04 * 28_000_000 / success;
+    assert.ok(Math.abs(
+      withoutProtection.expected_cost_meso - protectedResult.expected_cost_meso - savedRestorationCost,
+    ) < 0.001);
+  }
 });
 
 test("놀긍 첫작 뒤의 명확한 주흔 벡터를 분리해 합산한다", () => {

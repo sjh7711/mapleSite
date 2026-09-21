@@ -1,10 +1,12 @@
+@import "./theme.css";
+
 :root {
   color-scheme: dark;
   --bg: #12141a;
   --card: #1b1e26;
   --line: #2b303c;
-  --text: #e8eaf0;
-  --muted: #9aa3b5;
+  --text: #f1f3f8;
+  --muted: #b6c0d0;
   --accent: #ffc107;
   --accent-soft: rgba(255, 193, 7, 0.12);
   --page-max-width: 1320px;
@@ -72,6 +74,7 @@ input[type="number"],
   letter-spacing: -0.035em;
 }
 
+
 .page__head p,
 .page__foot {
   margin: 0;
@@ -137,7 +140,7 @@ input[type="number"],
 
 select,
 input {
-  background: #14161d;
+  background: var(--surface-input, #14161d);
   color: var(--text);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -192,7 +195,7 @@ input:focus {
   flex-direction: column;
   gap: 10px;
   padding: 12px;
-  background: #171a21;
+  background: var(--surface-soft, #171a21);
   border: 1px solid var(--line);
   border-radius: 10px;
 }
@@ -250,7 +253,7 @@ input:focus {
 .item__error {
   grid-column: 1 / -1;
   margin: 0;
-  color: #ff9b9b;
+  color: var(--text-red, #ff9b9b);
   font-size: 0.9375rem;
 }
 
@@ -305,7 +308,7 @@ input:focus {
 }
 
 .card--total {
-  background: linear-gradient(180deg, #1f2330, var(--card));
+  background: linear-gradient(180deg, var(--surface-hover, #1f2330), var(--card));
 }
 
 .total {
@@ -542,7 +545,7 @@ details[open] > summary {
 }
 
 .picker__pick:hover {
-  background: #14161d;
+  background: var(--surface-input, #14161d);
   border-color: var(--accent);
 }
 
@@ -689,7 +692,7 @@ details[open] > summary {
 }
 
 .chip {
-  background: #14161d;
+  background: var(--surface-input, #14161d);
   color: var(--muted);
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -722,7 +725,7 @@ details[open] > summary {
   flex: none;
   width: 8px;
   height: 8px;
-  border: 1px solid #6f7785;
+  border: 1px solid var(--text-disabled, #6f7785);
   border-radius: 50%;
   background: transparent;
   content: "";
@@ -827,7 +830,7 @@ details[open] > summary {
 
 .dropdown__button {
   width: 100%;
-  background: #14161d;
+  background: var(--surface-input, #14161d);
   color: var(--text);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -861,7 +864,7 @@ details[open] > summary {
   max-height: 348px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  background: #14161d;
+  background: var(--surface-input, #14161d);
   border: 1px solid var(--accent);
   border-radius: 8px;
   padding: 4px;
@@ -883,7 +886,7 @@ details[open] > summary {
 }
 
 .dropdown__option:hover {
-  background: #1f2330;
+  background: var(--surface-hover, #1f2330);
 }
 
 .dropdown__option[aria-selected="true"] {
@@ -946,7 +949,7 @@ details[open] > summary {
 
 .search-select__clear:hover,
 .search-select__clear:focus-visible {
-  color: #fff;
+  color: var(--text-strong, #fff);
   opacity: 0.95;
 }
 
@@ -983,7 +986,7 @@ details[open] > summary {
   padding: 4px;
   border: 1px solid var(--line);
   border-radius: 9px;
-  background: #171a22;
+  background: var(--surface-soft, #171a22);
   box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35);
 }
 
@@ -994,7 +997,7 @@ details[open] > summary {
 .search-select__group {
   margin: 4px 6px 2px;
   padding: 5px 2px 4px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--border-soft, rgba(255, 255, 255, 0.08));
   color: var(--muted);
   font-size: 0.73rem;
   font-weight: 800;
@@ -1025,7 +1028,7 @@ details[open] > summary {
 .search-select__option:hover,
 .search-select__option[data-active="true"] {
   background: rgba(255, 193, 7, 0.1);
-  color: #ffe083;
+  color: var(--text-gold, #ffe083);
 }
 
 .search-select__option[data-tone="legendary"]:hover,
@@ -1068,8 +1071,17 @@ details[open] > summary {
 }
 
 .search-select__option:disabled {
-  color: #626a78;
+  color: var(--text-disabled, #626a78);
   cursor: not-allowed;
+}
+
+.search-select__option-hint {
+  display: block;
+  cursor: not-allowed;
+}
+
+.search-select__option-hint > .search-select__option:disabled {
+  pointer-events: none;
 }
 
 .search-select__empty {
@@ -1132,7 +1144,7 @@ details[open] > summary {
 }
 
 .chip__remove:hover {
-  color: #ff9b9b;
+  color: var(--text-red, #ff9b9b);
 }
 
 .chip--input {
@@ -1218,7 +1230,7 @@ details[open] > summary {
   align-items: center;
   gap: 10px;
   padding: 5px 12px;
-  background: #171a21;
+  background: var(--surface-soft, #171a21);
   border: 1px solid var(--line);
   border-radius: 10px;
 }
@@ -1288,7 +1300,7 @@ details[open] > summary {
 }
 
 .starforce-character[data-state="error"] .starforce-character__status {
-  color: #ff9b9b;
+  color: var(--text-red, #ff9b9b);
 }
 
 .starforce-character[data-state="loading"] .starforce-character__load {
@@ -1338,7 +1350,7 @@ details[open] > summary {
   align-items: center;
   gap: 10px;
   padding: 5px 12px;
-  background: #171a21;
+  background: var(--surface-soft, #171a21);
   border: 1px solid var(--line);
   border-radius: 10px;
 }
@@ -1363,7 +1375,7 @@ details[open] > summary {
   width: 18px;
   height: 18px;
   border-radius: 6px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--surface-wash, rgba(255, 255, 255, 0.05));
   transition: background 0.12s ease, transform 0.12s ease;
 }
 
@@ -1455,7 +1467,7 @@ td:not(.empty):nth-last-child(-n + 2) {
     width: 52px;
     height: 40px;
     padding: 0 10px;
-    background: #171a21;
+    background: var(--surface-soft, #171a21);
     border: 1px solid var(--accent);
     border-radius: 10px;
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
@@ -1622,7 +1634,7 @@ td:not(.empty):nth-last-child(-n + 2) {
   }
 
   .picker__pick:active {
-    background: #14161d;
+    background: var(--surface-input, #14161d);
     border-color: var(--accent);
   }
 
@@ -2194,13 +2206,13 @@ input,
 /* 배경이 없어 카드에 묻히던 버튼들을 한 단계 또렷하게. */
 .card__head .button--quiet,
 .picker__actions .button--quiet {
-  background: #232936;
+  background: var(--surface-hover, #232936);
   color: var(--text);
 }
 
 .card__head .button--quiet:hover,
 .picker__actions .button--quiet:hover {
-  background: #2b3241;
+  background: var(--surface-hover, #2b3241);
 }
 
 /* 삭제·초기화는 평소에는 중립색, 가리켰을 때만 위험색으로 표시한다. */
@@ -2208,7 +2220,7 @@ input,
 .card__head .button.button--reset,
 .picker__actions .button.button--reset {
   border-color: var(--line);
-  background: #191c24;
+  background: var(--surface-soft, #191c24);
   color: var(--muted);
 }
 
@@ -2418,12 +2430,12 @@ input,
      "고를 수는 있지만 뒤에 있는 칸"으로 읽히게 한다. */
   .dropdown__list[data-columns="6"] .dropdown__option[data-dim="true"] {
     background: rgba(0, 0, 0, 0.22);
-    border-color: #1f232c;
+    border-color: var(--surface-hover, #1f232c);
   }
 
   /* 가라앉힌 칸도 마우스를 올리면 올라와야 누를 수 있다는 게 보인다. */
   .dropdown__list[data-columns="6"] .dropdown__option[data-dim="true"]:hover {
-    background: #1f2330;
+    background: var(--surface-hover, #1f2330);
     border-color: var(--line);
   }
 }
@@ -2477,7 +2489,7 @@ input,
   align-items: center;
   justify-content: center;
   padding: 8px 11px;
-  background: #14161d;
+  background: var(--surface-input, #14161d);
   border: 1px solid var(--line);
   border-radius: 9px;
   color: var(--muted);
@@ -2565,7 +2577,7 @@ input,
   padding: 0;
   display: grid;
   place-items: center;
-  background: #171a21;
+  background: var(--surface-soft, #171a21);
   color: var(--muted);
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -2638,7 +2650,7 @@ body[data-toolnav-drawer="open"] .toolnav-backdrop {
     max-height: calc(100vh - 36px);
     padding: 6px;
     overflow: visible;
-    background: rgba(27, 30, 38, 0.96);
+    background: var(--surface-overlay, rgba(27, 30, 38, 0.96));
     border: 1px solid var(--line);
     border-radius: 12px;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
@@ -2660,7 +2672,7 @@ body[data-toolnav-drawer="open"] .toolnav-backdrop {
     padding: 6px 9px;
     border: 1px solid var(--line);
     border-radius: 7px;
-    background: #171a21;
+    background: var(--surface-soft, #171a21);
     box-shadow: 0 7px 18px rgba(0, 0, 0, 0.38);
     color: var(--text);
     font-size: 0.8125rem;
@@ -2731,7 +2743,7 @@ body[data-toolnav-drawer="open"] .toolnav-backdrop {
   flex-direction: column;
   gap: 4px;
   padding: 12px 14px;
-  background: #171a21;
+  background: var(--surface-soft, #171a21);
   border: 1px dashed var(--line);
   border-radius: 10px;
 }
@@ -2832,7 +2844,7 @@ body[data-toolnav-drawer="open"] .toolnav-backdrop {
 .layout--single .result__line {
   margin: 0;
   padding: 5px 0;
-  border-bottom: 1px solid rgba(43, 48, 60, 0.5);
+  border-bottom: 1px solid var(--border-soft, rgba(43, 48, 60, 0.5));
 }
 
 .layout--single .result__line:last-of-type {
@@ -2969,7 +2981,7 @@ body[data-toolnav-drawer="open"] .toolnav-backdrop {
 }
 
 .enhance-toolbar .starforce-character__clear:hover:not(:disabled) {
-  color: #ffaaaa;
+  color: var(--text-red, #ffaaaa);
   opacity: 1;
 }
 
@@ -3044,7 +3056,7 @@ body[data-toolnav-drawer="open"] .toolnav-backdrop {
   width: min(100%, 356px);
   margin: 2px auto 18px;
   padding: 10px 12px 12px;
-  background: linear-gradient(180deg, #171b24 0%, #13161d 100%);
+  background: linear-gradient(180deg, var(--surface-soft, #171b24) 0%, var(--surface-input, #13161d) 100%);
   border: 1px solid var(--line);
   border-radius: 12px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
@@ -3087,8 +3099,8 @@ body[data-toolnav-drawer="open"] .toolnav-backdrop {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: radial-gradient(circle at 50% 62%, #252c39 0%, #171b24 70%);
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: radial-gradient(circle at 50% 62%, var(--surface-hover, #252c39) 0%, var(--surface-soft, #171b24) 70%);
+  border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.06));
   border-radius: 8px;
 }
 
@@ -3122,9 +3134,9 @@ body[data-toolnav-drawer="open"] .toolnav-backdrop {
   height: var(--equipment-size);
   padding: 2px;
   overflow: hidden;
-  background: #202530;
+  background: var(--surface-hover, #202530);
   color: var(--text);
-  border: 1px solid #343b49;
+  border: 1px solid var(--border-strong, #343b49);
   border-radius: 7px;
 }
 
@@ -3137,15 +3149,15 @@ button.character-equipment__slot {
 button.character-equipment__slot:hover,
 button.character-equipment__slot:focus-visible {
   z-index: 1;
-  background: #292f3c;
+  background: var(--surface-hover, #292f3c);
   border-color: var(--accent);
   outline: none;
   transform: translateY(-1px);
 }
 
 .character-equipment__slot[data-empty="true"] {
-  background: rgba(23, 27, 36, 0.55);
-  border-color: rgba(52, 59, 73, 0.55);
+  background: var(--surface-soft, rgba(23, 27, 36, 0.55));
+  border-color: var(--border-soft, rgba(52, 59, 73, 0.55));
 }
 
 .character-equipment__slot[data-disabled="true"] {
@@ -3164,8 +3176,8 @@ button.character-equipment__slot:focus-visible {
   right: 2px;
   bottom: 2px;
   padding: 1px 3px;
-  background: rgba(9, 11, 15, 0.82);
-  color: #ffe276;
+  background: var(--surface-soft, rgba(9, 11, 15, 0.82));
+  color: var(--text-gold, #ffe276);
   border-radius: 4px;
   font-size: 0.5625rem;
   font-weight: 700;
@@ -3301,4 +3313,46 @@ button.character-equipment__slot:focus-visible {
     width: 26px;
     height: 26px;
   }
+}
+
+
+/* 문서 끝의 공통 안내. 모바일 결과 막대용 본문 여백 안에 둔다. */
+.site-footer {
+  width: 100%;
+  padding: 20px 0 4px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.8125rem;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.site-footer__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  margin-bottom: 10px;
+}
+
+.site-footer p { margin: 4px 0; }
+.site-footer a { color: inherit; text-underline-offset: 4px; }
+.site-footer__links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  color: var(--text);
+}
+.site-footer a:hover { color: var(--accent); }
+.site-footer a:focus-visible,
+.info-content a:focus-visible,
+.info-nav a:focus-visible,
+.info-home:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
+.site-footer__contact .page__copy {
+  margin-left: 8px;
+  min-height: 32px;
+  padding: 2px 10px;
 }

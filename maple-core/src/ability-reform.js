@@ -322,9 +322,6 @@ export function getAbilityReformCost(method, {
   const locks = normalizeLockCount(lockCount);
 
   if (methodId === "advanced") {
-    if (halfHonor) {
-      throw new RangeError("고급 재설정의 반값 적용 여부는 공식적으로 확인되지 않았습니다.");
-    }
     const cost = ADVANCED_CONFIG.costsByLockedLineCount.find(
       ({ lockedLineCount }) => lockedLineCount === locks,
     );
@@ -333,7 +330,7 @@ export function getAbilityReformCost(method, {
         `고급 재설정 잠금 개수는 ${ADVANCED_LOCK_COUNTS.join(", ")} 중 하나여야 합니다.`,
       );
     }
-    return resourceVector({ honor: cost.honor, meso: cost.meso });
+    return resourceVector({ honor: cost.honor * (halfHonor ? 0.5 : 1), meso: cost.meso });
   }
 
   if (methodId === "honor") {

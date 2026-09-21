@@ -5,7 +5,7 @@ import test from "node:test";
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
 test("장비 시세 페이지가 환경별 진입점과 공용 내비게이션에 연결된다", async () => {
-  const [vite, shell, html, entry, features, productionEnv, previewEnv, pkg, source] = await Promise.all([
+  const [vite, shell, html, entry, features, productionEnv, previewEnv, pkg, source, nav] = await Promise.all([
     read("../vite.config.js"),
     read("../src/shared/shell.js"),
     read("../item-market/index.html"),
@@ -15,11 +15,13 @@ test("장비 시세 페이지가 환경별 진입점과 공용 내비게이션�
     read("../.env.preview"),
     read("../package.json"),
     read("../src/pages/item-market.js"),
+    read("../src/shared/tool-nav.js"),
   ]);
 
   assert.match(vite, /"item-market": resolve\(__dirname, "item-market\/index\.html"\)/u);
-  assert.match(shell, /id: "item-market", name: "장비 시세"/u);
-  assert.match(shell, /ITEM_MARKET_ENABLED \|\| tool\.id !== "item-market"/u);
+  assert.match(nav, /id: "item-market", name: "장비 시세"/u);
+  assert.match(nav, /itemMarketEnabled \|\| tool\.id !== "item-market"/u);
+  assert.match(shell, /getTools\(\{ itemMarketEnabled: ITEM_MARKET_ENABLED \}\)/u);
   assert.match(html, /page--item-market/u);
   assert.match(html, /src\/pages\/item-market-entry\.js/u);
   assert.doesNotMatch(html, /src\/pages\/item-market\.js/u);

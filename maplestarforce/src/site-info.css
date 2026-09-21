@@ -1,0 +1,102 @@
+.page--info .page {
+  max-width: 960px;
+  padding-top: 28px;
+  gap: 24px;
+}
+
+.info-home {
+  color: var(--accent);
+  font-weight: 650;
+  text-underline-offset: 4px;
+}
+
+.info-header h1 {
+  margin: 14px 0 8px;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  letter-spacing: -0.035em;
+}
+
+.info-header p {
+  margin: 6px 0;
+  color: var(--muted);
+}
+
+.info-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  padding: 12px 0;
+  border-block: 1px solid var(--line);
+}
+
+.info-nav a,
+.info-content a {
+  color: var(--text);
+  text-underline-offset: 4px;
+  overflow-wrap: anywhere;
+}
+
+.info-nav a:hover,
+.info-content a:hover,
+.info-nav a[aria-current="page"] {
+  color: var(--accent);
+}
+
+.info-content {
+  padding: clamp(18px, 4vw, 32px);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  line-height: 1.85;
+  overflow-wrap: anywhere;
+}
+
+.info-content section + section {
+  border-top: 1px solid var(--line);
+  margin-top: 28px;
+  padding-top: 20px;
+}
+
+.info-content h2 {
+  margin: 0 0 12px;
+  font-size: 1.125rem;
+  scroll-margin-top: 20px;
+}
+
+.info-content h3 {
+  font-size: 1rem;
+  margin: 20px 0 6px;
+}
+
+.info-content p {
+  margin: 10px 0;
+}
+
+.info-content ul,
+.info-content ol {
+  padding-left: 1.4em;
+}
+
+.info-content li + li {
+  margin-top: 8px;
+}
+
+.info-content .info-note {
+  padding: 12px 16px;
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+}
+
+.info-content dl {
+  margin: 12px 0;
+}
+
+.info-content dt {
+  font-weight: 650;
+  margin-top: 16px;
+}
+
+.info-content dd {
+  margin: 4px 0 0;
+  color: var(--muted);
+}

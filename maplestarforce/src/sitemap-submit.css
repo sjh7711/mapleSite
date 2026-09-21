@@ -74,7 +74,7 @@
   padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #171a21;
+  background: var(--surface-soft, #171a21);
   color: var(--muted);
   font-size: 0.9375rem;
 }
@@ -88,7 +88,7 @@
 }
 
 .sitemap-submit__status[data-state="success"] {
-  color: #b6dfc2;
+  color: var(--text-green, #b6dfc2);
   border-color: rgba(92, 184, 115, 0.38);
 }
 
@@ -97,7 +97,7 @@
 }
 
 .sitemap-submit__status[data-state="error"] {
-  color: #ffb0b0;
+  color: var(--text-red, #ffb0b0);
   border-color: rgba(224, 92, 92, 0.42);
 }
 
@@ -117,11 +117,11 @@
   width: auto;
   margin-top: 0;
   color: var(--text);
-  background: #232936;
+  background: var(--surface-hover, #232936);
 }
 
 .sitemap-submit__actions .button--quiet:hover {
-  background: #2b3241;
+  background: var(--surface-hover, #2b3241);
 }
 
 .sitemap-submit__primary {
@@ -153,13 +153,19 @@
 
 .sitemap-submit__message {
   min-height: 1.6em;
-  color: #b6dfc2;
+  color: var(--text-green, #b6dfc2);
   font-size: 0.9375rem;
   text-align: center;
 }
 
 .sitemap-submit__message[data-state="error"] {
-  color: #ffb0b0;
+  color: var(--text-red, #ffb0b0);
+}
+
+.sitemap-submit__note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.875rem;
 }
 
 @media (max-width: 560px) {

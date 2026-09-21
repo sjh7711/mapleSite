@@ -2,32 +2,49 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://starforce.pages.dev/</loc>
-    <lastmod>2026-09-05</lastmod>
+    <lastmod>2026-09-16</lastmod>
     <changefreq>weekly</changefreq>
   </url>
   <url>
     <loc>https://starforce.pages.dev/potential/</loc>
-    <lastmod>2026-09-07</lastmod>
+    <lastmod>2026-09-17</lastmod>
     <changefreq>weekly</changefreq>
   </url>
   <url>
     <loc>https://starforce.pages.dev/ability/</loc>
-    <lastmod>2026-09-07</lastmod>
+    <lastmod>2026-09-17</lastmod>
     <changefreq>weekly</changefreq>
   </url>
   <url>
     <loc>https://starforce.pages.dev/add-option/</loc>
-    <lastmod>2026-09-05</lastmod>
+    <lastmod>2026-09-16</lastmod>
     <changefreq>weekly</changefreq>
   </url>
   <url>
     <loc>https://starforce.pages.dev/scroll/</loc>
-    <lastmod>2026-09-05</lastmod>
+    <lastmod>2026-09-17</lastmod>
     <changefreq>weekly</changefreq>
   </url>
   <url>
     <loc>https://starforce.pages.dev/pet/</loc>
-    <lastmod>2026-09-05</lastmod>
+    <lastmod>2026-09-17</lastmod>
+    <changefreq>weekly</changefreq>
+  </url>
+  <url>
+    <loc>https://starforce.pages.dev/about/</loc>
+    <lastmod>2026-09-16</lastmod>
+  </url>
+  <url>
+    <loc>https://starforce.pages.dev/privacy/</loc>
+    <lastmod>2026-09-16</lastmod>
+  </url>
+  <url>
+    <loc>https://starforce.pages.dev/sources/</loc>
+    <lastmod>2026-09-17</lastmod>
+  </url>
+  <url>
+    <loc>https://starforce.pages.dev/soul/</loc>
+    <lastmod>2026-09-17</lastmod>
     <changefreq>weekly</changefreq>
   </url>
 </urlset>

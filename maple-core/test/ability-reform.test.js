@@ -168,10 +168,12 @@ test("고급 재설정 비용을 잠금별 명성치·메소 벡터로 분리한
     () => getAbilityReformCost("advanced", { lockCount: 3 }),
     /0, 1, 2/u,
   );
-  assert.throws(
-    () => getAbilityReformCost("advanced", { halfHonor: true }),
-    /공식적으로 확인되지 않았습니다/u,
-  );
+  for (const lockCount of [0, 1, 2]) {
+    const full = getAbilityReformCost("advanced", { lockCount });
+    assert.deepEqual(getAbilityReformCost("advanced", { lockCount, halfHonor: true }), {
+      ...full, honor: full.honor / 2,
+    });
+  }
 });
 
 test("심연의 서큘레이터 캐시·크레딧·보유분 조달을 섞지 않는다", () => {

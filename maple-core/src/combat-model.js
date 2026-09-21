@@ -289,10 +289,20 @@ export function composeCombatModel({
 
 /** 영구 패시브는 Nexon 최종 스탯에 포함되므로 전투 버프로 다시 더하지 않는다. */
 export function isBaselineReflectedSkill(skill) {
+  const name = String(skill?.skill_name ?? "").trim();
   const effect = String(skill?.skill_effect ?? "");
   const description = String(skill?.skill_description ?? "");
   const text = `${description}\n${effect}`;
-  if (!/영구적으로/u.test(text)) return false;
+  // 선택한 주사위 눈의 버프는 별도 럭키 다이스에 적혀 있다. 이 스킬의
+  // 직접 설명에 공격력 패시브만 있다고 선택 기능까지 패시브로 보지 않는다.
+  if (name === "로디드 다이스" && /주사위/u.test(text)) return false;
+  // 1.2.419에서 조건부 효과가 상시 패시브로 바뀌었다. 이전 스냅샷의
+  // 조건부 설명은 유지하되, 새 설명에 옛 버프를 다시 합산하지 않는다.
+  if (name === "이그니스 로어" && effect &&
+      !/중첩|연계 스킬 사용|초\s*동안/u.test(effect)) return true;
+  if (name === "위크포인트 컨버징 어택" && effect &&
+      !/상태 이상[^\n]*(?:크리티컬 확률|크리티컬 데미지)/u.test(effect)) return true;
+  if (!/영구적|영구히|\[패시브 효과\s*:/u.test(text)) return false;
 
   // 영구 패시브와 도트·회복 같은 부가 효과가 한 스킬 설명에 함께 있어도
   // `n초 동안`이라는 문구만 보고 전투 버프로 재합산하면 안 된다. 영구
@@ -300,14 +310,16 @@ export function isBaselineReflectedSkill(skill) {
   // 남긴다.
   const withoutPermanentLines = effect
     .split(/\r?\n/u)
-    .filter((line) => !/영구적으로/u.test(line))
+    .filter((line) => !/영구적|영구히/u.test(line))
     .join("\n")
     .replace(/\[패시브 효과\s*:[\s\S]*$/u, "");
-  const hasTimedCombatStat = new RegExp(
-    String.raw`\d+(?:\.\d+)?초 동안[^\n]*(?:공격력|마력|데미지|크리티컬 확률|크리티컬 데미지|방어율 무시)[^\n]*(?:증가|무시)`,
+  const hasActiveCombatStat = new RegExp(
+    String.raw`(?:공격력|마력|데미지|크리티컬 확률|크리티컬 데미지|방어율 무시|모든 능력치)[^\n]*(?:증가|무시)`,
     "u",
   ).test(withoutPermanentLines);
-  return !hasTimedCombatStat;
+  const hasActiveDuration = /\d+(?:\.\d+)?\s*초\s*동안|(?:MP|HP)\s*\d+\s*소비/u
+    .test(withoutPermanentLines);
+  return !(hasActiveCombatStat && hasActiveDuration);
 }
 
 /**
@@ -773,6 +785,16 @@ export function generalizedBattlePracticeDamageChannelsFromSkills({
     : [];
   if (!profileSkills.length || !(number(profile?.sampleCount) > 0)) return [];
 
+  // 1.2.419 이후 두 공용 5차는 보스맵에서 공격기로 사용할 수 없다.
+  // 새 패시브가 확인된 스냅샷에서는 과거 연무장 점유율에서도 제외한다.
+  // 나머지 공격군의 상대 비율만 유지하며 새 딜 사이클을 추정하지 않는다.
+  const unavailableBossSkills = new Set((skillData ?? []).flatMap(
+    (grade) => grade?.character_skill ?? [],
+  ).filter((skill) =>
+    ["스파이더 인 미러", "크레스트 오브 더 솔라"].includes(skill?.skill_name) &&
+    /\[패시브 효과\s*:[^\]]*공격력/u.test(String(skill?.skill_effect ?? ""))
+  ).map((skill) => skill.skill_name));
+
   const localChannels = mergedLocalIgnoreDefenseChannels(
     skillData,
     vMatrixData,
@@ -788,6 +810,7 @@ export function generalizedBattlePracticeDamageChannelsFromSkills({
       : "observed-damage",
     profileId: String(profile?.id ?? "") || null,
     sampleCount: number(profile?.sampleCount),
+    excludedBossSkills: [...unavailableBossSkills],
   };
   let profiledWeight = 0;
   let generalWeight = 0;
@@ -798,6 +821,7 @@ export function generalizedBattlePracticeDamageChannelsFromSkills({
     const weight = Math.max(0, number(entry?.weight));
     if (!(weight > 0)) continue;
     profiledWeight += weight;
+    if (unavailableBossSkills.has(String(entry?.source ?? "").trim())) continue;
     const localChannel = matchingLocalChannel(entry?.source, localChannels);
     if (!localChannel?.ignoreDefenseSources?.length) {
       generalWeight += weight;

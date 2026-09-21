@@ -8,6 +8,7 @@
     "node": ">=20"
   },
   "scripts": {
+    "adsense:check": "node scripts/check-adsense.mjs",
     "dev": "vite",
     "build": "vite build",
     "build:preview": "vite build --mode preview",

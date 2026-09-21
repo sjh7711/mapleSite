@@ -40,6 +40,10 @@ async function checkSitemap() {
       cache: "no-store",
     });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (response.redirected) throw new Error("redirected sitemap");
+    if (!/^(application|text)\/xml(?:;|$)/i.test(response.headers.get("content-type") ?? "")) {
+      throw new Error("not an XML response");
+    }
 
     const documentXml = new DOMParser().parseFromString(
       await response.text(),
@@ -47,6 +51,12 @@ async function checkSitemap() {
     );
     if (documentXml.querySelector("parsererror")) {
       throw new Error("invalid xml");
+    }
+    if (
+      documentXml.documentElement.localName !== "urlset" ||
+      documentXml.documentElement.namespaceURI !== "http://www.sitemaps.org/schemas/sitemap/0.9"
+    ) {
+      throw new Error("invalid sitemap root");
     }
 
     const locations = [...documentXml.querySelectorAll("url > loc")]
@@ -63,7 +73,7 @@ async function checkSitemap() {
     });
     if (!allProductionUrls) throw new Error("foreign origin");
 
-    setStatus(`정상 · 공개 페이지 ${locations.length}개`, "success");
+    setStatus(`파일 응답 정상 · 공개 페이지 ${locations.length}개`, "success");
   } catch {
     setStatus("확인 실패 · 사이트맵을 열어 직접 확인해 주세요.", "error");
   }

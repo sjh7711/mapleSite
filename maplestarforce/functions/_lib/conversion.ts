@@ -1,5 +1,6 @@
 import {
   calculateCharacterPotentialConversion,
+  characterBaselineSkillSummary,
   resolveCharacterPresetSnapshot,
   type PresetPolicy,
   type PresetSelection,
@@ -145,6 +146,12 @@ export type CharacterEquipmentTooltip = {
   } | null;
   soulName: string | null;
   soulOption: string | null;
+  soulActive: boolean | null;
+  soulAttack: number | null;
+  soulMagic: number | null;
+  soulPotentialGrade: string | null;
+  soulAmplification: number | null;
+  soulPotentialLines: string[];
 };
 
 export type CharacterPotentialSummary = {
@@ -159,7 +166,7 @@ export type CharacterPotentialSummary = {
 };
 
 export type CharacterEquipmentSummary = {
-  version: 11;
+  version: 12;
   presetNo: number | null;
   items: CharacterEquipmentSummaryItem[];
 };
@@ -668,6 +675,14 @@ function equipmentTooltip(item: JsonObject): CharacterEquipmentTooltip {
       : null,
     soulName: optionalString(item.soul_name),
     soulOption: optionalString(item.soul_option),
+    soulActive: item.soul_active == null ? null : String(item.soul_active) === "1",
+    soulAttack: optionalNonNegativeInteger(item.soul_pad),
+    soulMagic: optionalNonNegativeInteger(item.soul_mad),
+    soulPotentialGrade: optionalString(item.soul_potential_grade),
+    soulAmplification: optionalNonNegativeInteger(item.soul_potential_amplified_grade),
+    soulPotentialLines: [1, 2, 3]
+      .map((line) => optionalString(item[`soul_potential_option_${line}`]))
+      .filter((value): value is string => Boolean(value)),
   };
 }
 
@@ -727,7 +742,7 @@ export function buildCharacterEquipmentSummary(
       tooltip: equipmentTooltip(item),
     }];
   });
-  return { version: 11, presetNo, items: items.slice(0, 32) };
+  return { version: 12, presetNo, items: items.slice(0, 32) };
 }
 
 function characterLevel(character: JsonObject): number {
@@ -1197,6 +1212,10 @@ export function buildCharacterConversionFromData(
     };
   }
 
+  const baselineSkills = characterBaselineSkillSummary(snapshot.skillData);
+  for (const profile of [profiles.base, profiles.fullBoss]) {
+    profile.details = { ...profile.details, baselineSkills };
+  }
   const cashEquipmentSummary = cashEquipmentDisplaySummary(
     snapshot.cashEquipmentData,
   );

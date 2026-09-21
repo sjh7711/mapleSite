@@ -129,7 +129,7 @@ test("잠재·에디셔널 등급에 맞는 재설정 수단만 제공한다", (
   assert.deepEqual(
     getAvailablePotentialResetMethods("regular", "legendary")
       .map(({ id }) => id),
-    ["meso", "black", "gold"],
+    ["meso", "black", "gold", "prime"],
   );
   assert.deepEqual(
     getAvailablePotentialResetMethods("regular", "unique")
@@ -144,7 +144,7 @@ test("잠재·에디셔널 등급에 맞는 재설정 수단만 제공한다", (
   assert.deepEqual(
     getAvailablePotentialResetMethods("additional", "legendary")
       .map(({ id }) => id),
-    ["meso", "white"],
+    ["meso", "white", "prime"],
   );
   assert.deepEqual(
     getAvailablePotentialResetMethods("additional", "epic")

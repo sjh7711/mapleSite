@@ -227,7 +227,7 @@ test("최적 전략은 서큘레이터 보유량을 넘겨 사용하지 않고 �
   const honorStep = result.steps.find((step) => step.method === "honor");
   assert.ok(honorStep);
   assert.ok(honorStep.priority.length >= 2);
-  assert.match(honorStep.priority[0], /번째 줄/u);
+  assert.match(honorStep.priority[0], /첫 줄|아랫줄|둘째 줄|셋째 줄/u);
 });
 
 test("허용 상태여도 보유량이 0이면 서큘레이터를 추천하지 않는다", () => {
@@ -265,11 +265,17 @@ test("유니크 크확을 먼저 확보한 뒤 보유 블랙으로 수치를 맞
     blackCount: 40,
   });
 
+  const ordinaryGuide = honorOnly.steps.find((entry) => entry.method === "honor");
+  const initialDecisions = ordinaryGuide.lockRules.find((rule) => rule.lockedMask === 0).outcomes;
+  assert.equal(initialDecisions.find((outcome) => outcome.completedMask === 1).keepMask, 0,
+    "일반 재설정도 크확 확보 전 보공만 나오면 잠그지 않는다");
+  assert.match(ordinaryGuide.lockNotes[0], /크확 목표를 맞추기 전에는 보공·상추뎀 옵션을 잠그지 마세요/u);
   assert.ok(withBlack.expectedHonor < honorOnly.expectedHonor);
   assert.ok(withBlack.expectedCirculators.black > 0);
-  const priority = withBlack.steps.find((step) => step.method === "honor")?.priority ?? [];
-  assert.match(priority[0], /크리티컬 확률 증가 15% 이상을 명성치로 확보/u);
-  assert.match(priority[0], /블랙 최대 40개/u);
-  assert.match(priority[0], /20% 이상 완성/u);
-  assert.match(priority[0], /완성 후 잠금/u);
+  const step = withBlack.steps.find((entry) => entry.method === "honor");
+  assert.match(step.priority[0], /아랫줄 크확 15% 이상 \(유니크\) 확보/u);
+  assert.match(step.priority[1], /블서큘 최대 40개로 아랫줄 크확 20% 이상 맞춘 뒤 잠금/u);
+  assert.match(step.lockNotes[1], /목표 수치 미달일 때만 사용.*소진 후에도 미달이면 명성치로/u);
+  assert.equal(step.priority.length, 4);
+  assert.match(step.priority.at(-1), /맞추기$/u);
 });

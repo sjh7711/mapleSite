@@ -1,3 +1,4 @@
+import { SCROLL_PRICE_DEFAULTS, migrateScrollPrices } from "./scroll-price-defaults.js";
 import {
   TRACE_SLOTS,
   calculateChaosReturnStrategy,
@@ -5,6 +6,7 @@ import {
   calculateSlotCraft,
   chaosAtLeast,
   chaosSumAtLeast,
+  earringSuccessRate,
   specialTraceCost,
   traceCost,
   traceSuccessRate,
@@ -59,11 +61,11 @@ const ARMOR_CATEGORIES = new Set([
  */
 export const ITEM_MARKET_SCROLL_DEFAULTS = Object.freeze({
   tracePer1000: 140,
-  earringPrice: 8_000,
-  chaos60Price: 3,
-  chaos100Price: 4_500,
-  magicalPrice: 5_000,
-  returnPrice: 6_900,
+  earringPrice: SCROLL_PRICE_DEFAULTS.earringPrice,
+  chaos60Price: SCROLL_PRICE_DEFAULTS.chaos60Price,
+  chaos100Price: SCROLL_PRICE_DEFAULTS.chaos100Price,
+  magicalPrice: SCROLL_PRICE_DEFAULTS.magicalPrice,
+  returnPrice: SCROLL_PRICE_DEFAULTS.returnPrice,
   clean10Price: 140,
   clean5Price: 70,
   innocent50Price: 800,
@@ -136,7 +138,7 @@ export function loadItemMarketScrollSettings({ storage, settings } = {}) {
   } catch {
     saved = {};
   }
-  return normalizeSettings({ ...saved, ...(settings || {}) });
+  return normalizeSettings({ ...migrateScrollPrices(saved), ...(settings || {}) });
 }
 
 function itemBody(value) {
@@ -445,7 +447,10 @@ function slotCraftCost({ item, context, candidate, settings, targetApplied, allo
   let successRate;
   let scrollMeso;
   if (candidate.method === "earring_scroll") {
-    successRate = 0.1;
+    successRate = earringSuccessRate({
+      guild: settings.guild,
+      dexterity: settings.dexterityLevel,
+    });
     scrollMeso = settings.earringPrice * MAN_MESO;
   } else {
     successRate = traceSuccessRate(candidate.rate, {
@@ -469,9 +474,8 @@ function slotCraftCost({ item, context, candidate, settings, targetApplied, allo
     startSuccess: 0,
     startRemaining: maximum,
     successRate,
-    slotProtectionRate: candidate.method === "spell_trace"
-      ? settings.guildProtection / 100
-      : 0,
+    // 주흔과 귀지의 슬롯 소모에 같은 길드 실패 보호 규칙을 적용한다.
+    slotProtectionRate: settings.guildProtection / 100,
     scrollCost: scrollMeso,
     cleanCost: restore.cost,
     innocentCost: reset?.cost ?? Number.POSITIVE_INFINITY,
@@ -560,7 +564,8 @@ function magicalCost(candidate, context, settings) {
     slots: context.applied,
     target: 11,
     scrollPrice,
-    returnPrice: settings.returnPrice,
+    returnPrice: settings.returnPrice * MAN_MESO,
+    returnCurrency: "meso",
     resetCost: reset.each,
     resetRate: reset.rate,
     resetStock: 0,
@@ -568,7 +573,7 @@ function magicalCost(candidate, context, settings) {
   return {
     expectedCost:
       result.costs.otherMeso +
-      (result.costs.returnMaplePoints / settings.maplePointsPerEok) * EOK_MESO,
+      result.costs.returnMeso,
     reset: reset.name,
   };
 }
@@ -870,7 +875,7 @@ function chaosReturnCost(item, context, stats, settings) {
     returnWork: {
       chaosRate: 60,
       chaosPrice: settings.chaos60Price * MAN_MESO,
-      returnPrice: (settings.returnPrice / settings.maplePointsPerEok) * EOK_MESO,
+      returnPrice: settings.returnPrice * MAN_MESO,
     },
   });
   return {
@@ -981,11 +986,15 @@ function calculateAutomaticScrollExpectedCostUnsafe({
         evidence: commonEvidence,
       });
     }
-    return calculated(cost.expectedCost, `${context.applied}작 목표 · 귀지 10% · 보유 주문서 제외`, {
+    return calculated(cost.expectedCost, `${context.applied}작 목표 · 귀지 10% · 손재주/길드 설정 · 보유 주문서 제외`, {
       method: earring.method,
       method_label: earring.methodLabel,
       confidence: earring.confidence,
-      evidence: { ...commonEvidence, success_rate: cost.successRate },
+      evidence: {
+        ...commonEvidence,
+        success_rate: cost.successRate,
+        slot_protection_rate: resolvedSettings.guildProtection / 100,
+      },
     });
   }
 

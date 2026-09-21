@@ -316,3 +316,16 @@ test("잠재능력 화면은 특수 직업 추옵 프로필을 %급 환산에 �
     /getCalculationProfile\([\s\S]*?\{ capability: "potentialEquivalence" \}\)/,
   );
 });
+
+test('제논도 소울 잠재를 공퍼 역산에 포함하고 API 최종 공격력에 중복 가산하지 않는다', () => {
+  const snapshot=emptySnapshot({STR:1000,DEX:1000,LUK:1000,공격력:1130,데미지:100,'보스 몬스터 데미지':200});
+  snapshot.equipmentData.item_equipment=[{
+    item_equipment_slot:'무기',soul_active:'1',soul_option:'공격력 +3%',soul_pad:'20',
+    soul_potential_option_1:'공격력 +4%',soul_potential_option_2:'공격력 +3%',soul_potential_option_3:'공격력 +3%',
+  }];
+  const result=calculateSpecialAddOptionConversion({character:{character_class:'제논'},snapshot,statModel:'xenon',doping:null});
+  assert.equal(result.details.activeAttackPercent,13);
+  assert.equal(result.details.selectedAttackPercent,13);
+  // 기존 정수 올림 역산 오차는 1 공 × 1.13 이내다. 소울 공 20을 다시 더하면 안 된다.
+  assert.ok(Math.abs(result.details.dopedAttack-1130)<=1.13+1e-8);
+});

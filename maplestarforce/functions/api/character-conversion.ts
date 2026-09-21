@@ -36,7 +36,7 @@ export type CharacterConversionDependencies = NexonRequestDependencies & {
 
 const CACHE_SECONDS = 10 * 60;
 const SNAPSHOT_STALE_SECONDS = 6 * 60 * 60;
-export const CHARACTER_CONVERSION_CACHE_VERSION = "combat-profile-v65";
+export const CHARACTER_CONVERSION_CACHE_VERSION = "combat-profile-v67";
 // 현재 장착한 전투복과 마스터라벨 플러스 표시 정보를 응답에 추가했다.
 // 이전 변환 응답을 10분 캐시에서 재사용하지 않도록 버전을 분리한다.
 export const CHARACTER_SNAPSHOT_CACHE_VERSION = "character-snapshot-v2";
