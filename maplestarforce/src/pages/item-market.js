@@ -2,6 +2,7 @@ import { estimateItemMarketValue } from "../shared/item-market-estimator.js";
 import { compareItemMarketStatFamilies } from "../shared/item-market-stat-comparison.js";
 import { resolveItemMarketStatPeerGroup } from "../shared/item-market-peer-items.js";
 import { filterItemMarketCatalog } from "../shared/item-market-search.js";
+import { marketFieldsFromCharacterEquipment, unchangedImportedUpgrade } from "../shared/item-market-character.js";
 import {
   allocateSharedExpectedCostRecovery,
   attachExpectedCostRecovery,
@@ -228,6 +229,7 @@ function defaultItemFields() {
     additional: { grade: "none", lines: blankLines() },
     scroll: blankStats(),
     flame: blankStats(),
+    importedUpgrade: null,
   };
 }
 
@@ -311,6 +313,7 @@ const market = {
   data: null,
   tradeDefaults: null,
   error: "",
+  characterImportMessage: "",
   statPeerStatus: "idle",
   statPeerGroup: null,
   statPeerData: {},
@@ -779,11 +782,41 @@ async function loadCatalog() {
 }
 
 function selectItem(itemName) {
+  market.characterImportMessage = "";
   resetPotentialAvailability();
   state.itemName = itemName;
   resetItemFields();
   save();
   loadSelectedItem(itemName);
+}
+
+function selectCharacterEquipment(item) {
+  if (!item.tooltip || !Array.isArray(item.tooltip.options)) {
+    market.characterImportMessage = "장비 상세 정보를 불러온 뒤 다시 선택해 주세요. 정보 갱신 버튼으로 갱신할 수 있습니다.";
+    render();
+    return;
+  }
+  const imported = marketFieldsFromCharacterEquipment(item);
+  resetItemFields();
+  Object.assign(state, imported.fields);
+  market.characterImportMessage = `${item.name}의 옵션을 불러왔습니다.`;
+  if (imported.omitted.length) {
+    market.characterImportMessage += ` 가격 계산에 지원되지 않는 잠재: ${imported.omitted.join(" · ")}`;
+  }
+  const known = market.catalog?.items.some((entry) => entry.name === item.name);
+  save();
+  if (known) {
+    loadSelectedItem(item.name);
+  } else {
+    requestSequence += 1;
+    resetPotentialAvailability();
+    resetStatPeerComparison();
+    market.data = null;
+    market.tradeDefaults = null;
+    market.itemStatus = "empty";
+    market.characterImportMessage += " 수집된 거래 자료가 없어 시세를 계산할 수 없습니다.";
+    render();
+  }
 }
 
 function selectedCatalogEntry() {
@@ -1216,7 +1249,7 @@ export function buildItemMarketTarget(input, itemMeta = {}) {
   const scrollStats = itemMeta.upgradeApplicable === false ? {} : compactStats(input.scroll);
   const inferredUpgrade = itemMeta.upgradeApplicable === false
     ? { status: "not_applicable", applied: 0, remaining: 0, recoverable: 0, source: "scroll-stats" }
-    : inferAutomaticScrollUpgradeState({
+    : unchangedImportedUpgrade(input) || inferAutomaticScrollUpgradeState({
         target: {
           item: {
             ...expectationMetadata,
@@ -1362,44 +1395,102 @@ function expectationEvidenceText(expectation) {
   return parts.join(" · ");
 }
 
-function componentExpectationFooter(component) {
+function componentExpectationFooter(component, key) {
   const expectation = component?.expectation || {};
   const footer = element("div", "market-component__expectation");
   footer.dataset.expectationStatus = expectation.status || "unavailable";
-  footer.title = expectation.basis || "";
   const cost = Number(expectation.expected_cost_meso);
   const recovery = Number(expectation.recovery_percent);
-  const method = expectation.method_label || expectation.method || "";
-  const evidence = expectationEvidenceText(expectation);
-  const inference =
-    (method ? ` · 판별 ${method}` : "") +
-    (evidence ? ` · 근거 ${evidence}` : "");
   let label;
-  let value = "—";
+  let value = "";
 
   if (expectation.status === "calculated" && Number.isFinite(cost) && cost > 0) {
     label = `제작 기댓값 ${formatMeso(cost)}` +
-      (Number(expectation.ignored_lines) > 0 ? ` · 무효 ${expectation.ignored_lines}줄 제외` : "") +
-      inference;
+      (Number(expectation.ignored_lines) > 0 ? ` · 계산 제외 ${expectation.ignored_lines}줄` : "");
     value = component.market_allocation?.method === "shared_expected_cost_recovery"
       ? `기댓값 대비 약 ${formatRecoveryPercent(recovery)}`
       : component.identifiable === false
         ? "시장 반영액 분리 불가"
         : `기댓값 대비 ${formatRecoveryPercent(recovery)}`;
   } else if (expectation.status === "excluded") {
-    label = "이 장비에 유효한 옵션 없음 · 기댓값 제외";
+    label = "제작비 계산 대상 옵션 없음";
   } else if (expectation.status === "not_applicable") {
     label = expectation.basis || "적용된 강화 없음";
   } else {
-    label = `제작 기댓값 산출 불가${expectation.basis ? ` · ${expectation.basis}` : ""}` +
-      inference;
+    label = "제작 기댓값 산출 불가";
   }
 
-  footer.append(
+  const copy = element("div", "market-component__expectation-copy");
+  copy.append(
     element("span", "market-component__expected-cost", label),
     element("strong", "market-component__recovery", value),
   );
+  const { toggle, panel } = componentCalculationDetails(component, key);
+  footer.append(copy, toggle, panel);
   return footer;
+}
+
+// Keep expanded explanations open while an input refreshes the result.
+const openMarketDetails = new Set();
+function marketDisclosure(key, title, ...children) {
+  const details = element("details", "market-disclosure");
+  details.dataset.disclosure = key;
+  details.open = openMarketDetails.has(key);
+  details.append(element("summary", "", title));
+  const body = element("div", "market-disclosure__body");
+  body.append(...children.filter(Boolean));
+  details.append(body);
+  details.addEventListener("toggle", () => {
+    if (!details.isConnected) return;
+    if (details.open) openMarketDetails.add(key);
+    else openMarketDetails.delete(key);
+  });
+  return details;
+}
+
+function componentCalculationDetails(component, key) {
+  const expectation = component.expectation || {};
+  const method = expectation.method_label || expectation.method || "";
+  const evidence = expectationEvidenceText(expectation);
+  const isReproduction = expectation.assessment === "goal_reproduction";
+  const inference = method
+    ? `${isReproduction ? "제작 경로" : "판별"} ${method}`
+    : "";
+  const optionText = (line) => {
+    const perLevel = line.code === "STAT_PER_CHARACTER_LEVEL";
+    const spec = OPTION_BY_VALUE.get(`${line.code}:${perLevel ? line.params?.stat_code : line.unit}`);
+    return `${spec?.label.replace(/\s*%$/u, "") || line.code} +${perLevel ? line.params?.stat_value : line.value}${spec?.suffix || ""}`;
+  };
+  const panel = element("div", "market-disclosure__body market-component__evidence");
+  const disclosureKey = `component-${key}`;
+  panel.id = `market-evidence-${key}`;
+  panel.dataset.disclosure = disclosureKey;
+  panel.hidden = !openMarketDetails.has(disclosureKey);
+  panel.append(...[
+    component.identifiable === false && Number(component.contribution_meso) === 0 && expectation.status !== "not_applicable"
+      ? element("p", "", "다른 강화 효과와 가격을 따로 구분할 근거가 부족합니다. 가치가 0원이라는 뜻은 아니며, 제작 기댓값은 별도로 계산합니다.")
+      : null,
+    inference ? element("p", "", inference) : null,
+    expectation.basis ? element("p", "", expectation.basis) : null,
+    expectation.accepted_options?.length
+      ? element("p", "", `계산에 포함: ${expectation.accepted_options.map(optionText).join(" / ")}`)
+      : null,
+    expectation.ignored_options?.length
+      ? element("p", "", `계산에서 제외: ${expectation.ignored_options.map(optionText).join(" / ")} · ${expectation.family} 계열의 제작비 계산 조건에 포함하지 않습니다.`)
+      : null,
+    evidence ? element("p", "", `근거 ${evidence}`) : null,
+  ].filter(Boolean));
+  const toggle = element("button", "market-component__details-toggle", "계산 근거");
+  toggle.type = "button";
+  toggle.setAttribute("aria-controls", panel.id);
+  toggle.setAttribute("aria-expanded", String(!panel.hidden));
+  toggle.addEventListener("click", () => {
+    panel.hidden = !panel.hidden;
+    toggle.setAttribute("aria-expanded", String(!panel.hidden));
+    if (panel.hidden) openMarketDetails.delete(disclosureKey);
+    else openMarketDetails.add(disclosureKey);
+  });
+  return { toggle, panel };
 }
 
 function componentBreakdown(result) {
@@ -1408,9 +1499,12 @@ function componentBreakdown(result) {
     const component = result.components?.[key];
     if (!component) continue;
     const item = element("div", "market-component");
+    item.dataset.component = key;
     item.dataset.confidence = component.confidence || "low";
     item.dataset.identifiable = String(component.identifiable !== false);
     const identifiable = component.identifiable !== false;
+    const noAppliedEnhancement = component.expectation?.status === "not_applicable" &&
+      Number(component.contribution_meso) === 0;
     const sharedAllocation = component.market_allocation?.method ===
       "shared_expected_cost_recovery";
     const copy = element("div", "market-component__copy");
@@ -1419,7 +1513,9 @@ function componentBreakdown(result) {
       element(
         "span",
         "market-component__range",
-        sharedAllocation
+        noAppliedEnhancement
+          ? "적용된 강화 없음"
+          : sharedAllocation
           ? "합산 가격을 제작 기댓값 비중으로 배분"
           : !identifiable
           ? "개별 가격 분리 불가"
@@ -1431,15 +1527,19 @@ function componentBreakdown(result) {
     const value = element(
       "strong",
       "market-component__value",
-      sharedAllocation
+        noAppliedEnhancement
+        ? formatMeso(0)
+        : sharedAllocation
         ? `배분 추정치 ${formatMeso(component.contribution_meso)}`
+        : !identifiable && (component.contribution_meso == null || Number(component.contribution_meso) === 0)
+        ? "분리 추정 어려움"
         : !identifiable
         ? `참고 추정치 ${formatMeso(component.contribution_meso)}`
         : component.contribution_meso === null
           ? "-"
           : formatMeso(component.contribution_meso),
     );
-    item.append(copy, value, componentExpectationFooter(component));
+    item.append(copy, value, componentExpectationFooter(component, key));
     list.append(item);
   }
   return list;
@@ -1784,16 +1884,17 @@ function resultCard() {
   sumLine.dataset.matches = String(sumMatches);
   section.append(...[
     heading,
-    statFamilyComparison(statComparison),
-    equivalenceComparison(result),
     element("h3", "market-result-subtitle", "구성요소별 시장 반영액"),
     note("기댓값 대비 비율 = 해당 요소의 시장 반영액 ÷ 제작 기댓값", "market-recovery-formula"),
     componentBreakdown(result),
     sumLine,
+    element("h3", "market-result-subtitle", "타스탯 비교 · 환산"),
+    statFamilyComparison(statComparison),
+    equivalenceComparison(result),
   ].filter(Boolean));
   const warnings = warningList(result.warnings);
   if (warnings) {
-    section.append(element("h3", "market-result-subtitle", "추정 시 주의"), warnings);
+    section.append(marketDisclosure("warnings", `추정 시 주의 · ${warnings.childElementCount}건`, warnings));
   }
   return section;
 }
@@ -1807,7 +1908,15 @@ function render() {
   potentials.classList.add("calculator-market-options");
   const enhancements = enhancementCard();
   enhancements.classList.add("calculator-market-enhancement");
-  const profile = characterProfileCard({ extraContent: manualCharacterSettings() });
+  const profile = characterProfileCard({
+    extraContent: manualCharacterSettings(),
+    equipmentMetric: "regular",
+    collapseReferenceDetails: true,
+    onEquipmentSelect: selectCharacterEquipment,
+  });
+  if (market.characterImportMessage) {
+    equipment.append(note(market.characterImportMessage, "market-character-import-status"));
+  }
   profile.classList.add("calculator-profile");
   controls.append(
     equipment,

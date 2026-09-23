@@ -15,7 +15,7 @@ test("자석펫 페이지가 멀티 페이지 빌드와 공용 내비게이션�
     read("../src/shared/tool-nav.js"),
   ]);
   assert.match(html, /page--calculator page--pet/);
-  assert.match(html, /src\/pages\/pet\.js/);
+  assert.match(html, /src\/shared\/calculator-entry\.js/);
   assert.match(html, /자석펫 기댓값/);
   assert.match(vite, /pet:\s*resolve\(__dirname, "pet\/index\.html"\)/);
   assert.match(shell, /id: "pet", name: "자석펫", href: "pet\/"/);

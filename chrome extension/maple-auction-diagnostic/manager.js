@@ -42,7 +42,7 @@ import {
 import {
   isPriceTabUrl,
   isSubmittedFilterSearchUrl,
-  queryMatchesSearchContext,
+  searchContextMismatches,
   requiresFilterSubmission
 } from "./tools/preset-core.mjs";
 import {
@@ -2861,11 +2861,15 @@ function publicQuota(state) {
 }
 
 function assertSearchContext(searchContext, job, pageLimit) {
-  if (!queryMatchesSearchContext(searchContext, publicAuctionQuery(job.task.query), {
+  const mismatches = searchContextMismatches(searchContext, publicAuctionQuery(job.task.query), {
     page: job.page,
     limit: pageLimit
-  })) {
-    throw new Error("판매 완료·장비 검색어·페이지 조건이 적용되지 않아 저장을 중단했습니다.");
+  });
+  if (mismatches.length) {
+    const display = (value) => JSON.stringify(value).replace(/[\u0000-\u001f]/gu, " ").slice(0, 100);
+    const details = mismatches.map(({ label, expected, actual }) =>
+      `${label}: 예상 ${display(expected)}, 확인 ${display(actual)}`).join("; ");
+    throw new Error(`검색 조건 불일치로 저장을 중단했습니다. ${details}`);
   }
 }
 
@@ -3283,6 +3287,12 @@ async function flushCaptureRecord(pageCaptureId) {
   const record = await getPageCaptureRecord(pageCaptureId);
   if (!record || record.file_status === "flushed") return;
   if (!record.output_text) throw new Error(`원본 ${pageCaptureId}의 임시 내용이 없습니다.`);
+  // Persist the VM outbox before local backup clears output_text. A network
+  // failure never discards the payload or requires repeating an auction search.
+  const queued = await chrome.runtime.sendMessage({
+    type: "MAPLE_VM_UPLOAD_QUEUE", text: record.output_text, sha256: record.file_sha256,
+  });
+  if (!queued?.ok) throw new Error(`VM 전송 대기열 저장 실패: ${queued?.error || "응답 없음"}`);
   await ensureDirectoryWritePermission();
   const rawDirectory = directoryHandle.name.toLowerCase() === "raw"
     ? directoryHandle
@@ -3313,6 +3323,22 @@ async function flushCaptureRecord(pageCaptureId) {
     });
   });
 }
+
+function renderVmUploadStatus(value = {}) {
+  const node = document.getElementById("vmUploadStatus");
+  if (!node) return;
+  node.textContent = !value.configured ? "VM 연결 설정 없음" :
+    value.pending ? `VM 전송 대기 ${value.pending}개${value.lastError ? " · 연결 복구 시 자동 재시도" : ""}` :
+      value.lastSuccessAt ? `VM 저장 완료 · ${new Date(value.lastSuccessAt).toLocaleString("ko-KR")}` : "VM 자동 전송 준비됨";
+}
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes.mapleAuctionVmUploadStatus) renderVmUploadStatus(changes.mapleAuctionVmUploadStatus.newValue);
+});
+document.getElementById("retryVmUploadButton")?.addEventListener("click", () => {
+  chrome.runtime.sendMessage({ type: "MAPLE_VM_UPLOAD_RETRY" }).catch(() => {});
+});
+chrome.runtime.sendMessage({ type: "MAPLE_VM_UPLOAD_STATUS" })
+  .then((result) => renderVmUploadStatus(result?.status)).catch(() => {});
 
 async function flushCommittedCaptureSafely(pageCaptureId) {
   try {

@@ -22,6 +22,12 @@
         <div id="folderName" class="folder-name">아직 선택된 루트 폴더가 없습니다.</div>
         <button id="chooseFolderButton" class="secondary" type="button">market-data 폴더 선택</button>
         <p class="hint">원본은 <code>raw/</code>에 페이지별 JSONL로 저장합니다. 저장된 원본은 다시 덮어쓰지 않습니다.</p>
+        <div class="section-heading">
+          <strong>VM 자동 전송</strong>
+          <button id="retryVmUploadButton" class="ghost compact" type="button">전송 재시도</button>
+        </div>
+        <p id="vmUploadStatus" class="hint" role="status">연결 상태 확인 중</p>
+        <p class="hint">수집한 원본은 PC와 VM에 저장합니다. 전송에 실패하면 브라우저에 보관하고 자동으로 다시 보냅니다.</p>
       </section>
 
       <section class="card">

@@ -15,7 +15,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import { refreshItemMarketData } from "../scripts/refresh-item-market-data.mjs";
+import { refreshItemMarketData, writeTrainingArtifact } from "../scripts/refresh-item-market-data.mjs";
 
 const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(TEST_DIR, "..");
@@ -29,6 +29,7 @@ const catalog = await import(
 const collector = await import(
   pathToFileURL(path.join(EXTENSION_ROOT, "tools/collector-core.mjs")).href
 );
+const training = await import(pathToFileURL(path.join(EXTENSION_ROOT, "tools/training-lib.mjs")).href);
 
 const queries = catalog.expandCatalogQueries();
 const EXACT_ZERO_QUERY = queries.find(
@@ -631,6 +632,24 @@ async function snapshotTree(root) {
   await visit(root);
   return snapshot;
 }
+
+test("분할 저장한 JSONL·CSV는 기존 직렬화 및 SHA-256 결과와 동일하다", async (t) => {
+  const paths = await createSandbox(t);
+  const rows = Array.from({ length: 700 }, (_, index) => ({
+    price_meso: index, item_name: '한글,"장비"\n이름',
+    ...(index % 2 ? { later_column: null } : { first_column: '값' })
+  }));
+  for (const format of ["jsonl", "csv"]) {
+    const file = path.join(paths.privateRoot, `stream.${format}`);
+    const result = await writeTrainingArtifact(file, rows, format);
+    const expected = format === "csv" ? training.toCsv(rows) : rows.map((row) => JSON.stringify(row)).join("\n") + "\n";
+    assert.equal(await readFile(file, "utf8"), expected);
+    assert.deepEqual(result, { sha256: sha256(expected), bytes: Buffer.byteLength(expected) });
+    const empty = await writeTrainingArtifact(file, [], format);
+    assert.equal(await readFile(file, "utf8"), "");
+    assert.equal(empty.bytes, 0);
+  }
+});
 
 test("0.7.7 자연 종료 캡처를 공개·비공개 비교매물로 적용하고 가격 하한을 보존한다", async (t) => {
   const paths = await createSandbox(t);
@@ -1662,7 +1681,7 @@ test("원본/보존 건수와 500건 cap 절단 근거를 엄격히 검증한다
   );
 });
 
-test("전체 건수/페이지/다음 페이지 산술은 재개 attempt별로 검증한다", async (t) => {
+test("각 페이지의 건수 산술은 검증하되 페이지 간 전체 건수·페이지 수 감소는 허용한다", async (t) => {
   const impossiblePage = await createSandbox(t);
   await writeCapture(impossiblePage.rawRoot, "impossible-page.jsonl", buildCapture({
     sweepId: "impossible-page",
@@ -1702,13 +1721,47 @@ test("전체 건수/페이지/다음 페이지 산술은 재개 attempt별로 �
     pageRows: 1,
     hasNextPage: false,
   }));
-  await assert.rejects(
-    refresh(changedSameAttempt, { mode: "check" }),
-    /같은 attempt .* 전체 결과 수가 1건을 초과해 바뀌었거나 전체 페이지 수가 바뀌었습니다/,
-  );
+  const changed = await refresh(changedSameAttempt, { mode: "check" });
+  assert.equal(changed.ready, true);
+  assert.equal(changed.completed_chains, 1);
+  assert.equal(changed.unique_sales, 61);
 });
 
-test("페이지 순회 중 판매 완료 건수가 1건 변하어도 네이티브 거래 ID로 안전하게 병합한다", async (t) => {
+test("자동 갱신은 불일치 묶음 전체를 격리하고 기존 자료와 정상 신규 묶음은 반영한다", async (t) => {
+  const paths = await createSandbox(t);
+  await writeCapture(paths.rawRoot, "previous.jsonl", buildCapture({ sweepId: "previous", listingPrefix: "previous" }));
+  await refresh(paths);
+  await writeCapture(paths.rawRoot, "new.jsonl", buildCapture({ sweepId: "new", listingPrefix: "new" }));
+  const common = { sweepId: "inconsistent-usage", attemptId: "same-attempt", siteUsage: 61 };
+  await writeCapture(paths.rawRoot, "drift-1.jsonl", buildCapture({ ...common, page: 1,
+    totalResults: 61, totalPages: 2, sourceRows: 60, pageRows: 60, hasNextPage: true,
+    listingPrefix: "quarantined-first" }));
+  await writeCapture(paths.rawRoot, "drift-2.jsonl", buildCapture({ ...common, page: 2,
+    totalResults: 63, totalPages: 2, sourceRows: 3, pageRows: 3, hasNextPage: false,
+    siteUsage: 62, listingPrefix: "quarantined-second" }));
+
+  const result = await refresh(paths, { deferInvalidChains: true });
+  assert.equal(result.applied, true);
+  assert.equal(result.newly_eligible_files, 1);
+  assert.equal(result.reused_validated_files, 1);
+  assert.equal(result.unique_sales, 2);
+  assert.equal(result.quarantined_chains.length, 1);
+  assert.equal(result.quarantined_chains[0].pages, 2);
+  assert.match(result.quarantined_chains[0].error, /같은 attempt의 페이지에서 검색 횟수가 변했습니다/);
+  assert.equal(result.quarantined_chains[0].source_hashes.length, 2);
+  assert.equal((await readPublishedItem(paths)).item.records.length, 2);
+  assert.equal(await exists(path.join(paths.rawRoot, "drift-1.jsonl")), true);
+  assert.equal(await exists(path.join(paths.rawRoot, "drift-2.jsonl")), true);
+  await assert.rejects(refresh(paths, { mode: "check" }), /같은 attempt의 페이지에서 검색 횟수가 변했습니다/);
+
+  // This policy must not swallow integrity failures before chain validation.
+  const tampered = buildCapture({ sweepId: "tampered" });
+  tampered.integrity.payload_sha256 = "0".repeat(64);
+  await writeCapture(paths.rawRoot, "tampered.jsonl", tampered);
+  await assert.rejects(refresh(paths, { deferInvalidChains: true }), /무결성 검증에 실패/);
+});
+
+test("페이지 순회 중 판매 완료 건수가 1건 변해도 정상 수집한다", async (t) => {
   const paths = await createSandbox(t);
   const common = {
     sweepId: "one-result-live-drift",
@@ -1741,6 +1794,26 @@ test("페이지 순회 중 판매 완료 건수가 1건 변하어도 네이티�
   assert.equal(checked.completed_chains, 1);
   assert.equal(checked.observations, 62);
   assert.equal(checked.unique_sales, 62);
+});
+
+test("전체 건수·페이지 수 증가를 허용하고 경계에서 반복된 거래는 한 번만 반영한다", async (t) => {
+  const paths = await createSandbox(t);
+  const common = { sweepId: "live-growth", attemptId: "live-growth-attempt", siteUsage: 61 };
+  await writeCapture(paths.rawRoot, "page-1.jsonl", buildCapture({ ...common, page: 1,
+    totalResults: 119, totalPages: 2, sourceRows: 60, pageRows: 60, hasNextPage: true,
+    listingPrefix: "growth-p1" }));
+  await writeCapture(paths.rawRoot, "page-2.jsonl", buildCapture({ ...common, page: 2,
+    totalResults: 122, totalPages: 3, sourceRows: 60, pageRows: 60, hasNextPage: true,
+    listingKeys: Array.from({ length: 60 }, (_, i) => i === 0 ? "growth-p1-1" : `growth-p2-${i + 1}`) }));
+  await writeCapture(paths.rawRoot, "page-3.jsonl", buildCapture({ ...common, page: 3,
+    totalResults: 122, totalPages: 3, sourceRows: 2, pageRows: 2, hasNextPage: false }));
+  const result = await refresh(paths);
+  assert.equal(result.applied, true);
+  assert.equal(result.quarantined_chains.length, 0);
+  assert.equal(result.observations, 122);
+  assert.equal(result.unique_sales, 121);
+  assert.equal(result.duplicate_observations, 1);
+  assert.equal((await readPublishedItem(paths)).item.records.length, 121);
 });
 
 test("0.7.7 자동 카탈로그 외 collection_mode를 거부한다", async (t) => {

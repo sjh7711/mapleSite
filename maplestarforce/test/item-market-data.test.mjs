@@ -75,6 +75,22 @@ function makeFixture(options = {}) {
   };
 }
 
+test("장비별 검증 정책을 해시 검증한 시세 자료에 연결한다", async () => {
+  const fixture = makeFixture({ mutateManifest: (manifest) => {
+    manifest.model = { estimator_policy: { defaults: { halfLifeDays: 7, periodDays: 7, ridge: 2 },
+      items: { "거대한 공포": { options: { halfLifeDays: 3, periodDays: 7, ridge: 2 } } } } };
+  } });
+  const loaded = await loadItemMarketComparables("거대한 공포", { fetcher: fixtureFetcher(fixture), manifestUrl: MANIFEST_URL });
+  assert.deepEqual(loaded.data.model_options, { halfLifeDays: 3, periodDays: 7, ridge: 2 });
+});
+
+test("허용 범위를 벗어난 시세 모델 정책을 거부한다", async () => {
+  const fixture = makeFixture({ mutateManifest: (manifest) => {
+    manifest.model = { estimator_policy: { defaults: { halfLifeDays: -7, periodDays: 7, ridge: 2 } } };
+  } });
+  await assert.rejects(loadItemMarketComparables("거대한 공포", { fetcher: fixtureFetcher(fixture), manifestUrl: MANIFEST_URL }), /정책 값/u);
+});
+
 test("공용 장비 아이콘 키만 Nexon 이미지 URL로 변환한다", () => {
   assert.equal(
     itemMarketIconUrl({ icon_asset_key: "KEODIEOH" }),

@@ -29,6 +29,7 @@ const {
   shouldKeepNewerSavedCharacterData,
   toBossDamagePercentEquivalent,
   xenonMainPercentToDamagePercent,
+  levelTwoStatBonus,
 } = await import(
   "../src/shared/character-profile.js?conversion-ui"
 );
@@ -61,6 +62,17 @@ test("주스탯%급을 데미지%급으로 같은 기준에서 환산한다", ()
   );
   assert.equal(toBossDamagePercentEquivalent(10, 0), null);
   assert.equal(toBossDamagePercentEquivalent(Number.NaN, 1), null);
+});
+
+test("렙당2는 캐릭터 레벨의 9레벨 경계를 적용하고 정보가 없으면 환산하지 않는다", () => {
+  assert.equal(levelTwoStatBonus(287), 62);
+  assert.equal(levelTwoStatBonus(288), 64);
+  assert.equal(levelTwoStatBonus(290), 64);
+  assert.equal(levelTwoStatBonus(300), 66);
+  assert.equal(levelTwoStatBonus("290"), 64);
+  for (const level of [undefined, null, "", 0, -1, 290.5, NaN]) {
+    assert.equal(levelTwoStatBonus(level), null);
+  }
 });
 
 test("제논 개별 스탯%는 STR% 기준 단위를 써서 합계가 올스탯%와 일치한다", () => {

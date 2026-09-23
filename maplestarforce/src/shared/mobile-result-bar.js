@@ -125,3 +125,52 @@ export function installMobileResultBar(tool = document.querySelector("#tool")) {
 
   refresh();
 }
+
+/** 스타포스는 위쪽 합계가 화면 밖으로 사라졌을 때 장비 버튼 옆에서 안내한다. */
+export function installStarforceMobileResultBar() {
+  const result = document.querySelector("#starforce-total");
+  if (!result || document.getElementById(MOBILE_RESULT_BAR_ID)) return;
+
+  const bar = createBar();
+  bar.classList.add("mobile-result-bar--starforce");
+  bar.setAttribute("aria-controls", result.id);
+  bar.querySelector(".mobile-result-bar__label").textContent = "준비할 메소";
+  document.body.append(bar);
+
+  const mobile = window.matchMedia("(max-width: 760px)");
+  let scheduled = false;
+  const refresh = () => {
+    scheduled = false;
+    const value = text(result.querySelector("#total-cost"));
+    bar.querySelector(".mobile-result-bar__value").textContent = value;
+    bar.title = `준비할 메소 ${value} · 결과 보기`;
+    bar.setAttribute("aria-label", `준비할 메소 ${value}, 위쪽 계산 결과로 이동`);
+    bar.hidden = !mobile.matches || result.getBoundingClientRect().bottom >= 0;
+  };
+  const scheduleRefresh = () => {
+    if (scheduled) return;
+    scheduled = true;
+    requestAnimationFrame(refresh);
+  };
+
+  // 캐릭터 장비창·목록 변화와 합계 갱신도 위치 및 표시 금액에 반영한다.
+  const observer = new MutationObserver(scheduleRefresh);
+  observer.observe(result.closest(".card--enhance"), {
+    childList: true,
+    subtree: true,
+    characterData: true,
+  });
+  window.addEventListener("scroll", scheduleRefresh, { passive: true });
+  window.addEventListener("resize", scheduleRefresh);
+  mobile.addEventListener("change", scheduleRefresh);
+
+  bar.addEventListener("click", () => {
+    result.focus({ preventScroll: true });
+    result.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+        ? "auto" : "smooth",
+      block: "start",
+    });
+  });
+  refresh();
+}

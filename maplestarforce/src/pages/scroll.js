@@ -1,3 +1,4 @@
+import { calculatorStorage, registerResultShare } from "../shared/result-share-state.js";
 import { SCROLL_PRICE_DEFAULTS, migrateScrollPrices } from "../shared/scroll-price-defaults.js";
 import {
   TRACE_SLOTS,
@@ -162,9 +163,10 @@ const state = {
   maplePointsPerEok: 2000,
   returnResultUnit: "meso",
 };
+const initialSettings = structuredClone(state);
 
 try {
-  const saved = JSON.parse(localStorage.getItem("maplestarforce:scroll:v2")) ?? {};
+  const saved = JSON.parse(calculatorStorage.getItem("maplestarforce:scroll:v2")) ?? {};
   const savedVersion = Number(saved.settingsVersion) || 0;
   Object.assign(state, migrateScrollPrices(saved));
   state.workCount = normalizeWorkCount(
@@ -427,7 +429,7 @@ function returnCalculationCard(status, message = "") {
 
 function save() {
   try {
-    localStorage.setItem("maplestarforce:scroll:v2", JSON.stringify(state));
+    calculatorStorage.setItem("maplestarforce:scroll:v2", JSON.stringify(state));
   } catch {
     // 저장을 막은 브라우저에서도 현재 탭 계산은 계속한다.
   }
@@ -503,33 +505,25 @@ function returnFirstWorkOption(disabled = false) {
   return option;
 }
 
-function resetReturnProgressInputs() {
-  Object.assign(state, {
-    returnAppliedWorks: 0,
-    returnCurrentAttack: 0,
-    returnCurrentStat: 0,
-  });
+function resetScrollTargets() {
+  for (const key of ["traceRate", "preferredRate", "slot", "itemLevel", "remaining", "recoverable",
+    "workCount", "magicalCompletedCount", "returnAppliedWorks", "returnCurrentAttack", "returnCurrentStat",
+    "chaosFirst", "chaosFirstAttack", "chaosFirstStat", "returnFirst", "returnFirstAttack", "returnFirstStat",
+    "returnFirstStarforced", "magicalFirstStarforced", "preserveStarforce", "attackTarget", "statTarget", "stats"]) {
+    state[key] = structuredClone(initialSettings[key]);
+  }
   render();
-}
-
-function returnProgressResetButton() {
-  return resetAction("입력값 초기화", resetReturnProgressInputs, {
-    disabled: ![
-    state.returnAppliedWorks,
-    state.returnCurrentAttack,
-    state.returnCurrentStat,
-    ].some((value) => Number(value) !== 0),
-    title: "이미 적용한 작 수와 현재 적용된 상승량만 0으로 되돌립니다.",
-    ariaLabel: "놀긍리턴 장비 입력값 초기화",
-    key: "reset-return-progress",
-  });
 }
 
 function line(label, value, strong = false) {
   const p = document.createElement("p");
   p.className = "result__line";
   const tag = strong ? "strong" : "span";
-  p.innerHTML = `<span>${label}</span><${tag}>${value}</${tag}>`;
+  const labelNode = document.createElement("span");
+  labelNode.textContent = label;
+  const valueNode = document.createElement(tag);
+  valueNode.textContent = value;
+  p.append(labelNode, valueNode);
   return p;
 }
 
@@ -1919,9 +1913,12 @@ function render() {
   const showsChaosSettings = method.kind === "slot" || usesChaos;
   const hasReturnProgress = method.kind === "return" && hasAppliedReturnWorks();
   const returnUsesFirst = method.kind === "return" && usesReturnFirstWork();
-  const methodCard = settingsSection(
+  const methodCard = settingsSectionWithHead(
     "작 방식",
     "method",
+    resetAction("초기화", resetScrollTargets, {
+      key: "reset-scroll-targets", title: "목표와 장비 입력값만 기본값으로 되돌립니다. 시세와 작 방식은 유지합니다.",
+    }),
     chipRow(
       Object.entries(METHODS).map(([id, entry]) =>
         chip(entry.name, state.method === id, () => {
@@ -2099,14 +2096,7 @@ function render() {
         : null,
   ];
   if (!isStandaloneFirst) {
-    equipmentSettingsCard = method.kind === "return"
-      ? settingsSectionWithHead(
-          "장비",
-          "equipment",
-          returnProgressResetButton(),
-          ...equipmentContent,
-        )
-      : settingsSection("장비", "equipment", ...equipmentContent);
+    equipmentSettingsCard = settingsSection("장비", "equipment", ...equipmentContent);
   }
 
   if (method.kind === "magical") {
@@ -2356,3 +2346,5 @@ const scheduleIdle = globalThis.requestIdleCallback ??
 scheduleIdle(() => {
   if (!pageDisposed) void loadCharacterProfile().catch(() => {});
 });
+
+registerResultShare(() => ({ local: { ["maplestarforce:scroll:v2"]: state } }));

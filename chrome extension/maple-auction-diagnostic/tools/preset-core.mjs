@@ -215,29 +215,39 @@ export function presetMatchesSearchContext(searchContext, preset = null, options
 }
 
 export function queryMatchesSearchContext(searchContext, query = null, options = {}) {
+  return searchContextMismatches(searchContext, query, options).length === 0;
+}
+
+// Only public filter values enter diagnostics. Never include URLs, search keys,
+// response bodies, cookies or account identifiers in a collector error.
+export function searchContextMismatches(searchContext, query = null, options = {}) {
   const expectedPage = options.page ?? query?.page ?? 1;
   const expectedLimit = options.limit ?? query?.page_limit ?? DEFAULT_PAGE_LIMIT;
-  if (
-    searchContext?.page_kind !== "sold" ||
-    searchContext?.page !== expectedPage ||
-    searchContext?.limit !== expectedLimit ||
-    searchContext?.sort !== SOLD_SORT.toLowerCase()
-  ) {
-    return false;
+  const checks = [
+    filterCheck("판매 완료 탭", "sold", searchContext?.page_kind),
+    filterCheck("페이지", expectedPage, searchContext?.page),
+    filterCheck("페이지당 매물 수", expectedLimit, searchContext?.limit),
+    filterCheck("정렬", SOLD_SORT.toLowerCase(), searchContext?.sort),
+  ];
+  if (query) {
+    const rawFilters = searchContext?.raw_filters || {};
+    checks.push(
+      filterCheck("장비 검색어", normalizedKeyword(query.keyword), normalizedKeyword(searchContext?.keyword)),
+      filterCheck("장비명 정확 일치", expectedExactMatch(query), nullableBoolean(rawFilters.isExactMatch),
+        exactMatchParamMatches(rawFilters.isExactMatch, query)),
+      ...rawFilterChecks(rawFilters, query),
+    );
+    if (requiresFilterSubmission(query)) checks.push(
+      filterCheck("필터 검색 적용", true, searchContext?.filter_search_applied),
+      filterCheck("검색 키 생성", true, searchContext?.price_search_key_present),
+    );
   }
-  if (!query) {
-    return true;
-  }
-  const rawFilters = searchContext.raw_filters || {};
-  return (
-    normalizedKeyword(searchContext.keyword) === normalizedKeyword(query.keyword) &&
-    exactMatchParamMatches(rawFilters.isExactMatch, query) &&
-    rawFiltersMatchQuery(rawFilters, query) &&
-    (!requiresFilterSubmission(query) || (
-      searchContext.filter_search_applied === true &&
-      searchContext.price_search_key_present === true
-    ))
-  );
+  return checks.filter((check) => !check.matches).map(({ label, expected, actual }) =>
+    ({ label, expected, actual }));
+}
+
+function filterCheck(label, expected, actual, matches = expected === actual) {
+  return { label, expected: expected ?? null, actual: actual ?? null, matches };
 }
 
 function normalizeLegacyPreset(preset = {}) {
@@ -291,6 +301,10 @@ function urlFiltersMatchQuery(searchParams, query) {
 }
 
 function rawFiltersMatchQuery(rawFilters, query, options = {}) {
+  return rawFilterChecks(rawFilters, query, options).every((check) => check.matches);
+}
+
+function rawFilterChecks(rawFilters, query, options = {}) {
   const potentialCode = query.server_filter?.code ?? query.potential_code;
   const potentialMinimum = query.server_filter?.minimum ?? query.potential_min;
   const expectedPotential = potentialCode && potentialMinimum != null
@@ -346,21 +360,36 @@ function rawFiltersMatchQuery(rawFilters, query, options = {}) {
     actualCategory === canonicalCategoryForSubcategory;
   const canonicalSubcategoryEvidence = expectedSubcategory != null &&
     actualSubcategory === null && subcategoryCategoryAlias;
-  return (
-    (actualCategory === expectedCategory || subcategoryCategoryAlias ||
-      (expectedCategory === null && actualCategory === "ARMOR")) &&
-    (
+  // A named search (exact item or catalog prefix) can leave the broad equipment button selected
+  // in the DOM. content.js reads its label as a subcategory, even though the
+  // submitted URL has no subcategory restriction. Treat that form-only label
+  // as irrelevant for named searches, as the form/readiness checks already do.
+  // Explicit category searches, global searches and restrictive URL
+  // categories still require their original evidence.
+  const namedSearchFormCategoryAlias = query.search_scope !== "catalog_global" &&
+    Boolean(normalizedKeyword(query.keyword)) &&
+    expectedCategory === null && expectedSubcategory === null &&
+    (actualCategory === null || actualCategory === "ARMOR") &&
+    ["방어구", "장신구"].includes(actualSubcategory);
+  return [
+    filterCheck("장비 분류", expectedCategory, actualCategory,
+      actualCategory === expectedCategory || subcategoryCategoryAlias ||
+      (expectedCategory === null && actualCategory === "ARMOR")),
+    filterCheck("장비 하위 분류", expectedSubcategory, actualSubcategory,
       actualSubcategory === expectedSubcategory ||
       canonicalSubcategoryEvidence ||
-      (expectedSubcategory === null && actualSubcategory === null) ||
-      (options.allow_missing_expected_subcategory === true && actualSubcategory === null)
-    ) &&
-    (actualStarforceMin === expectedStarforceMin ||
-      (expectedStarforceMin === null && actualStarforceMin === 0)) &&
-    (actualStarforceMax === expectedStarforceMax || zeroStarMaximumAlias) &&
-    priceMatches &&
-    (rawFilters[POTENTIAL_FILTER_KEY] || null) === expectedPotential
-  );
+      namedSearchFormCategoryAlias ||
+      (options.allow_missing_expected_subcategory === true && actualSubcategory === null)),
+    filterCheck("스타포스 최소", expectedStarforceMin, actualStarforceMin,
+      actualStarforceMin === expectedStarforceMin ||
+      (expectedStarforceMin === null && actualStarforceMin === 0)),
+    filterCheck("스타포스 최대", expectedStarforceMax, actualStarforceMax,
+      actualStarforceMax === expectedStarforceMax || zeroStarMaximumAlias),
+    filterCheck("가격 범위", [expectedPriceMin, expectedPriceMax],
+      { min: actualPriceMin, max: actualPriceMax, valid: validPriceEvidence,
+        conflicting: conflictingPriceEvidence }, priceMatches),
+    filterCheck("잠재 조건", expectedPotential, rawFilters[POTENTIAL_FILTER_KEY] || null),
+  ];
 }
 
 function normalizeSort(raw) {

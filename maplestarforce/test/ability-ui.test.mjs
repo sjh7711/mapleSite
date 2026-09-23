@@ -13,7 +13,7 @@ test("어빌리티 계산기는 별도 페이지와 메뉴 진입점을 제공�
 
   assert.match(vite, /ability: resolve\(__dirname, "ability\/index\.html"\)/u);
   assert.match(html, /<h1>어빌리티 기댓값<\/h1>/u);
-  assert.match(html, /src="\.\.\/src\/pages\/ability\.js"/u);
+  assert.match(html, /src="\.\.\/src\/shared\/calculator-entry\.js"/u);
   assert.match(shell, /id: "ability", name: "어빌리티", href: "ability\/"/u);
   assert.match(
     shell,

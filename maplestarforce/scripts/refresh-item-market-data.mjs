@@ -4,6 +4,7 @@ import { createHash, randomUUID } from "node:crypto";
 import {
   link,
   mkdir,
+  open,
   readFile,
   readdir,
   rename,
@@ -1272,29 +1273,19 @@ function inspectCaptureDocument(document, relativePath, toolchain) {
   };
 }
 
-function sameKnownValue(values) {
-  const known = values.filter((value) => value != null);
-  return new Set(known.map((value) => stableStringify(value))).size <= 1;
-}
-
-function knownIntegerSpanWithin(values, tolerance) {
-  const known = values.filter((value) => value != null);
-  if (known.length <= 1) return true;
-  if (known.some((value) => !Number.isSafeInteger(value))) return false;
-  return Math.max(...known) - Math.min(...known) <= tolerance;
-}
+class CaptureChainValidationError extends Error {}
 
 function validateSweepGroup(group) {
   const sorted = [...group].sort((left, right) => left.inspection.page - right.inspection.page);
   const canonical = sorted[0].inspection.canonical_query;
   const label = `${canonical.query_id} / ${sorted[0].inspection.sweep_id}`;
   const pages = sorted.map((entry) => entry.inspection.page);
-  if (new Set(pages).size !== pages.length) throw new Error(`${label}: 같은 페이지가 두 번 저장되었습니다.`);
+  if (new Set(pages).size !== pages.length) throw new CaptureChainValidationError(`${label}: 같은 페이지가 두 번 저장되었습니다.`);
   if (canonical.page_sweep?.enabled !== true && (sorted.length !== 1 || pages[0] !== 1)) {
-    throw new Error(`${label}: 단일 페이지 정책 검색에 후속 페이지가 포함되었습니다.`);
+    throw new CaptureChainValidationError(`${label}: 단일 페이지 정책 검색에 후속 페이지가 포함되었습니다.`);
   }
   if (pages[0] !== 1 || pages.some((page, index) => page !== index + 1)) {
-    throw new Error(`${label}: 페이지가 1부터 연속으로 저장되지 않았습니다.`);
+    throw new CaptureChainValidationError(`${label}: 페이지가 1부터 연속으로 저장되지 않았습니다.`);
   }
   const attempts = new Map();
   for (const entry of sorted) {
@@ -1306,28 +1297,23 @@ function validateSweepGroup(group) {
   for (const [attemptId, attemptEntries] of attempts) {
     const usage = attemptEntries.map((entry) => stableStringify(entry.inspection.site_usage));
     if (new Set(usage).size !== 1) {
-      throw new Error(`${label}: 검색 없이 이동한 같은 attempt의 페이지에서 검색 횟수가 변했습니다.`);
+      throw new CaptureChainValidationError(`${label}: 검색 없이 이동한 같은 attempt의 페이지에서 검색 횟수가 변했습니다.`);
     }
-    const totalResults = attemptEntries.map((entry) => entry.inspection.total_results);
-    const totalPages = attemptEntries.map((entry) => entry.inspection.total_pages);
-    // 판매 완료 목록은 페이지를 순회하는 수 초 사이에도 새 거래가 하나 추가될 수 있다.
-    // 페이지 경계의 중복은 네이티브 거래 ID로 후속 제거하므로, 전체 건수 1건 변동만
-    // 허용하고 페이지 수 변경이나 더 큰 변동은 기존처럼 거부한다.
-    if (!knownIntegerSpanWithin(totalResults, 1) || !sameKnownValue(totalPages)) {
-      throw new Error(`${label}: 같은 attempt ${attemptId}의 전체 결과 수가 1건을 초과해 바뀌었거나 전체 페이지 수가 바뀌었습니다.`);
-    }
+    // A live sold-items list can change both its total count and page count
+    // while we traverse it. Validate each page against its own snapshot in
+    // validateResultPaginationEvidence; merge repeated sales by native ID.
     if (new Set(attemptEntries.map((entry) => entry.inspection.collection_mode)).size !== 1) {
-      throw new Error(`${label}: 같은 attempt ${attemptId}의 수집 mode가 바뀌었습니다.`);
+      throw new CaptureChainValidationError(`${label}: 같은 attempt ${attemptId}의 수집 mode가 바뀌었습니다.`);
     }
     if (new Set(attemptEntries.map((entry) => stableStringify({
       retry_count: entry.inspection.retry_count,
       resume_restart_reason: entry.inspection.resume_restart_reason
     }))).size !== 1) {
-      throw new Error(`${label}: 같은 attempt ${attemptId}의 retry/restart 근거가 바뀌었습니다.`);
+      throw new CaptureChainValidationError(`${label}: 같은 attempt ${attemptId}의 retry/restart 근거가 바뀌었습니다.`);
     }
     const attemptPages = attemptEntries.map((entry) => entry.inspection.page).sort((left, right) => left - right);
     if (attemptPages.some((page, index) => index > 0 && page !== attemptPages[index - 1] + 1)) {
-      throw new Error(`${label}: 같은 attempt ${attemptId}의 저장 페이지가 연속되지 않습니다.`);
+      throw new CaptureChainValidationError(`${label}: 같은 attempt ${attemptId}의 저장 페이지가 연속되지 않습니다.`);
     }
   }
 
@@ -1337,7 +1323,7 @@ function validateSweepGroup(group) {
     }
     if (sorted[0].inspection.page_rows !== sorted[0].inspection.source_rows ||
         sorted[0].inspection.capped_rows !== 0) {
-      throw new Error(`${label}: 단일 페이지 정책 결과의 원본 행이 잘려 있습니다.`);
+      throw new CaptureChainValidationError(`${label}: 단일 페이지 정책 결과의 원본 행이 잘려 있습니다.`);
     }
     return {
       status: "complete",
@@ -1349,13 +1335,13 @@ function validateSweepGroup(group) {
 
   if (sorted[0].inspection.page_rows === 0) {
     if (sorted.length !== 1) {
-      throw new Error(`${label}: 빈 1페이지 뒤에 추가 페이지가 저장되었습니다.`);
+      throw new CaptureChainValidationError(`${label}: 빈 1페이지 뒤에 추가 페이지가 저장되었습니다.`);
     }
     return { status: "pending", reason: "empty_first_page", entries: [] };
   }
   for (let index = 0; index < sorted.length - 1; index += 1) {
     if (sorted[index].inspection.has_next_page !== true) {
-      throw new Error(`${label}: 종료된 페이지 뒤에 추가 페이지가 저장되었습니다.`);
+      throw new CaptureChainValidationError(`${label}: 종료된 페이지 뒤에 추가 페이지가 저장되었습니다.`);
     }
   }
   const limit = 60;
@@ -1369,12 +1355,12 @@ function validateSweepGroup(group) {
     const remainingRows = Math.max(0, resultCap - cumulativeRows);
     const expectedPageRows = Math.min(entry.inspection.source_rows, remainingRows);
     if (entry.inspection.page_rows !== expectedPageRows) {
-      throw new Error(`${label}: 페이지 ${entry.inspection.page}의 원본/상한 보존 건수가 0.7.7 수집 계약과 다릅니다.`);
+      throw new CaptureChainValidationError(`${label}: 페이지 ${entry.inspection.page}의 원본/상한 보존 건수가 0.7.7 수집 계약과 다릅니다.`);
     }
     cumulativeRows += entry.inspection.page_rows;
   }
   if (cumulativeRows > resultCap || pages.at(-1) > maxPages) {
-    throw new Error(`${label}: 카탈로그의 페이지/결과 상한을 초과했습니다.`);
+    throw new CaptureChainValidationError(`${label}: 카탈로그의 페이지/결과 상한을 초과했습니다.`);
   }
   const last = sorted.at(-1).inspection;
   const naturalEnd = last.has_next_page === false;
@@ -1390,7 +1376,7 @@ function validateSweepGroup(group) {
   };
 }
 
-function selectCompleteCaptureChains(scanned) {
+function selectCompleteCaptureChains(scanned, { deferInvalidChains = false } = {}) {
   const groups = new Map();
   for (const entry of scanned) {
     const key = `${entry.inspection.query_id}\u001f${entry.inspection.sweep_id}`;
@@ -1400,9 +1386,27 @@ function selectCompleteCaptureChains(scanned) {
   }
   const included = [];
   const pending = [];
+  const quarantined = [];
   const completedChains = [];
   for (const group of groups.values()) {
-    const result = validateSweepGroup(group);
+    let result;
+    try {
+      result = validateSweepGroup(group);
+    } catch (error) {
+      if (!deferInvalidChains || !(error instanceof CaptureChainValidationError)) throw error;
+      // Keep every original, but exclude the entire inconsistent sweep from
+      // training. Other independently verified sweeps can still be published.
+      quarantined.push({
+        query_id: group[0].inspection.query_id,
+        sweep_id: group[0].inspection.sweep_id,
+        pages: group.length,
+        reason: "invalid_capture_chain",
+        error: error.message,
+        files: group.map((entry) => entry.relative_path),
+        source_hashes: group.map((entry) => entry.sha256)
+      });
+      continue;
+    }
     if (result.status === "complete") {
       included.push(...result.entries);
       completedChains.push({
@@ -1422,7 +1426,7 @@ function selectCompleteCaptureChains(scanned) {
       });
     }
   }
-  return { included, pending, completedChains };
+  return { included, pending, quarantined, completedChains };
 }
 
 async function loadToolchain(extensionRoot) {
@@ -1990,6 +1994,46 @@ async function writeReleaseArtifact(filePath, content) {
   await atomicWrite(filePath, content);
 }
 
+export async function writeTrainingArtifact(filePath, rows, format) {
+  if (!["jsonl", "csv"].includes(format)) throw new Error(`지원하지 않는 자료 형식: ${format}`);
+  await mkdir(path.dirname(filePath), { recursive: true });
+  const temporary = `${filePath}.tmp-${randomUUID()}`;
+  const handle = await open(temporary, "wx");
+  const digest = createHash("sha256");
+  let bytes = 0;
+  let batch = [];
+  const flush = async () => {
+    if (!batch.length) return;
+    const buffer = Buffer.from(batch.join(""), "utf8");
+    await handle.writeFile(buffer);
+    digest.update(buffer);
+    bytes += buffer.length;
+    batch = [];
+  };
+  try {
+    const csvCell = (value) => value == null ? "" : `"${String(value).replace(/"/gu, '""')}"`;
+    const columns = new Set();
+    if (format === "csv" && rows.length) {
+      for (const row of rows) for (const key of Object.keys(row)) columns.add(key);
+    }
+    const orderedColumns = [...columns].sort();
+    if (format === "csv" && rows.length) batch.push(orderedColumns.map(csvCell).join(",") + "\n");
+    for (const row of rows) {
+      batch.push(format === "jsonl" ? JSON.stringify(row) + "\n" :
+        orderedColumns.map((column) => csvCell(row[column])).join(",") + "\n");
+      if (batch.length >= 256) await flush();
+    }
+    await flush();
+    await handle.close();
+    await rename(temporary, filePath);
+    return { sha256: digest.digest("hex"), bytes };
+  } catch (error) {
+    await handle.close().catch(() => {});
+    await unlink(temporary).catch(() => {});
+    throw error;
+  }
+}
+
 async function writeRelease({
   uniqueEntries,
   inventory,
@@ -2008,7 +2052,7 @@ async function writeRelease({
   for (const entry of uniqueEntries) {
     const name = entry.row.item_name;
     const group = grouped.get(name) || [];
-    group.push(publicRecord(entry));
+    group.push(entry);
     grouped.set(name, group);
     const iconAssetKey = entry.row.icon_asset_key;
     if (ICON_ASSET_KEY_PATTERN.test(iconAssetKey || "")) {
@@ -2020,7 +2064,8 @@ async function writeRelease({
   const publicReleaseRoot = path.join(publicRoot, "releases", datasetVersion);
   const privateReleaseRoot = path.join(privateRoot, "releases", datasetVersion);
   const catalogItems = [];
-  for (const [name, records] of [...grouped.entries()].sort(([left], [right]) => left.localeCompare(right, "ko"))) {
+  for (const [name, itemEntries] of [...grouped.entries()].sort(([left], [right]) => left.localeCompare(right, "ko"))) {
+    const records = itemEntries.map(publicRecord);
     records.sort((left, right) =>
       String(right.sold_at).localeCompare(String(left.sold_at)) ||
       Number(left.price_meso) - Number(right.price_meso)
@@ -2075,20 +2120,12 @@ async function writeRelease({
     entry.quality.stat_component_mismatch === false
   ).map((entry) => entry.row);
   toolchain.training.assertTrainingSafe(trainingRows);
-  const privateArtifactContents = new Map([
-    ["auction-sold.jsonl", `${trainingRows.map((row) => JSON.stringify(row)).join("\n")}\n`],
-    ["auction-sold.csv", toolchain.training.toCsv(trainingRows)],
-    [
-      "auction-model-ready.jsonl",
-      modelReadyRows.length ? `${modelReadyRows.map((row) => JSON.stringify(row)).join("\n")}\n` : ""
-    ],
-    [
-      "auction-model-ready.csv",
-      modelReadyRows.length ? toolchain.training.toCsv(modelReadyRows) : ""
-    ]
-  ]);
-  for (const [filename, content] of privateArtifactContents) {
-    await writeReleaseArtifact(path.join(privateReleaseRoot, filename), content);
+  const privateArtifacts = {};
+  for (const [name, rows] of [["auction-sold", trainingRows], ["auction-model-ready", modelReadyRows]]) {
+    for (const format of ["jsonl", "csv"]) {
+      const filename = `${name}.${format}`;
+      privateArtifacts[filename] = await writeTrainingArtifact(path.join(privateReleaseRoot, filename), rows, format);
+    }
   }
 
   const sourceState = inventory.eligible.map((source) => ({
@@ -2107,10 +2144,7 @@ async function writeRelease({
     minimum_catalog_version: MINIMUM_CATALOG_VERSION,
     dataset_version: datasetVersion,
     generated_at: createdAt,
-    artifacts: Object.fromEntries([...privateArtifactContents].map(([filename, content]) => [
-      filename,
-      { sha256: sha256(content), bytes: Buffer.byteLength(content, "utf8") }
-    ])),
+    artifacts: privateArtifacts,
     sources: sourceState,
     ignored_legacy_files: inventory.ignored_legacy.length,
     observations: inventory.observations,
@@ -2604,7 +2638,9 @@ export async function refreshItemMarketData(options = {}) {
     cache_hits: 0,
     cache_misses: 0
   };
-  const entries = [];
+  // Array#push(...rows) passes one argument per row and fails for large
+  // releases. Copy the array without expanding it into function arguments.
+  const entries = trustedPrevious?.entries.slice() || [];
   const scanned = [];
   const seenSourceHashes = new Set();
   const rawPresentSourceHashes = new Set();
@@ -2612,16 +2648,15 @@ export async function refreshItemMarketData(options = {}) {
   const cacheRoot = path.join(privateRoot, "cache");
 
   if (trustedPrevious) {
-    inventory.eligible.push(...trustedPrevious.state.sources.map((source) => ({
+    inventory.eligible = trustedPrevious.state.sources.map((source) => ({
       relative_path: source.relative_path,
       sha256: source.sha256,
       bytes: source.bytes,
       capture_count: source.captures,
       observation_count: source.observations
-    })));
-    inventory.completed_chains.push(...(trustedPrevious.state.completed_chains || []));
+    }));
+    inventory.completed_chains = [...(trustedPrevious.state.completed_chains || [])];
     inventory.observations = trustedPrevious.state.observations;
-    entries.push(...trustedPrevious.entries);
   }
 
   for (const filePath of files) {
@@ -2677,8 +2712,7 @@ export async function refreshItemMarketData(options = {}) {
     const inspections = documents.map((document) => inspectCaptureDocument(document, relativePath, toolchain));
     const scannedEntry = {
       relative_path: relativePath,
-      buffer,
-      documents,
+      file_path: filePath,
       inspections,
       inspection: inspections[0],
       sha256: sourceSha,
@@ -2694,15 +2728,17 @@ export async function refreshItemMarketData(options = {}) {
     });
   }
 
-  const chainSelection = selectCompleteCaptureChains(scanned);
+  const chainSelection = selectCompleteCaptureChains(scanned, options);
   inventory.pending_chains = chainSelection.pending;
-  inventory.completed_chains.push(...chainSelection.completedChains);
+  for (const chain of chainSelection.completedChains) inventory.completed_chains.push(chain);
   for (const source of chainSelection.included) {
+    const buffer = await readFile(source.file_path);
+    if (sha256(buffer) !== source.sha256) throw new Error(`${source.relative_path}: 검증 후 원본이 변경되었습니다.`);
     const processed = await processEligibleFile({
       relativePath: source.relative_path,
-      buffer: source.buffer,
+      buffer,
       sourceSha: source.sha256,
-      documents: source.documents,
+      documents: parseJsonLines(buffer.toString("utf8"), source.relative_path),
       inspections: source.inspections,
       toolchain,
       cacheRoot,
@@ -2751,6 +2787,7 @@ export async function refreshItemMarketData(options = {}) {
     duplicate_source_files: inventory.duplicate_source_files.length,
     completed_chains: inventory.completed_chains.length,
     pending_chains: inventory.pending_chains,
+    quarantined_chains: chainSelection.quarantined,
     observations: inventory.observations,
     cache_hits: inventory.cache_hits,
     cache_misses: inventory.cache_misses,
@@ -2768,6 +2805,12 @@ export async function refreshItemMarketData(options = {}) {
   }
 
   const uniqueEntries = deduplicateNativeEntries(entries);
+  // Old rows and new per-observation objects are no longer needed after merge.
+  entries.length = 0;
+  if (trustedPrevious) {
+    trustedPrevious.entries.length = 0;
+    trustedPrevious.rows.length = 0;
+  }
   baseResult.unique_sales = uniqueEntries.length;
   baseResult.duplicate_observations = inventory.observations - uniqueEntries.length;
   if (!uniqueEntries.length) {
@@ -2838,6 +2881,7 @@ function parseArguments(argv) {
     if (argument === "--check") options.mode = "check";
     else if (argument === "--status") options.mode = "status";
     else if (argument === "--replace") options.replaceExisting = true;
+    else if (argument === "--defer-invalid-chains") options.deferInvalidChains = true;
     else if (["--raw-dir", "--private-dir", "--public-dir", "--extension-root"].includes(argument)) {
       const value = argv[++index];
       if (!value) throw new Error(`${argument} 뒤에 경로가 필요합니다.`);

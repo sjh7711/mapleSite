@@ -1,5 +1,6 @@
 import { SCROLL_PRICE_DEFAULTS, migrateScrollPrices } from "./scroll-price-defaults.js";
 import {
+  AMAZING_POSITIVE_CHAOS,
   TRACE_SLOTS,
   calculateChaosReturnStrategy,
   calculateMagicalReturnCraft,
@@ -78,8 +79,8 @@ export const ITEM_MARKET_SCROLL_DEFAULTS = Object.freeze({
   useInnocent: true,
   preserveStarforce: false,
   magicalFirstStarforced: false,
-  // 현재 주문서 계산기에는 이 시세 입력이 없다. 호출자가 명시한 경우만 쓴다.
-  premiumAccessoryPrice: 0,
+  // 넥슨 주문서 강화 가이드: 프리미엄 악세서리 100%는 6,000만 메소.
+  premiumAccessoryPrice: 6_000,
   cleanStock: 0,
   innocentStock: 0,
   arkInnocentStock: 0,
@@ -606,8 +607,8 @@ function usefulChaosTarget(item, stats) {
   };
 }
 
-function firstChaosCost(item, residual, settings) {
-  const target = usefulChaosTarget(item, residual);
+function firstChaosCost(item, residual, settings, explicitTarget = null) {
+  const target = explicitTarget || usefulChaosTarget(item, residual);
   if (!(target.attack > 0 || target.stat > 0)) return null;
   const optionChance =
     chaosAtLeast(target.attack) *
@@ -722,6 +723,62 @@ function inferPremiumAccessory(item, context, stats) {
     attackKey: entries[0][0],
     amount,
   };
+}
+
+// Each premium scroll gives +4 (85%) or +5 (15%). This is the probability
+// of reaching an at-least target, not the probability of one exact history.
+function premiumAttackChance(rolls, target) {
+  if (target <= rolls * 4) return 1;
+  if (target > rolls * 5) return 0;
+  let distribution = [1];
+  for (let roll = 0; roll < rolls; roll += 1) {
+    const next = Array(distribution.length + 1).fill(0);
+    distribution.forEach((chance, fives) => {
+      next[fives] += chance * 0.85;
+      next[fives + 1] += chance * 0.15;
+    });
+    distribution = next;
+  }
+  return Math.min(1, distribution.reduce((sum, chance, fives) =>
+    sum + (rolls * 4 + fives >= target ? chance : 0), 0));
+}
+
+/**
+ * Recreate useful main-stat/attack targets even when the item's exact scroll
+ * history cannot be inferred. Other stats do not identify or constrain this
+ * route. Compare first-scroll thresholds; after the premium batch, restart
+ * the whole craft on a miss and include every failed batch and reset.
+ */
+function chaosFirstPremiumGoalCost(item, context, stats, settings) {
+  if (!ACCESSORY_CATEGORIES.has(String(item.category)) || context.applied < 2 ||
+      !(settings.premiumAccessoryPrice > 0)) return null;
+  const target = usefulChaosTarget(item, stats);
+  // Restrict this fallback to premium-like attack totals. Low ordinary chaos
+  // rolls should not be priced as an unnecessarily expensive premium craft.
+  if (target.attack < 4 * context.applied || !(target.stat > 0 && target.stat <= 6)) return null;
+  const premiumWorks = context.applied - 1;
+  if (target.attack > 6 + premiumWorks * 5) return null;
+  const reset = resetChoices(settings)[0];
+  if (!reset) return null;
+  const options = [];
+  for (const threshold of CHAOS_VALUES) {
+    const first = firstChaosCost(item, {
+      [target.primary]: target.stat,
+      [target.attackKey]: threshold,
+    }, settings, { ...target, attack: threshold });
+    if (!first) continue;
+    const accepted = AMAZING_POSITIVE_CHAOS.filter((outcome) => outcome.value >= threshold);
+    const acceptedChance = accepted.reduce((sum, outcome) => sum + outcome.chance, 0);
+    const finishChance = accepted.reduce((sum, outcome) => sum + outcome.chance *
+      premiumAttackChance(premiumWorks, target.attack - outcome.value), 0) / acceptedChance;
+    if (!(finishChance > 0)) continue;
+    const premiumCost = premiumWorks * settings.premiumAccessoryPrice * MAN_MESO;
+    const expectedCost = (first.expectedCost + premiumCost + (1 - finishChance) * reset.cost) /
+      finishChance;
+    options.push({ expectedCost, first, target, threshold, premiumWorks, finishChance,
+      reset: reset.name, premiumCost });
+  }
+  return options.sort((left, right) => left.expectedCost - right.expectedCost)[0] || null;
 }
 
 function inferredUpgradeContext(maximum, applied) {
@@ -1074,14 +1131,22 @@ function calculateAutomaticScrollExpectedCostUnsafe({
   const premium = inferPremiumAccessory(item, context, stats);
   if (premium) {
     if (resolvedSettings.premiumAccessoryPrice > 0) {
+      const finishChance = premiumAttackChance(context.applied, premium.amount);
+      const reset = resetChoices(resolvedSettings)[0];
+      if (finishChance < 1 && !reset) {
+        return unavailable("프리미엄 악세서리 목표 미달 시 초기화 시세 확인 필요", {
+          method: premium.method, method_label: premium.methodLabel, evidence: commonEvidence,
+        });
+      }
+      const batchCost = context.applied * resolvedSettings.premiumAccessoryPrice * MAN_MESO;
       return calculated(
-        context.applied * resolvedSettings.premiumAccessoryPrice * MAN_MESO,
-        "프리미엄 악세서리 100% 주문서 장당 시세 · 결과 +4~+5는 재설정하지 않음",
+        (batchCost + (1 - finishChance) * (reset?.cost || 0)) / finishChance,
+        "프리미엄 악세서리 100% · 입력 공·마 이상 목표 · 미달 시 초기화 후 다시 제작",
         {
           method: premium.method,
           method_label: premium.methodLabel,
           confidence: premium.confidence,
-          evidence: commonEvidence,
+          evidence: { ...commonEvidence, finish_chance: finishChance, reset: reset?.name || null },
         },
       );
     }
@@ -1121,6 +1186,33 @@ function calculateAutomaticScrollExpectedCostUnsafe({
   const looksIntentional = targetStats.attack >= 4 * context.applied &&
     targetStats.stat >= 2 * context.applied;
   if (!looksIntentional) {
+    const mixedPremium = chaosFirstPremiumGoalCost(item, context, stats, resolvedSettings);
+    if (mixedPremium) {
+      const { target, threshold, premiumWorks, finishChance } = mixedPremium;
+      const statLabel = target.primary.replace("_flat", "").toUpperCase();
+      const attackLabel = target.attackKey === "magic_attack_flat" ? "마력" : "공격력";
+      const scrollLabel = target.attackKey === "magic_attack_flat" ? "프악마" : "프악공";
+      return calculated(mixedPremium.expectedCost,
+        `${statLabel} +${target.stat}·${attackLabel} +${target.attack} 이상 목표 · ` +
+        `첫작 ${statLabel} +${target.stat}·${attackLabel} +${threshold} 이상 후 ${scrollLabel} ${premiumWorks}회 · ` +
+        "목표 미달 시 초기화 비용 포함 · 다른 옵션 수치 제외 · 실제 작 이력 미확정", {
+          method: "chaos_first_premium_goal",
+          method_label: `놀긍 첫작 + ${scrollLabel}`,
+          assessment: "goal_reproduction",
+          confidence: "low",
+          evidence: {
+            ...commonEvidence,
+            useful_target: target,
+            first_attack_minimum: threshold,
+            premium_works: premiumWorks,
+            finish_chance: finishChance,
+            reset: mixedPremium.reset,
+            exact_history_identified: false,
+            ignored_stat_keys: Object.keys(stats).filter((key) =>
+              ![target.primary, target.attackKey].includes(key)),
+          },
+        });
+    }
     return unavailable("최종 수치만으로 일반 놀긍작과 리턴 사용 여부를 구분할 수 없음", {
       method: "chaos_or_return",
       method_label: "놀긍 · 리턴 여부 판별 불가",

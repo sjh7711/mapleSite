@@ -640,6 +640,16 @@
   margin-bottom: 16px;
 }
 
+.page--calculator .card__head h2 {
+  margin-bottom: 0;
+}
+
+/* The starforce equipment header floats its reset button on mobile. Shared
+   calculator cards keep actions in flow so adjacent buttons cannot overlap. */
+.page--calculator .card__head .button--quiet {
+  position: static;
+}
+
 .page--calculator .settings,
 .page--calculator .settings--row {
   display: grid;
@@ -1650,6 +1660,10 @@
 
 .page--calculator .potential-rank-progress {
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+}
+
+.page--calculator :is([data-key="soul-targetStage"], [data-key="soul-toGrade"], [aria-label="등급 상승 목표 등급"]) .chip {
+  font-weight: 600;
 }
 
 .page--calculator .potential-selector-group--target {
@@ -3379,19 +3393,43 @@
 
   .page--calculator .profile-card .card__head {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 8px 5px;
+    align-items: center;
   }
 
-  .page--calculator .profile-head-actions--with-names {
+  .page--calculator .profile-card .card__head h2 {
+    grid-column: 1;
+    grid-row: 1;
+    font-size: clamp(0.8125rem, 4.5cqw, 1rem);
+    letter-spacing: -0.04em;
+    white-space: nowrap;
+  }
+
+  .page--calculator .profile-head-actions {
+    display: contents;
+  }
+
+  .page--calculator .profile-head-actions .profile-saved-names {
     grid-column: 1 / -1;
-    width: 100%;
-    max-width: none;
-    margin-left: 0;
-    justify-content: flex-start;
+    grid-row: 2;
   }
 
-  .page--calculator .profile-head-actions--with-names .profile-saved-names {
-    flex: 1;
+  .page--calculator .profile-equipment-refresh,
+  .page--calculator .profile-head-reset {
+    grid-row: 1;
+    min-height: 38px;
+    padding: 6px;
+    font-size: 0.6875rem;
+    white-space: nowrap;
+  }
+
+  .page--calculator .profile-equipment-refresh {
+    grid-column: 2;
+  }
+
+  .page--calculator .profile-head-reset {
+    grid-column: 3;
   }
 }
 
@@ -3457,7 +3495,7 @@
 }
 
 .page--calculator .profile-equipment-tooltip {
-  position: fixed;
+  position: absolute;
   z-index: 2200;
   width: min(354px, calc(100vw - 16px));
   max-height: none;
@@ -3923,8 +3961,6 @@
 
 @media (max-width: 620px) {
   .page--calculator .profile-equipment-tooltip {
-    width: 100%;
-    margin-top: 10px;
     border-radius: 11px 11px 7px 7px;
     font-size: 0.73rem;
   }
@@ -4705,19 +4741,43 @@
 
   .page--calculator .profile-card .card__head {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 8px 5px;
+    align-items: center;
   }
 
-  .page--calculator .profile-head-actions--with-names {
+  .page--calculator .profile-card .card__head h2 {
+    grid-column: 1;
+    grid-row: 1;
+    font-size: clamp(0.8125rem, 4.5cqw, 1rem);
+    letter-spacing: -0.04em;
+    white-space: nowrap;
+  }
+
+  .page--calculator .profile-head-actions {
+    display: contents;
+  }
+
+  .page--calculator .profile-head-actions .profile-saved-names {
     grid-column: 1 / -1;
-    width: 100%;
-    max-width: none;
-    margin-left: 0;
-    justify-content: flex-start;
+    grid-row: 2;
   }
 
-  .page--calculator .profile-head-actions--with-names .profile-saved-names {
-    flex: 1;
+  .page--calculator .profile-equipment-refresh,
+  .page--calculator .profile-head-reset {
+    grid-row: 1;
+    min-height: 38px;
+    padding: 6px;
+    font-size: 0.6875rem;
+    white-space: nowrap;
+  }
+
+  .page--calculator .profile-equipment-refresh {
+    grid-column: 2;
+  }
+
+  .page--calculator .profile-head-reset {
+    grid-column: 3;
   }
 
   .page--calculator .profile-saved-character,
@@ -4793,10 +4853,13 @@
   grid-column: 1 / -1;
 }
 
-/* 장비 시세는 옵션 입력량이 많지만 결과의 구성요소도 한눈에 보여야 한다.
-   입력 열을 충분히 확보하고 결과는 기존 계산기보다 조금만 넓힌다. */
+/* 입력보다 결과에 폭을 더 배분하고 긴 결과 전체를 고정하지 않는다. */
 .page--item-market .calculator-grid {
-  grid-template-columns: minmax(0, 1fr) 420px;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+}
+
+.page--item-market .calculator-result {
+  position: static;
 }
 
 .page--item-market .market-item-field {
@@ -5178,6 +5241,10 @@
 }
 
 .page--item-market .market-result-heading {
+  position: sticky;
+  top: 12px;
+  z-index: 3;
+  background: var(--card);
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -5343,7 +5410,9 @@
 
 .page--item-market .market-components {
   display: grid;
-  gap: 5px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  align-items: start;
+  gap: 8px;
 }
 
 .page--item-market .market-component {
@@ -5360,15 +5429,46 @@
 
 .page--item-market .market-component__expectation {
   grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px 8px;
   min-width: 0;
   padding-top: 6px;
   border-top: 1px solid var(--border-soft, rgba(43, 48, 60, 0.68));
   color: var(--text-secondary, #aeb6c6);
-  font-size: 0.68rem;
+  font-size: 0.73rem;
+}
+
+.page--item-market .market-component__expectation-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.page--item-market .market-component__details-toggle {
+  align-self: end;
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.page--item-market .market-component__details-toggle::after {
+  content: " ▾";
+}
+
+.page--item-market .market-component__details-toggle[aria-expanded="true"]::after {
+  content: " ▴";
+}
+
+.page--item-market .market-component__details-toggle:hover,
+.page--item-market .market-component__details-toggle:focus-visible {
+  color: var(--text);
 }
 
 .page--item-market .market-component__expected-cost {
@@ -5380,6 +5480,46 @@
   color: var(--text-gold, #f2d46c);
   font-size: 0.72rem;
   white-space: nowrap;
+}
+
+.page--item-market .market-component__recovery:empty {
+  display: none;
+}
+
+.page--item-market .market-disclosure {
+  min-width: 0;
+  margin-top: 10px;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.page--item-market .market-disclosure > summary {
+  cursor: pointer;
+  padding: 3px 0;
+  font-weight: 600;
+}
+
+.page--item-market .market-disclosure > summary:hover,
+.page--item-market .market-disclosure > summary:focus-visible {
+  color: var(--text);
+}
+
+.page--item-market .market-disclosure__body {
+  padding-top: 6px;
+  overflow-wrap: anywhere;
+  line-height: 1.55;
+}
+
+.page--item-market .market-disclosure__body > p {
+  margin: 0 0 6px;
+}
+
+.page--item-market .market-component__evidence {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 0.7rem;
 }
 
 .page--item-market .market-component__expectation[data-expectation-status="excluded"],
@@ -5486,7 +5626,12 @@
 
 @media (max-width: 1040px) {
   .page--item-market .calculator-grid {
-    grid-template-columns: minmax(0, 1fr) 370px;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  }
+
+  .page--item-market .market-potential-grid,
+  .page--item-market .market-enhancement-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .page--item-market .market-stat-fields {
@@ -5592,12 +5737,6 @@
 
   .page--item-market .market-stat-fields {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .page--item-market .market-component__expectation {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 3px;
   }
 
   .page--item-market .market-option-line {

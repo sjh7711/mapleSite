@@ -6,6 +6,7 @@ const SHA256_PATTERN = /^[0-9a-f]{64}$/u;
 const SAFE_ARTIFACT_PATH_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/u;
 const ICON_ASSET_KEY_PATTERN = /^[A-Z0-9]{1,32}$/u;
 const ITEM_ICON_ORIGIN = "https://avatar.maplestory.nexon.com";
+const DEFAULT_MANIFEST_URL = import.meta.env?.VITE_ITEM_MARKET_MANIFEST_URL || "/item-market/manifest.json";
 
 export function normalizeMarketItemName(value) {
   return String(value || "").normalize("NFKC").replace(/\s+/gu, " ").trim();
@@ -166,7 +167,7 @@ function validateCatalog(catalog, manifest, catalogUrl) {
 export async function loadItemMarketManifest(options = {}) {
   const fetcher = options.fetcher || globalThis.fetch;
   if (typeof fetcher !== "function") throw new Error("fetch를 사용할 수 없습니다.");
-  const manifestUrl = options.manifestUrl || "/item-market/manifest.json";
+  const manifestUrl = options.manifestUrl || DEFAULT_MANIFEST_URL;
   const manifest = await fetchJson(fetcher, manifestUrl, ITEM_MARKET_MANIFEST_SCHEMA, {
     cache: "no-cache",
   });
@@ -175,7 +176,7 @@ export async function loadItemMarketManifest(options = {}) {
 
 export async function loadItemMarketCatalog(options = {}) {
   const fetcher = options.fetcher || globalThis.fetch;
-  const manifestUrl = options.manifestUrl || "/item-market/manifest.json";
+  const manifestUrl = options.manifestUrl || DEFAULT_MANIFEST_URL;
   const manifest = options.manifest
     ? validateManifest(options.manifest)
     : await loadItemMarketManifest({ fetcher, manifestUrl });
@@ -212,6 +213,14 @@ export async function loadItemMarketComparables(itemName, options = {}) {
   if (data.dataset_version !== loaded.manifest.dataset_version ||
       normalizeMarketItemName(data.item_name) !== normalizeMarketItemName(entry.name)) {
     throw new Error("시세 item shard와 catalog가 일치하지 않습니다.");
+  }
+  const policy = loaded.manifest.model?.estimator_policy;
+  const selected = policy?.items?.[entry.name]?.options || policy?.defaults;
+  if (selected) {
+    const bounded = (value, min, max) => Number.isFinite(value) && value >= min && value <= max;
+    if (!bounded(selected.halfLifeDays, 1, 30) || !bounded(selected.periodDays, 2, 30) ||
+        !bounded(selected.ridge, 0.1, 20)) throw new Error("시세 모델 정책 값이 올바르지 않습니다.");
+    data.model_options = { halfLifeDays: selected.halfLifeDays, periodDays: selected.periodDays, ridge: selected.ridge };
   }
   return { ...loaded, entry, data, itemUrl };
 }

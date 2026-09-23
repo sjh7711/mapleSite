@@ -170,7 +170,7 @@ export function orderPotentialTargetTypes(types, { system } = {}) {
   });
 }
 
-/** 한 세트에서 중복 목표를 막고, 주스탯%급만 캐릭터 정보가 있을 때 첫 줄에 허용한다. */
+/** 같은 옵션을 다른 칸에서도 고를 수 있으며 주스탯%급만 첫 칸에 제한한다. */
 export function getPotentialTargetTypesForRow({
   availableTargetTypes,
   targets,
@@ -178,13 +178,27 @@ export function getPotentialTargetTypesForRow({
   hasProfile,
 }) {
   if (index > 0 && targets[0]?.type === "stat-equivalent") return [];
-  const previousTypes = new Set(
-    targets.slice(0, index).map((target) => target.type).filter(Boolean),
-  );
   return availableTargetTypes.filter((type) =>
-    !previousTypes.has(type) &&
     (type !== "stat-equivalent" || (hasProfile && index === 0))
   );
+}
+
+/** 입력 칸은 유지하고 계산에 넘길 때 같은 옵션의 합계 목표를 만든다. */
+export function mergePotentialTargets(targets) {
+  const totals = new Map();
+  for (const target of targets) {
+    if (!isCompletePotentialTarget(target)) continue;
+    const value = Number(target.value);
+    const previous = totals.get(target.type);
+    if (!previous) {
+      totals.set(target.type, { type: target.type, value });
+      continue;
+    }
+    previous.value = Number((target.type === "ignore-defense"
+      ? 100 * (1 - (1 - previous.value / 100) * (1 - value / 100))
+      : previous.value + value).toFixed(10));
+  }
+  return [...totals.values()];
 }
 
 /** 이전 프라임의 줄별 목표를 두 줄 합계 목표로 옮긴다. 첫 칸은 비워 둔다. */

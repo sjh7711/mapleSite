@@ -1,3 +1,4 @@
+import { calculatorStorage, isSharedResult, getSharedResultView, registerResultShare } from "../shared/result-share-state.js";
 import {
   ABILITY_GRADES,
   ABILITY_RESET_METHODS,
@@ -44,6 +45,7 @@ import { abilityPracticalGuide } from "../shared/ability-practical-guide.js";
 const STORAGE_KEY = "maplestarforce:ability:v2";
 const PRACTICAL_ENABLED = import.meta.env.VITE_ABILITY_PRACTICAL_ENABLED === "true";
 let selectedComparison = null, selectedRouteId = "";
+let initialSharedRouteId = getSharedResultView().routeId ?? "";
 let routeComparisonCard = null;
 
 const TARGET_CHANCE_DEFAULT = 80;
@@ -129,10 +131,10 @@ const defaults = {
 
 function safeLoad() {
   try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    // Each visit starts in ordinary optimal strategy; other inputs are retained.
+    const saved = JSON.parse(calculatorStorage.getItem(STORAGE_KEY));
+    // Ordinary visits start in optimal strategy; shared links retain their chosen method.
     return saved && typeof saved === "object"
-      ? { ...structuredClone(defaults), ...saved, method: defaults.method, useAdvanced: defaults.useAdvanced,
+      ? { ...structuredClone(defaults), ...saved, method: isSharedResult() ? saved.method : defaults.method, useAdvanced: isSharedResult() ? saved.useAdvanced : defaults.useAdvanced,
         allowBlackChaos: typeof saved.allowBlackChaos === "boolean" ? saved.allowBlackChaos
           : saved.allowBlack !== false || saved.allowChaos !== false,
         // Migrate the old automatic 80% default once; retain later user choices.
@@ -146,7 +148,7 @@ function safeLoad() {
 
 function safeSave(value) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+    calculatorStorage.setItem(STORAGE_KEY, JSON.stringify(value));
   } catch {
     // 저장이 막힌 환경에서는 현재 탭에서만 유지한다.
   }
@@ -752,8 +754,18 @@ function setupCard() {
     }
     strategyOptions.append(priceSection);
   }
-  const section = card(
+  const resetStrategy = state.method === "optimal" ? resetAction("초기화", () => update(() => {
+    for (const key of ["useAdvanced", "allowMiracle", "allowBlackChaos", "allowAbyss",
+      "miracleCount", "blackCount", "chaosCount", "abyssCount", "honorPriceMan", "abyssPriceEok"]) {
+      state[key] = defaults[key];
+    }
+    selectedComparison = null;
+    selectedRouteId = "";
+    pendingPresetPlacement = "";
+  }), { key: "reset-ability-strategy", title: "최적 전략 설정만 기본값으로 되돌립니다. 목표 옵션은 유지합니다." }) : null;
+  const section = cardWithHead(
     "재설정 방식",
+    resetStrategy,
     chipRow(...methodButtons),
     circulatorMethods,
     strategyOptions,
@@ -1673,7 +1685,12 @@ function optimalResultCard() {
   const detailedResult = request.result;
   const practical = PRACTICAL_ENABLED ? detailedResult.practicalStrategy : null;
   const comparison = PRACTICAL_ENABLED ? detailedResult.routeComparison : null;
-  if (selectedComparison !== comparison) { selectedComparison = comparison; selectedRouteId = comparison?.recommendedId ?? ""; }
+  if (selectedComparison !== comparison) {
+    selectedComparison = comparison;
+    selectedRouteId = comparison?.routes.some((route) => route.id === initialSharedRouteId)
+      ? initialSharedRouteId : comparison?.recommendedId ?? "";
+    if (comparison) initialSharedRouteId = "";
+  }
   const selectedRoute = comparison?.routes.find((route) => route.id === selectedRouteId);
   const result = selectedRoute?.result ?? practical ?? detailedResult;
   if (pendingPresetPlacement && state.useAdvanced && state.presetMode === "boss-legendary" &&
@@ -1941,3 +1958,5 @@ function render() {
 
 render();
 window.addEventListener("pagehide", stopOptimalStrategyWorker, { once: true });
+
+registerResultShare(() => ({ local: { [STORAGE_KEY]: state }, view: { routeId: selectedRouteId } }));

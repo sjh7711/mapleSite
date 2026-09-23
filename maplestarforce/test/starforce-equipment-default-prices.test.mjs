@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import { EQUIPMENT_PRESETS } from "../src/calc.js";
-import { updateMatchingEquipmentPrices } from "../src/shared/starforce-equipment-prices.js";
+import { applyPersonalStarforcePrices, readPersonalStarforcePrices, updateMatchingEquipmentPrices } from "../src/shared/starforce-equipment-prices.js";
 
 const mainSource = await readFile(new URL("../src/main.js", import.meta.url), "utf8");
 
@@ -80,4 +80,28 @@ test("좌측과 우측 가격 입력은 모두 공유 가격 갱신 흐름을 �
     mainSource,
     /state\.priceOverridesBySlot\[state\.slot\]\?\.\[presetId\]/u,
   );
+});
+
+test("공유 스페어값 불러오기는 개인 저장 가격만 읽고 장비 조건은 그대로 둔다", () => {
+  const settings = JSON.stringify({ event: "none", priceOverrides: {
+    "giant-fear": 81, "dreamy-belt": 0, "npc": 9999, invalid: -3, string: "12",
+  } });
+  const storage = { getItem: (key) => key === "maplestarforce:v5" ? settings : null };
+  const prices = readPersonalStarforcePrices(() => storage);
+  assert.deepEqual(prices, { "giant-fear": 81, "dreamy-belt": 0, npc: 9999 });
+  const items = [
+    { presetId: "giant-fear", replacementEok: 52, itemLevel: 200, startStar: 17, targetStar: 22, quantity: 2 },
+    { presetId: "dreamy-belt", replacementEok: 45 },
+    { presetId: "default-only", replacementEok: 100 },
+    { presetId: "npc", replacementEok: 9999 },
+    { presetId: "unknown", replacementEok: 22 },
+  ];
+  const originalConditions = items.map(({ replacementEok, ...item }) => item);
+  applyPersonalStarforcePrices(items, prices, { defaults: { "default-only": 17.5 }, fixed: { npc: 0.01 } });
+  assert.deepEqual(items.map((item) => item.replacementEok), [81, 0, 17.5, 0.01, 22]);
+  assert.deepEqual(items.map(({ replacementEok, ...item }) => item), originalConditions);
+  assert.equal(storage.getItem("maplestarforce:v5"), settings);
+  assert.equal(readPersonalStarforcePrices(() => ({ getItem: () => null })), null);
+  assert.equal(readPersonalStarforcePrices(() => { throw new Error("blocked"); }), null);
+  assert.deepEqual(readPersonalStarforcePrices(() => ({ getItem: () => '{"priceOverrides":{}}' })), {});
 });

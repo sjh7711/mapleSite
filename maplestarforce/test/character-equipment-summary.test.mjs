@@ -649,7 +649,7 @@ test("툴팁이 장비 양쪽 어느 곳에도 겹치지 않게 들어가지 않
   );
 });
 
-test("하단 환산 영역 위에 툴팁 전체가 들어가지 않을 때만 인라인으로 배치한다", () => {
+test("세로 공간만 부족하면 옆에 띄우고 하단에 부족한 높이만 확보한다", () => {
   assert.deepEqual(
     getEquipmentTooltipPlacement({
       equipment: { left: 40, right: 580, bottom: 600, width: 540 },
@@ -660,8 +660,25 @@ test("하단 환산 영역 위에 툴팁 전체가 들어가지 않을 때만 �
       viewportHeight: 800,
       protectedTop: 600,
     }),
-    { placement: "inline" },
+    { placement: "overlay", left: 120, top: 8, reserveBelow: 8 },
   );
+});
+
+test("화면보다 긴 무기 상세도 오른쪽 공간을 사용하고 장비판 아래 겹침만 확보한다", () => {
+  const input = {
+    equipment: { left: 250, right: 830, top: 190, bottom: 630, width: 580 },
+    anchor: { left: 330, right: 468, width: 138, top: 558, height: 72 },
+    tooltipWidth: 354,
+    tooltipHeight: 1100,
+    viewportWidth: 1400,
+    viewportHeight: 900,
+    protectedTop: 640,
+  };
+  const placement = getEquipmentTooltipPlacement(input);
+  assert.deepEqual(placement, { placement: "overlay", left: 478, top: 190, reserveBelow: 660 });
+  assert.equal(placement.top + input.tooltipHeight + 10, input.protectedTop + placement.reserveBelow);
+  assert.ok(placement.reserveBelow < input.tooltipHeight);
+  assert.equal(getEquipmentTooltipPlacement({ ...input, tooltipHeight: 340 }).reserveBelow, 0);
 });
 
 test("장착 장비 환산 제목은 직업별 사용자 표시 기준을 밝힌다", () => {
@@ -1150,7 +1167,7 @@ test("구버전 장비도 네이티브 title 대신 접근 가능한 맞춤 툴�
   assert.match(component, /"profile-equipment-tooltip__close"/u);
   assert.match(
     component,
-    /board\.append\(caption, grid, tooltipController\.tooltip, detail\.panel\)/u,
+    /board\.append\(caption, grid, tooltipController\.tooltip, tooltipController\.spacer, detail\.panel\)/u,
   );
   assert.doesNotMatch(component, /slot\.title\s*=/u);
   assert.doesNotMatch(component, /upperText\.title\s*=/u);

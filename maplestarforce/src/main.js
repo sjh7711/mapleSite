@@ -1,3 +1,4 @@
+import { calculatorStorage, calculatorSessionStorage, registerResultShare } from "./shared/result-share-state.js";
 import {
   DEFAULT_START_STAR,
   EQUIPMENT_PRESETS,
@@ -8,6 +9,7 @@ import {
   appliedStrategy,
   applyMultiplier,
   foldedPresets,
+  equipmentGroupMembers,
   groupPresetsByLevel,
   SAFETY_MULTIPLIERS,
   STARFORCE_EVENTS,
@@ -26,20 +28,14 @@ import {
   startStarForPreset,
 } from "./shared/starforce-character-equipment.js";
 import {
-  armOnHover,
   chip,
-  configureWheel,
   dropdown,
   field,
   numberInput,
   range,
 } from "./shared/ui.js";
 import { createDeleteTargetAnchor } from "./shared/delete-target-anchor.js";
-import { updateMatchingEquipmentPrices } from "./shared/starforce-equipment-prices.js";
-import {
-  WHEEL_DEFAULT_REVISION,
-  migrateWheelPreference,
-} from "./shared/starforce-wheel-preference.js";
+import { applyPersonalStarforcePrices, readPersonalStarforcePrices, updateMatchingEquipmentPrices } from "./shared/starforce-equipment-prices.js";
 
 // 기본 스페어값이 바뀌면 값을 올린다. 예전에 저장된 가격이 새 기본값을
 // 덮어써 0원처럼 보이는 일을 막는다.
@@ -65,7 +61,6 @@ const elements = {
   totalCost: document.querySelector("#total-cost"),
   totalScaled: document.querySelector("#total-scaled"),
   totalMeta: document.querySelector("#total-meta"),
-  wheelToggle: document.querySelector("#wheel-toggle"),
   contactMail: document.querySelector("#contact-mail"),
   contactCopy: document.querySelector("#contact-copy"),
   menu: document.querySelector("#menu"),
@@ -173,6 +168,9 @@ function characterSourcesFrom(saved) {
 const defaultPrices = Object.fromEntries(
   EQUIPMENT_PRESETS.map((preset) => [preset.id, preset.price]),
 );
+const groupForPreset = Object.fromEntries(
+  EQUIPMENT_PRESETS.filter((preset) => preset.groupId).map((preset) => [preset.id, preset.groupId]),
+);
 
 const state = {
   event: "shining",
@@ -181,9 +179,6 @@ const state = {
   multiplier: 1,
   customMultipliers: [],
   priceOverrides: {},
-  // 굴려서 값을 바꾸는 기능 자체를 켜고 끈다.
-  wheelEnabled: false,
-  wheelDefaultRevision: WHEEL_DEFAULT_REVISION,
   // 값을 다 맞춰 두면 목록 전체를 잠가 실수로 건드리지 않게 한다.
   pricesLocked: false,
   // 다시 그려도 그 외 레벨 서랍이 접히지 않도록 상태를 들고 있는다.
@@ -195,7 +190,9 @@ const state = {
   slot: 0,
   ...load(),
 };
-Object.assign(state, migrateWheelPreference(state));
+// 예전 설정과 공유 링크의 휠 허용 값은 더 이상 사용하거나 저장하지 않는다.
+delete state.wheelEnabled;
+delete state.wheelDefaultRevision;
 
 // 코드 곳곳이 state.items 를 쓰고 있어 그 이름을 그대로 두고,
 // 지금 고른 자리를 가리키도록 연결한다.
@@ -331,32 +328,46 @@ function priceOfItem(item) {
 
 /** 직접 고친 값이 있으면 그것을, 없으면 기본가를 쓴다. */
 function priceOf(presetId) {
+  const groupId = groupForPreset[presetId];
   return (
     fixedPrices[presetId] ??
     state.priceOverrides[presetId] ??
+    (groupId ? state.priceOverrides[groupId] : undefined) ??
     defaultPrices[presetId] ??
     0
   );
 }
 
 function setPrice(presetId, value) {
-  if (value === defaultPrices[presetId]) delete state.priceOverrides[presetId];
+  const groupId = groupForPreset[presetId];
+  const inheritedPrice = (groupId ? state.priceOverrides[groupId] : undefined) ?? defaultPrices[presetId];
+  if (value === inheritedPrice) delete state.priceOverrides[presetId];
   else state.priceOverrides[presetId] = value;
 }
 
-/** 현재 입력을 제외한 좌·우 가격 칸을 즉시 맞춘다. 입력 중 포커스는 유지한다. */
-function syncPriceInputs(presetId, value, sourceInput) {
-  for (const input of document.querySelectorAll("input[data-price-preset-id]")) {
+/** 지정한 영역의 동일 장비 가격을 맞추되 입력 중 포커스는 유지한다. */
+function syncPriceInputs(presetId, value, sourceInput, scope = document) {
+  for (const input of scope.querySelectorAll("input[data-price-preset-id]")) {
     if (input === sourceInput || input.dataset.pricePresetId !== presetId) continue;
     input.value = String(value);
   }
 }
 
-/** 어느 쪽 가격 칸에서 고쳐도 현재 강화목록의 좌측과 동일 장비만 맞춘다. */
+/** 잠금 중에는 현재 강화목록만 수정하고 좌측에 저장한 가격은 보존한다. */
 function setSharedPrice(presetId, value, sourceInput) {
   const nextValue = Math.max(0, Number(value) || 0);
-  setPrice(presetId, nextValue);
   updateMatchingEquipmentPrices(state.items, presetId, nextValue);
+  if (state.pricesLocked) {
+    syncPriceInputs(presetId, nextValue, sourceInput, elements.items);
+    return;
+  }
+  // 예전 묶음 장비를 수정해도 새 부위별 가격은 함께 변하지 않게 한다.
+  for (const part of equipmentGroupMembers(presetId)) {
+    if (!Object.hasOwn(state.priceOverrides, part.id)) {
+      state.priceOverrides[part.id] = priceOf(part.id);
+    }
+  }
+  setPrice(presetId, nextValue);
   syncPriceInputs(presetId, nextValue, sourceInput);
 }
 
@@ -367,7 +378,7 @@ function setSharedPrice(presetId, value, sourceInput) {
 function loadSlots(shared) {
   const blank = () => Array.from({ length: SLOT_COUNT }, () => []);
   try {
-    const own = JSON.parse(sessionStorage.getItem(ITEMS_KEY) ?? "null");
+    const own = JSON.parse(calculatorSessionStorage.getItem(ITEMS_KEY) ?? "null");
     if (Array.isArray(own?.slots)) {
       const slots = blank();
       own.slots.slice(0, SLOT_COUNT).forEach((list, index) => {
@@ -394,13 +405,13 @@ function loadSlots(shared) {
 
 function load() {
   try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null");
+    const saved = JSON.parse(calculatorStorage.getItem(STORAGE_KEY) ?? "null");
     if (saved) return { ...saved, ...loadSlots(saved) };
 
     // 이전 저장 형식도 목록과 설정을 그대로 물려받는다. 목표 X(0)는 state를
     // 만든 직후 현재 기본값인 21성으로 정규화한다.
     const previous = JSON.parse(
-      localStorage.getItem(PREVIOUS_STORAGE_KEY) ?? "null",
+      calculatorStorage.getItem(PREVIOUS_STORAGE_KEY) ?? "null",
     );
     if (previous) {
       return {
@@ -418,7 +429,7 @@ function load() {
 
     // v3까지는 전체 가격표를 저장했다. 기본가와 다른 값만 공유 가격 형식으로
     // 넘겨받은 뒤 초기화 과정에서 세 강화목록별 가격으로 이관한다.
-    const legacy = JSON.parse(localStorage.getItem("maplestarforce:v3") ?? "null");
+    const legacy = JSON.parse(calculatorStorage.getItem("maplestarforce:v3") ?? "null");
     if (!legacy?.prices) return loadSlots(null);
     return {
       ...legacy,
@@ -438,7 +449,7 @@ function load() {
 function save() {
   try {
     // 목록은 빼고 저장해야 다른 탭이 자기 목록을 그대로 지킬 수 있다.
-    localStorage.setItem(
+    calculatorStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
         ...state,
@@ -448,7 +459,7 @@ function save() {
         slot: undefined,
       }),
     );
-    sessionStorage.setItem(
+    calculatorSessionStorage.setItem(
       ITEMS_KEY,
       JSON.stringify({
         slots: state.slots,
@@ -865,9 +876,87 @@ async function loadCharacterEquipment() {
   }
 }
 
-function pickerRow(preset) {
+let equipmentGroupDialog = null;
+
+function openEquipmentGroup(groupId, opener) {
+  equipmentGroupDialog?.close();
+  const group = EQUIPMENT_PRESETS.find((preset) => preset.id === groupId);
+  const parts = equipmentGroupMembers(groupId);
+  if (!group || !parts.length) return;
+
+  const dialog = document.createElement("dialog");
+  dialog.className = "equipment-group-dialog";
+  dialog.setAttribute("aria-labelledby", "equipment-group-title");
+  const header = document.createElement("div");
+  header.className = "equipment-group-dialog__header";
+  const title = document.createElement("h2");
+  title.id = "equipment-group-title";
+  title.textContent = group.name;
+  const close = document.createElement("button");
+  close.type = "button";
+  close.className = "equipment-group-dialog__close";
+  close.textContent = "×";
+  close.setAttribute("aria-label", "장비 선택 닫기");
+  close.autofocus = true;
+  close.addEventListener("click", () => dialog.close());
+  header.append(title, close);
+  const list = document.createElement("div");
+  list.className = "equipment-group-dialog__list";
+  list.append(...parts.map((part) => pickerRow(part, { inOverlay: true })));
+  dialog.append(header, list);
+  document.body.append(dialog);
+  equipmentGroupDialog = dialog;
+  opener.setAttribute("aria-expanded", "true");
+  const position = () => {
+    const viewport = window.visualViewport;
+    const left = viewport?.offsetLeft ?? 0;
+    const top = viewport?.offsetTop ?? 0;
+    const width = viewport?.width ?? window.innerWidth;
+    const height = viewport?.height ?? window.innerHeight;
+    dialog.style.maxHeight = `${Math.max(120, height - 24)}px`;
+    dialog.style.maxWidth = `${Math.max(0, width - 24)}px`;
+    const anchor = opener.getBoundingClientRect();
+    const bounds = dialog.getBoundingClientRect();
+    const preferredTop = anchor.bottom + 8 + bounds.height <= top + height - 12
+      ? anchor.bottom + 8 : anchor.top - bounds.height - 8;
+    dialog.style.left = `${Math.max(left + 12, Math.min(anchor.right - bounds.width, left + width - bounds.width - 12))}px`;
+    dialog.style.top = `${Math.max(top + 12, Math.min(preferredTop, top + height - bounds.height - 12))}px`;
+  };
+  const outside = (event) => {
+    const bounds = dialog.getBoundingClientRect();
+    return event.target === dialog && (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom);
+  };
+  let pressedOutside = false;
+  dialog.addEventListener("pointerdown", (event) => { pressedOutside = outside(event); });
+  dialog.addEventListener("click", (event) => {
+    if (pressedOutside && outside(event)) dialog.close();
+    pressedOutside = false;
+  });
+  dialog.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") event.stopPropagation();
+  });
+  dialog.addEventListener("close", () => {
+    window.removeEventListener("resize", position);
+    window.removeEventListener("scroll", position, true);
+    window.visualViewport?.removeEventListener("resize", position);
+    window.visualViewport?.removeEventListener("scroll", position);
+    if (equipmentGroupDialog === dialog) equipmentGroupDialog = null;
+    opener.setAttribute("aria-expanded", "false");
+    dialog.remove();
+    if (!equipmentGroupDialog && opener.isConnected) opener.focus({ preventScroll: true });
+  }, { once: true });
+  dialog.showModal();
+  position();
+  window.addEventListener("resize", position);
+  window.addEventListener("scroll", position, true);
+  window.visualViewport?.addEventListener("resize", position);
+  window.visualViewport?.addEventListener("scroll", position);
+}
+
+function pickerRow(preset, { inOverlay = false } = {}) {
   const row = document.createElement("div");
   row.className = "picker__row";
+  const isGroup = !inOverlay && equipmentGroupMembers(preset.id).length > 0;
 
   const pick = document.createElement("button");
   pick.type = "button";
@@ -891,7 +980,25 @@ function pickerRow(preset) {
   plus.className = "picker__plus";
   plus.setAttribute("aria-hidden", "true");
   pick.append(plus, iconOf(preset), name);
-  pick.addEventListener("click", () => addItem(preset.id));
+  let pickControl = pick;
+  if (isGroup) {
+    // 두 버튼은 같은 장비 영역 안에 배치하되 HTML 버튼을 중첩하지 않는다.
+    pickControl = document.createElement("span");
+    pickControl.className = "picker__part-control";
+    const menu = document.createElement("button");
+    menu.type = "button";
+    menu.className = "picker__group-menu";
+    menu.dataset.equipmentGroup = preset.id;
+    menu.setAttribute("aria-label", `${preset.name} 부위 선택 및 가격 설정`);
+    menu.setAttribute("aria-haspopup", "dialog");
+    menu.setAttribute("aria-expanded", "false");
+    menu.innerHTML = '<svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true"><path d="M3 5h14M3 10h14M3 15h14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>';
+    menu.addEventListener("click", () => openEquipmentGroup(preset.id, menu));
+    pickControl.append(pick, menu);
+  }
+  pick.addEventListener("click", () => {
+    if (addItem(preset.id) && inOverlay) equipmentGroupDialog?.close();
+  });
 
   // 상점 고정가이거나 목록을 잠가 둔 경우에는 같은 모양을 두되 고쳐지지만 않게 한다.
   const locked = preset.npcSpare || state.pricesLocked;
@@ -907,11 +1014,12 @@ function pickerRow(preset) {
           className: "input--locked",
           title: preset.npcSpare
             ? "상점에서 정해진 값이라 바꿀 수 없습니다."
-            : "목록이 잠겨 있습니다. 아래 스페어값 잠금 버튼으로 풀 수 있습니다.",
+            : "목록이 잠겨 있습니다. 스페어값 잠금 버튼으로 풀 수 있습니다.",
         }
-      : { stepFor: spareStep, wheel: true },
+      : { stepFor: spareStep },
   );
   input.dataset.pricePresetId = preset.id;
+  input.setAttribute("aria-label", `${preset.name} 스페어값 (억 메소)`);
   const unit = document.createElement("span");
   unit.className = "picker__unit";
   unit.textContent = "억";
@@ -921,7 +1029,7 @@ function pickerRow(preset) {
   inputBox.className = "spare-input spare-input--fill";
   inputBox.append(input, unit);
 
-  row.append(pick, inputBox);
+  row.append(pickControl, inputBox);
   return row;
 }
 
@@ -977,6 +1085,7 @@ function pickerGroup(group) {
 }
 
 function renderPicker() {
+  equipmentGroupDialog?.close();
   const folded = document.createElement("details");
   folded.className = "picker__folded";
   folded.open = state.foldedOpen === true;
@@ -1129,24 +1238,14 @@ function renderCharacterEquipment() {
   elements.characterEquipment.hidden = false;
 }
 
-/** 굴려서 바꾸기 스위치. 꺼 두면 테두리도 뜨지 않고 페이지만 스크롤된다. */
-function renderWheelToggle() {
-  const on = state.wheelEnabled !== false;
-  elements.wheelToggle.innerHTML = `스크롤 허용 <strong>${on ? "O" : "X"}</strong>`;
-  elements.wheelToggle.setAttribute("aria-pressed", String(on));
-  elements.wheelToggle.title = on
-    ? "스크롤로 시작, 목표, 스페어값 수정 가능합니다."
-    : "스크롤로 시작, 목표, 스페어값 수정할 수 없습니다.";
-}
-
-/** 목록 전체를 잠그는 자물쇠. 장비창 아래 스페어값 리셋 옆에 둔다. */
+/** 목록 전체를 잠그는 자물쇠. 첫 장비 분류 위 스페어값 리셋 옆에 둔다. */
 function renderLock() {
   const on = state.pricesLocked === true;
-  elements.pricesLock.textContent = `스페어값 잠금 ${on ? "켜짐" : "꺼짐"}`;
+  elements.pricesLock.textContent = "스페어값 잠금";
   elements.pricesLock.setAttribute("aria-pressed", String(on));
   elements.pricesLock.title = on
-    ? "잠금을 풀고 스페어값을 고칩니다."
-    : "실수로 고치지 않도록 목록 전체를 잠급니다.";
+    ? "잠금 상태에서는 오른쪽 영역의 스페어값을 수정해도 왼쪽 장비 목록의 가격은 바뀌지 않습니다.\n클릭하면 잠금을 해제합니다."
+    : "왼쪽 장비 목록의 가격을 잠급니다.\n잠금 상태에서는 오른쪽 영역의 스페어값을 수정해도 왼쪽 장비 목록의 가격은 바뀌지 않습니다.";
 }
 
 function renderItems(
@@ -1224,9 +1323,10 @@ function renderItems(
               className: "input--locked",
               title: "상점에서 정해진 값이라 바꿀 수 없습니다.",
             }
-          : { stepFor: spareStep, wheel: true },
+          : { stepFor: spareStep },
       );
       priceInput.dataset.pricePresetId = item.presetId;
+      priceInput.setAttribute("aria-label", `${preset.name} 스페어값 (억 메소)`);
       spareControl.append(priceInput, spareUnit);
       const spareValue = field(
         "스페어값",
@@ -1305,7 +1405,7 @@ function renderItems(
                 item.quantity = Math.min(9, Math.max(1, value));
                 update();
               },
-              { min: "1", max: "9", className: "input--narrow", wheel: true },
+              { min: "1", max: "9", className: "input--narrow" },
             ),
         "field--inline",
       );
@@ -1318,7 +1418,7 @@ function renderItems(
             item.spare = Math.min(9, Math.max(0, value));
             update();
           },
-          { min: "0", max: "9", className: "input--narrow", wheel: true },
+          { min: "0", max: "9", className: "input--narrow" },
         ),
         "field--inline",
       );
@@ -1501,13 +1601,13 @@ function customMultiplierChip(multiplier, cost) {
 
 function multiplierAdder(cost) {
   const add = chip("+ 추가", false, () => {
-    const input = document.createElement("input");
-    input.type = "number";
-    input.className = "chip chip--input";
-    input.step = "0.01";
-    input.min = String(MIN_MULTIPLIER);
-    input.max = String(MAX_MULTIPLIER);
-    input.placeholder = "1.20";
+    const input = numberInput("", () => {}, {
+      className: "chip chip--input",
+      step: "0.01",
+      min: String(MIN_MULTIPLIER),
+      max: String(MAX_MULTIPLIER),
+      placeholder: "1.20",
+    });
 
     let done = false;
     const finish = (commit) => {
@@ -1853,22 +1953,8 @@ elements.contactCopy.addEventListener("click", async () => {
   }, 1500);
 });
 
-elements.wheelToggle.addEventListener("click", () => {
-  state.wheelEnabled = state.wheelEnabled === false;
-  // 꺼면 이미 열려 있던 칸도 즉시 거둬들인다.
-  for (const armed of document.querySelectorAll("[data-armed]")) {
-    delete armed.dataset.armed;
-  }
-  renderWheelToggle();
-  save();
-});
-
 renderToolNav(document.querySelector("#toolnav"), "starforce");
 
-// 공용 UI 가 굴리기 허용 여부를 물어볼 때 이 도구의 스위치를 보게 한다.
-configureWheel({ isEnabled: () => state.wheelEnabled !== false });
-
-renderWheelToggle();
 renderLock();
 renderEvents();
 renderMvp();
@@ -1877,3 +1963,37 @@ renderPicker();
 renderCharacterLookup();
 renderItems();
 update();
+
+// 가격 전환에 필요한 사본만 유지한다. 공유/개인 설정에는 저장하지 않는다.
+let sharedPriceSnapshot = null;
+registerResultShare(() => ({
+  local: { [STORAGE_KEY]: { ...state, items: undefined, slots: undefined, characterSources: undefined, slot: undefined } },
+  session: { [ITEMS_KEY]: { slots: state.slots, slot: state.slot } },
+}), { setPersonalPrices: (enabled) => {
+  if (enabled === (sharedPriceSnapshot !== null)) return { enabled, message: "" };
+  const items = state.slots.flat();
+  if (enabled) {
+    const prices = readPersonalStarforcePrices();
+    if (prices === null) return { enabled: false, message: "불러올 수 있는 저장된 스페어값이 없습니다." };
+    sharedPriceSnapshot = {
+      overrides: { ...state.priceOverrides },
+      items: new Map(items.map((item) => [item, item.replacementEok])),
+    };
+    state.priceOverrides = prices;
+    applyPersonalStarforcePrices(items, prices, { defaults: defaultPrices, fixed: fixedPrices, groups: groupForPreset });
+  } else {
+    state.priceOverrides = sharedPriceSnapshot.overrides;
+    applyPersonalStarforcePrices(items, state.priceOverrides, { defaults: defaultPrices, fixed: fixedPrices, groups: groupForPreset });
+    for (const item of items) {
+      if (!sharedPriceSnapshot.items.has(item)) continue;
+      const price = sharedPriceSnapshot.items.get(item);
+      if (price === undefined) delete item.replacementEok;
+      else item.replacementEok = price;
+    }
+    sharedPriceSnapshot = null;
+  }
+  renderPicker();
+  renderItems();
+  update();
+  return { enabled, message: enabled ? "내 스페어값으로 계산합니다." : "공유 스페어값으로 계산합니다." };
+} });

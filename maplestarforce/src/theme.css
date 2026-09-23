@@ -108,19 +108,6 @@
 :root[data-theme="light"] .theme-toggle__sun { display: none; }
 :root[data-theme="light"] .theme-toggle__moon { display: block; }
 
-/* 스타포스의 스크롤 안내와 테마 버튼을 같은 행의 세로 중심에 맞춘다. */
-@media (min-width: 761px) {
-  .page__head:has(> .page__hint):has(> .theme-toggle) {
-    align-items: center;
-    padding-right: 0;
-  }
-
-  .page__head:has(> .page__hint) > .theme-toggle {
-    position: static;
-    flex: none;
-  }
-}
-
 /* 등급별 색상도 밝은 바탕에서 읽을 수 있는 같은 계열의 색으로 바꾼다. */
 :root[data-theme="light"] .search-select__group[data-tone="legendary"],
 :root[data-theme="light"] .search-select__option[data-tone="legendary"]:hover,

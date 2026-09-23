@@ -33,7 +33,7 @@ test("수동 캐릭터 레벨은 290으로 시작하고 저장 상태를 우선�
   );
   assert.match(
     potentialPage,
-    /return \{ \.\.\.fallback, \.\.\.JSON\.parse\(localStorage\.getItem\(key\)\) \};/u,
+    /return \{ \.\.\.fallback, \.\.\.JSON\.parse\(calculatorStorage\.getItem\(key\)\) \};/u,
   );
   assert.match(
     itemMarketPage,

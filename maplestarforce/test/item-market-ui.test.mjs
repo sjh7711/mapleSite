@@ -265,7 +265,8 @@ test("일반 레벨 장비의 스타포스 제작 기댓값 프리셋 연결을 
 test("캐릭터 환산을 공유하고 프로필 구독은 페이지 생명주기에서 한 번만 등록한다", async () => {
   const source = await read("../src/pages/item-market.js");
 
-  assert.match(source, /characterProfileCard\(\{ extraContent: manualCharacterSettings\(\) \}\)/u);
+  assert.match(source, /characterProfileCard\(\{[\s\S]*?extraContent: manualCharacterSettings\(\)/u);
+  assert.match(source, /onEquipmentSelect: selectCharacterEquipment/u);
   assert.match(source, /getCalculationProfile\(\{/u);
   assert.match(source, /제논 \(STR·DEX·LUK\)/u);
   assert.match(source, /데몬어벤져 \(HP\)/u);
@@ -333,7 +334,7 @@ test("결과는 시장 반영액과 합계·범위·신뢰도·주의를 표시�
   assert.match(source, /합산 가격을 제작 기댓값 비중으로 배분/u);
   assert.match(source, /기댓값 대비 약/u);
   assert.match(source, /기댓값 대비/u);
-  assert.match(source, /이 장비에 유효한 옵션 없음 · 기댓값 제외/u);
+  assert.match(source, /제작비 계산 대상 옵션 없음/u);
   assert.match(source, /compareItemMarketStatFamilies/u);
   assert.match(source, /타스탯 동급 매물 대비/u);
   assert.match(source, /같은 세트·부위의 직업별 장비/u);
@@ -353,10 +354,10 @@ test("결과는 시장 반영액과 합계·범위·신뢰도·주의를 표시�
   assert.doesNotMatch(source, /flameExpectedCostEok/u);
 });
 
-test("시세 페이지는 데스크톱 고정 결과와 모바일 한 열 배치를 지원한다", async () => {
+test("시세 페이지는 넓은 결과 영역과 모바일 한 열 배치를 지원한다", async () => {
   const css = await read("../src/calculator.css");
 
-  assert.match(css, /\.page--item-market \.calculator-grid \{[\s\S]*420px/u);
+  assert.match(css, /\.page--item-market \.calculator-grid \{\s*grid-template-columns: minmax\(0, 0.85fr\) minmax\(0, 1.15fr\)/u);
   assert.match(css, /\.page--item-market \.market-potential-grid/u);
   assert.match(css, /\.page--item-market \.market-enhancement-grid/u);
   assert.match(css, /\.page--item-market \.market-components/u);

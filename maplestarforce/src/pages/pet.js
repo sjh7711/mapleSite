@@ -1,3 +1,4 @@
+import { calculatorStorage, registerResultShare } from "../shared/result-share-state.js";
 import {
   PET_PROBABILITIES,
   calculatePetExpectation,
@@ -74,10 +75,10 @@ function normalizeOutputTradeability(value) {
 
 function loadState() {
   try {
-    const current = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    const current = JSON.parse(calculatorStorage.getItem(STORAGE_KEY));
     const legacy = current && typeof current === "object"
       ? null
-      : JSON.parse(localStorage.getItem(LEGACY_STORAGE_KEY));
+      : JSON.parse(calculatorStorage.getItem(LEGACY_STORAGE_KEY));
     const saved = current && typeof current === "object"
       ? current
       : legacy && typeof legacy === "object"
@@ -133,7 +134,7 @@ const root = document.querySelector("#tool");
 
 function save() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    calculatorStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch {
     // 저장을 막은 브라우저에서도 현재 계산은 계속한다.
   }
@@ -207,8 +208,13 @@ function setChoice(key, value) {
 
 function resetButton() {
   return resetAction("초기화", () => update(() => {
-    Object.assign(state, defaults);
-  }));
+    for (const key of [
+      "wonderBerryBundleMaplePoints", "wonderBerryAuctionBundleEokPrice",
+      "lunaCrystalMaplePoints", "wonderBlackEokPrice", "lunaSweetEokPrice",
+      "mesoMarketMaplePointsPerEok", "cashWonPerEok", "lunaDreamEokPrice",
+      "lunaKeyEokPrice", "auctionFeeRate",
+    ]) state[key] = defaults[key];
+  }), { key: "reset-pet-costs", title: "시세와 판매 수수료만 기본값으로 되돌립니다." });
 }
 
 function formatCount(value, unit = "회", fractionDigits = null) {
@@ -773,7 +779,10 @@ function targetCard() {
     outputTradeability,
   );
 
-  return card("뽑기 설정", settings);
+  return cardWithHead("뽑기 설정", resetAction("초기화", () => update(() => {
+    for (const key of ["targetCount", "wonderBlackEvent", "wonderBlackEventIncreasePercent",
+      "wonderBerryCashPurchaseAllowed", "outputTradeability"]) state[key] = defaults[key];
+  }), { key: "reset-pet-draw", title: "목표 마릿수·이벤트·구매 허용·완성 결과를 기본값으로 되돌립니다." }), settings);
 }
 
 function costCard() {
@@ -1996,3 +2005,5 @@ function render() {
 
 render();
 window.addEventListener("pagehide", stopPercentileWorker, { once: true });
+
+registerResultShare(() => ({ local: { [STORAGE_KEY]: state } }));

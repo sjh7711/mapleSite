@@ -1,3 +1,4 @@
+import "./vm-upload-worker.js";
 import {
   NETWORK_DIAGNOSTIC_MAX_EVENTS,
   NETWORK_DIAGNOSTIC_SCHEMA_VERSION,

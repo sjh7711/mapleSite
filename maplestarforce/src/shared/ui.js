@@ -1,14 +1,6 @@
 /* 도구가 함께 쓰는 화면 조각. 스타포스든 잠재든 같은 조작감을 유지하려고
    여기 모아 둔다. 계산이나 특정 도구의 사정은 여기 들어오지 않는다. */
 
-/* 굴려서 값을 바꾸는 기능을 쓸지 묻는 함수. 도구마다 켜고 끄는 방식이 달라
-   바깥에서 꽂아 준다. 꽂지 않으면 늘 켜 둔 것으로 본다. */
-let isWheelEnabled = () => true;
-
-export function configureWheel({ isEnabled } = {}) {
-  if (typeof isEnabled === "function") isWheelEnabled = isEnabled;
-}
-
 export function field(labelText, control, className = "") {
   const label = document.createElement("label");
   label.className = `field${className ? ` ${className}` : ""}`;
@@ -267,8 +259,7 @@ function legacyDropdown({
     }
   });
 
-  // 펼치지 않아도 휠만으로 값을 바꾼다. 펼친 상태에서는 한 줄씩 넘긴다.
-  const armed = armOnHover(button);
+  // 펼친 목록만 한 줄씩 스크롤한다. 휠로 선택값을 바꾸지는 않는다.
   root.addEventListener(
     "wheel",
     (event) => {
@@ -279,10 +270,6 @@ function legacyDropdown({
         list.scrollTop = (line + (event.deltaY > 0 ? 1 : -1)) * rowStep;
         return;
       }
-      if (!armed()) return;
-      event.preventDefault();
-      // 위로 굴리면 커지고 아래로 굴리면 작아진다.
-      commit(step(event.deltaY > 0 ? -1 : 1));
     },
     { passive: false },
   );
@@ -292,8 +279,8 @@ function legacyDropdown({
   return root;
 }
 
-/* 시작·목표 성 선택은 숫자 격자, 현재 성 기준 스크롤, 직접 숫자 입력과
-   휠 조작을 함께 쓰는 스타포스 전용 UI다. 일반 검색형 선택창과 분리한다. */
+/* 시작·목표 성 선택은 숫자 격자, 현재 성 기준 목록 스크롤, 직접 숫자 입력을
+   쓰는 스타포스 전용 UI다. 일반 검색형 선택창과 분리한다. */
 export function dropdown(options) {
   return legacyDropdown(options);
 }
@@ -304,57 +291,11 @@ const VISIBLE_ROWS = 2;
 // 이어 치는 숫자로 볼지 새로 치는 숫자로 볼지 가르는 시간.
 const TYPE_RESET = 900;
 
-// 마우스를 올린 뒤 이만큼 지나야 휠을 넘겨받는다.
-const HOVER_DWELL = 400;
-
-// 페이지가 멈춘 뒤 이만큼은 넘겨받지 않는다. 스크롤 중에 커서 밑으로
-// 박스가 미끄러져 들어와도 값이 바뀌지 않게 하기 위한 것이다.
-const SCROLL_QUIET = 800;
-
-let lastScrollAt = 0;
-
-window.addEventListener(
-  "scroll",
-  () => {
-    lastScrollAt = Date.now();
-    // 스크롤이 시작되면 이미 넘겨준 칸도 도로 거둬들인다.
-    for (const armed of document.querySelectorAll("[data-armed]")) {
-      delete armed.dataset.armed;
-    }
-  },
-  { passive: true, capture: true },
-);
-
-/** 마우스가 머무르고 페이지도 멈춰 있을 때만 휠을 넘긴다. */
-export function armOnHover(element) {
-  let timer = null;
-  const arm = () => {
-    if (!isWheelEnabled()) return;
-    const quiet = Date.now() - lastScrollAt;
-    if (quiet < SCROLL_QUIET) {
-      timer = setTimeout(arm, SCROLL_QUIET - quiet);
-      return;
-    }
-    element.dataset.armed = "true";
-  };
-  element.addEventListener("pointerenter", () => {
-    clearTimeout(timer);
-    timer = setTimeout(arm, HOVER_DWELL);
-  });
-  element.addEventListener("pointerleave", () => {
-    clearTimeout(timer);
-    delete element.dataset.armed;
-  });
-  return () =>
-    isWheelEnabled() && element.dataset.armed === "true";
-}
-
 export function numberInput(value, onChange, extra = {}) {
   const {
     allowDecimalDraft = false,
     allowEmpty = false,
     className,
-    wheel = false,
     stepFor,
     ...attributes
   } = extra;
@@ -364,7 +305,7 @@ export function numberInput(value, onChange, extra = {}) {
   if (className) element.className = className;
   Object.assign(element, { min: "0", step: "1", ...attributes });
   element.value = String(value);
-  // 눈금은 굴리거나 화살표를 누를 때만 쓴다. step 속성으로 두면 브라우저가
+  // 눈금은 화살표를 누를 때만 쓴다. step 속성으로 두면 브라우저가
   // 눈금에 안 맞는 입력을 경고하는데, 직접 치는 값은 자유로워야 한다.
   if (stepFor) element.step = "any";
   element.addEventListener("input", () => {
@@ -408,29 +349,14 @@ export function numberInput(value, onChange, extra = {}) {
     });
   }
 
-  // 굴려서 바꾸는 칸이 아니면, 눌러 놓은 상태에서 스크롤해도 값이 변하지 않게 한다.
-  if (!wheel) {
-    element.addEventListener(
-      "wheel",
-      () => {
-        if (document.activeElement === element) element.blur();
-      },
-      { passive: true },
-    );
-  }
-
-  if (wheel) {
-    const armed = armOnHover(element);
-    element.addEventListener(
-      "wheel",
-      (event) => {
-        if (element.readOnly || !armed()) return;
-        event.preventDefault();
-        shift(event.deltaY > 0 ? -1 : 1);
-      },
-      { passive: false },
-    );
-  }
+  // 포커스가 있어도 휠로 숫자가 바뀌지 않게 하고 페이지 스크롤은 허용한다.
+  element.addEventListener(
+    "wheel",
+    () => {
+      if (document.activeElement === element) element.blur();
+    },
+    { passive: true },
+  );
 
   return element;
 }

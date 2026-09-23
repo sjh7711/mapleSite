@@ -563,7 +563,29 @@ test("같은 장비에서 값이 항상 같은 feature는 intercept와 섞지 �
   assert.equal(model.fitted.coefficients.trade_scissors_remaining, 0);
 });
 
-test("슬롯 소모·복구 가능은 음수 감가, 레벨 감소와 거래 상태는 별도 요소로 학습한다", () => {
+test("성공한 작 횟수가 낮은 거래가와 상관되어도 완작 주문서 가격을 음수로 만들지 않는다", () => {
+  const records = Array.from({ length: 150 }, (_, index) => {
+    const applied = index % 5;
+    const attack = applied ? applied * 4 + (Math.floor(index / 5) % 3) : 0;
+    const starforce = Math.floor(index / 15) % 3 * 5;
+    return sold({ name: "마력이 깃든 안대", category: "눈장식", baseLevel: 160,
+      applied, maximum: 4, remaining: 4 - applied, recoverable: 0, starforce,
+      scroll: applied ? { attack_flat: attack, str_flat: 1, luk_flat: 1, magic_attack_flat: 1 } : {},
+    }, 2_000_000_000 * Math.exp(-applied * .08 + attack * .003 + starforce * .07));
+  });
+  const result = estimateItemMarketValue({
+    target: item({ name: "마력이 깃든 안대", category: "눈장식", baseLevel: 160,
+      maximum: 4, applied: 4, remaining: 0, recoverable: 0, starforce: 5,
+      scroll: { attack_flat: 19, str_flat: 1, luk_flat: 1, magic_attack_flat: 1 },
+    }), comparables: records, profile: CHARACTER_PROFILE,
+  });
+  assert.equal(result.status, "estimated");
+  assert.ok(result.components.scroll.contribution_meso >= 0);
+  assert.equal(Object.values(result.components).reduce((sum, row) => sum + row.contribution_meso, 0),
+    result.estimate_meso);
+});
+
+test("실패 복구 부담은 음수 감가, 레벨 감소와 거래 상태는 별도 요소로 학습한다", () => {
   const records = Array.from({ length: 120 }, (_, index) => {
     const applied = index % 4;
     const recoverable = Math.floor(index / 4) % 3;
@@ -1357,15 +1379,13 @@ test("에디 레전드리 단건 이상치 대신 보수적 공통 등급 기준
     );
     for (const component of Object.keys(grades[0].components)
       .filter((component) => component !== "additional_grade")) {
-      assert.equal(
-        grades[index].components[component].contribution_meso,
-        grades[0].components[component].contribution_meso,
-      );
+      assert.ok(Math.abs(grades[index].components[component].contribution_meso -
+        grades[0].components[component].contribution_meso) <= 1,
+      "합계 정수 반올림의 1메소 배분을 제외하면 다른 구성요소 값은 같아야 합니다.");
     }
-    assert.equal(
-      grades[index].components.additional_grade.contribution_meso,
-      grades[index].estimate_meso - grades[0].estimate_meso,
-    );
+    assert.ok(Math.abs(grades[index].components.additional_grade.contribution_meso -
+      (grades[index].estimate_meso - grades[0].estimate_meso)) <= 1,
+    "등급별 가격 차이는 1메소 반올림 오차 이내에서 등업값과 같아야 합니다.");
     assert.equal(
       Object.values(grades[index].components)
         .reduce((sum, component) => sum + component.contribution_meso, 0),
@@ -1793,10 +1813,9 @@ test("레전드리 잡옵 거래가 비어 있으면 최저 옵션군과 하위 
     );
   }
   assert.ok(legendary21.estimate_meso >= legendaryBlank.estimate_meso);
-  assert.equal(
-    legendary21.components.potential_grade.contribution_meso,
-    legendaryBlank.components.potential_grade.contribution_meso,
-  );
+  assert.ok(Math.abs(legendary21.components.potential_grade.contribution_meso -
+    legendaryBlank.components.potential_grade.contribution_meso) <= 1,
+  "옵션값 변화가 등업값에 정수 반올림 이상의 차이를 만들면 안 됩니다.");
   assert.equal(
     Object.values(legendaryBlank.components)
       .reduce((sum, row) => sum + row.contribution_meso, 0),

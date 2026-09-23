@@ -77,6 +77,6 @@ test("결과·초기화 도구와 어빌리티 선택창은 공통 구현만 사
   assert.doesNotMatch(ui, /title\.includes\("결과"\)/u);
   assert.match(scroll, /resultCard as createResultCard/u);
   assert.doesNotMatch(scroll, /\bcard\(\s*"계산 결과"/u);
-  assert.match(profile, /resetAction\("현재 정보 초기화"/u);
+  assert.match(profile, /resetAction\("초기화"/u);
   assert.doesNotMatch(abilityCss, /ability-search-select/u);
 });

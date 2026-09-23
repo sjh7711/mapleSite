@@ -17,13 +17,9 @@
     <link rel="stylesheet" href="./src/style.css" />
   </head>
   <body>
-    <main class="page" google-side-rail-overlap="false">
+    <main data-calculator="starforce" class="page" google-side-rail-overlap="false">
       <header class="page__head">
         <h1>스타포스 기댓값</h1>
-        <p class="page__hint">
-          <span>스페어값 · 시작 · 목표</span>
-          <button id="wheel-toggle" class="chip chip--switch" type="button"></button>
-        </p>
         <button
           id="menu"
           class="menu-button"
@@ -57,37 +53,22 @@
       </section>
 
       <div class="layout__side">
-        <section class="card card--total">
-          <div class="card__head">
-            <div class="fee">
-              <span class="fee__label">대장장이 배율</span>
-              <div id="multipliers" class="chips chips--multiplier"></div>
-            </div>
-            <h2>준비할 메소</h2>
-          </div>
-          <p class="total">
-            <span id="total-scaled" class="total__scaled"></span>
-            <span id="total-cost">-</span>
-          </p>
-          <p id="total-storage" class="total__storage"></p>
-
-        </section>
-
         <aside class="card card--picker">
           <button id="picker-close" class="drawer-close" type="button">
             닫기
           </button>
-          <div id="picker" class="picker"></div>
           <div class="picker__actions">
             <button
               id="prices-lock"
-              class="button button--quiet picker__lock"
+              class="chip picker__lock"
+              data-kind="toggle"
               type="button"
             ></button>
             <button id="reset-prices" class="button button--quiet button--reset" type="button">
               스페어값 리셋
             </button>
           </div>
+          <div id="picker" class="picker"></div>
         </aside>
       </div>
 
@@ -158,6 +139,20 @@
               aria-label="불러온 캐릭터 장착 장비"
               hidden
             ></section>
+            <section id="starforce-total" class="card card--total" tabindex="-1">
+              <div class="card__head">
+                <div class="fee">
+                  <span class="fee__label">대장장이 배율</span>
+                  <div id="multipliers" class="chips chips--multiplier"></div>
+                </div>
+                <h2>준비할 메소</h2>
+              </div>
+              <p class="total">
+                <span id="total-scaled" class="total__scaled"></span>
+                <span id="total-cost">-</span>
+              </p>
+              <p id="total-storage" class="total__storage"></p>
+            </section>
             <div id="items" class="items"></div>
             <p id="total-meta" class="total__meta"></p>
           </section>
@@ -166,6 +161,6 @@
       </div>
       <!-- site-footer -->
     </main>
-    <script type="module" src="./src/main.js"></script>
+    <script type="module" src="./src/shared/calculator-entry.js"></script>
   </body>
 </html>

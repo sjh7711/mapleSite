@@ -2,7 +2,7 @@
    따로 적지 않도록 여기서 한 번에 만든다. */
 
 import { ITEM_MARKET_ENABLED } from "./features.js";
-import { installMobileResultBar } from "./mobile-result-bar.js";
+import { installMobileResultBar, installStarforceMobileResultBar } from "./mobile-result-bar.js";
 import { getTools, rootPrefix, TOOL_ITEM_ICONS, TOOL_VECTOR_ICONS } from "./tool-nav.js";
 
 const TOOLS = getTools({ itemMarketEnabled: ITEM_MARKET_ENABLED });
@@ -125,12 +125,13 @@ export function renderToolNav(container, current) {
     }),
   );
   enhanceToolNav(container);
+  if (current === "starforce") installStarforceMobileResultBar();
   if (current !== "starforce") installMobileResultBar();
 }
 
 /**
  * 계산기 목록은 넓은 화면에서는 본문 바깥의 왼쪽 사이드바로 보이고,
- * 그 자리가 부족한 화면에서는 제목 옆 버튼으로 여는 서랍이 된다.
+ * 그 자리가 부족한 화면에서는 제목 전체 버튼으로 여는 서랍이 된다.
  * 스타포스의 장비 목록 서랍과 상태 및 선택자를 완전히 분리한다.
  */
 function enhanceToolNav(container) {
@@ -149,7 +150,11 @@ function enhanceToolNav(container) {
     titleRow.append(heading);
   }
 
-  let toggle = titleRow.querySelector(":scope > .toolnav-toggle");
+  const pageTitle = heading.textContent.trim();
+  const titleLabel = document.createElement("span");
+  titleLabel.className = "toolnav-toggle__label";
+  titleLabel.textContent = pageTitle;
+  let toggle = heading.querySelector(":scope > .toolnav-toggle");
   if (!toggle) {
     toggle = document.createElement("button");
     toggle.type = "button";
@@ -166,8 +171,8 @@ function enhanceToolNav(container) {
       document.createElement("span"),
       document.createElement("span"),
     );
-    toggle.append(icon);
-    titleRow.append(toggle);
+    toggle.append(titleLabel, icon);
+    heading.replaceChildren(toggle);
   }
 
   const close = document.createElement("button");
@@ -204,7 +209,7 @@ function enhanceToolNav(container) {
     container.dataset.open = String(open);
     container.inert = !desktop.matches && !open;
     toggle.setAttribute("aria-expanded", String(open));
-    toggle.setAttribute("aria-label", open ? "메뉴 닫기" : "메뉴 열기");
+    toggle.setAttribute("aria-label", `${pageTitle} · ${open ? "메뉴 닫기" : "메뉴 열기"}`);
     if (open) {
       close.focus({ preventScroll: true });
     } else if (restoreFocus && !desktop.matches) {
@@ -227,13 +232,18 @@ function enhanceToolNav(container) {
     }
   });
 
-  const handleLayoutChange = () => setOpen(false);
+  const handleLayoutChange = () => {
+    // 데스크톱에서는 일반 제목으로, 모바일에서는 제목 전체가 버튼으로 동작한다.
+    if (desktop.matches) heading.prepend(titleLabel);
+    else toggle.prepend(titleLabel);
+    setOpen(false);
+  };
   if (typeof desktop.addEventListener === "function") {
     desktop.addEventListener("change", handleLayoutChange);
   } else if (typeof desktop.addListener === "function") {
     desktop.addListener(handleLayoutChange);
   }
-  setOpen(false);
+  handleLayoutChange();
 }
 
 /** 아직 계산을 붙이지 않은 자리에 세워 두는 표지. */

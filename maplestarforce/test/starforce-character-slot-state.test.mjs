@@ -19,7 +19,7 @@ test("강화 목록 세 슬롯은 캐릭터 이름과 장비 응답을 각각 �
   assert.match(source, /characterSources: blankCharacterSources\(\)/u);
   assert.match(
     source,
-    /sessionStorage\.setItem\([\s\S]*characterSources: state\.characterSources/u,
+    /calculatorSessionStorage\.setItem\([\s\S]*characterSources: state\.characterSources/u,
   );
   assert.doesNotMatch(source, /let characterEquipmentMatches = new Map\(\)/u);
 });
@@ -114,18 +114,18 @@ test("캐릭터 조회 중에는 상단 폭을 바꾸지 않고 필요한 영역
   );
 });
 
-test("모바일 상단 도구는 닉네임을 첫 줄에 두고 기본값과 리셋을 차례로 배치한다", () => {
+test("좁은 강화 목록은 리셋을 첫 줄에 유지하고 닉네임과 기본값을 아래에 배치한다", () => {
   assert.match(
     styles,
-    /@media \(max-width: 520px\) \{[\s\S]*?grid-template-areas:\s*"slots character"\s*"bulk bulk"\s*"reset reset";/u,
+    /@container starforce-enhance \(max-width: 420px\) \{[\s\S]*?grid-template-areas:\s*"slots reset"\s*"character character"\s*"bulk bulk";/u,
   );
   assert.match(
     styles,
-    /@media \(max-width: 520px\) \{[\s\S]*?\.enhance-toolbar__left,[\s\S]*?\.enhance-toolbar__right \{\s*display: contents;/u,
+    /@container starforce-enhance \(max-width: 420px\) \{[\s\S]*?\.enhance-toolbar__left,[\s\S]*?\.enhance-toolbar__right \{\s*display: contents;/u,
   );
   assert.match(
     styles,
-    /@media \(max-width: 520px\) \{[\s\S]*?\.enhance-toolbar \.starforce-character__field \{[\s\S]*?flex: 1 1 auto;[\s\S]*?max-width: none;/u,
+    /@container starforce-enhance \(max-width: 420px\) \{[\s\S]*?\.enhance-toolbar \.starforce-character__field \{[\s\S]*?flex: 1 1 auto;[\s\S]*?max-width: none;/u,
   );
   assert.match(
     styles,
@@ -207,11 +207,7 @@ test("닉네임 입력은 6글자와 내부 초기화 버튼을 담고 캐릭터
   );
   assert.match(
     styles,
-    /\.dropdown__button\[data-armed\] \{[\s\S]*?border-color: var\(--accent\);/u,
-  );
-  assert.match(
-    styles,
-    /@media \(max-width: 1280px\)[\s\S]*?\.enhance-toolbar__right \{[\s\S]*?justify-content: flex-start;/u,
+    /@container starforce-enhance \(max-width: 680px\) \{[\s\S]*?grid-template-areas:\s*"lookup reset"\s*"bulk bulk";/u,
   );
   assert.match(
     styles,
@@ -227,7 +223,7 @@ test("닉네임 입력은 6글자와 내부 초기화 버튼을 담고 캐릭터
   );
   assert.match(
     styles,
-    /\.enhance-toolbar__right \{[\s\S]*?gap: 10px;/u,
+    /\.enhance-toolbar__right \{\s*display: contents;/u,
   );
   assert.match(
     styles,

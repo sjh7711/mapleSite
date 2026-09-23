@@ -1,12 +1,12 @@
 {
   "name": "maple-auction-capture-tools",
   "private": true,
-  "version": "0.8.6",
+  "version": "0.9.2",
   "type": "module",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
-    "test": "node tests/run-tests.mjs && node tests/tooltip-network-hook.test.mjs && node tests/tooltip-response-core.test.mjs"
+    "test": "node tests/run-tests.mjs && node tests/tooltip-network-hook.test.mjs && node tests/tooltip-response-core.test.mjs && node --test tests/search-context.test.mjs"
   }
 }

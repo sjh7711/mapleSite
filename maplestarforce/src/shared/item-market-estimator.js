@@ -1,3 +1,4 @@
+import { normalizeMarketPeriods } from "./item-market-time-normalization.js";
 import {
   STAT_EQUIVALENCE,
   convertPotentialTargetToEquivalents,
@@ -17,7 +18,7 @@ import {
   readUpgradeSlotMaximum,
 } from "./item-upgrade-slots.js";
 
-export const ITEM_MARKET_ESTIMATOR_VERSION = "item-market-component-ridge.v14";
+export const ITEM_MARKET_ESTIMATOR_VERSION = "item-market-component-ridge.v17";
 
 const DAY_MS = 86_400_000;
 const EPSILON = 1e-12;
@@ -25,8 +26,9 @@ const MAX_SAFE_MESO = Number.MAX_SAFE_INTEGER;
 const MAX_SAFE_LOG_MESO = Math.log(MAX_SAFE_MESO);
 const MAX_UNQUALIFIED_GRADE_FLOOR_RATIO = 1.05;
 // 최신 거래에 더 빠르게 반응하되 일시적인 하루 변동에만 끌리지 않도록 한다.
-// 아래 30일/정규화 2 조합은 126개 장비·7,418건 시간순 홀드아웃에서 검증했다.
-const DEFAULT_HALF_LIFE_DAYS = 30;
+// 자동 검증된 품목별 정책이 있으면 그 값을 사용한다. 기본은 7일 반감기다.
+const DEFAULT_HALF_LIFE_DAYS = 7;
+const DEFAULT_PERIOD_DAYS = 7;
 // 표본 수에 따라 강하게 커지던 정규화는 고가 옵션 효과를 과도하게 누를 수 있다.
 // 고정 2와 30일 가중치 조합이 중앙 오차와 장비별 균형 지표를 함께 개선했다.
 const DEFAULT_RIDGE = 2;
@@ -103,7 +105,10 @@ const FEATURE_DEFINITIONS = Object.freeze([
   { key: "additional_auto_steal", component: "additional_options", scale: 3 },
   { key: "additional_hp", component: "additional_options", scale: 8 },
   { key: "scroll_equivalent", component: "scroll", scale: 5 },
-  { key: "scroll_applied", component: "scroll", scale: 4, signed: true },
+  // Applied means successful upgrades, not failed/lost slots. Allowing a
+  // negative coefficient here can make completed attack scrolls worth less
+  // than an unscrolled item. Only recoverable failures may carry a penalty.
+  { key: "scroll_applied", component: "scroll", scale: 4 },
   { key: "scroll_recoverable", component: "scroll", scale: 2, signed: true },
   { key: "flame_equivalent", component: "flame", scale: 8 },
   { key: "flame_level_reduction", component: "flame", scale: 20 },
@@ -2385,7 +2390,7 @@ function normalizedWeightEntries(entries) {
  * 시간순 최신 20%를 한 번도 학습에 보여주지 않고 평가한다. 같은 날짜 경계는
  * 통째로 검증 쪽에 두어 사실상 같은 거래 묶음이 양쪽에 섞이는 것을 피한다.
  */
-function temporalHoldoutValidation(entries, lambda) {
+function temporalHoldoutValidation(entries, lambda, periodDays = DEFAULT_PERIOD_DAYS) {
   const timed = entries
     .filter((entry) => Number.isFinite(entry.soldTime) && entry.soldTime > 0)
     .sort((left, right) => left.soldTime - right.soldTime || left.price - right.price);
@@ -2417,7 +2422,20 @@ function temporalHoldoutValidation(entries, lambda) {
     };
   }
 
-  const fitted = fitNonnegativeRidge(training, FEATURE_DEFINITIONS, lambda);
+  const baselineFit = fitNonnegativeRidge(training, FEATURE_DEFINITIONS, lambda);
+  const normalizedTraining = normalizeMarketPeriods(training, FEATURE_DEFINITIONS, { periodDays });
+  const candidateFit = normalizedTraining.diagnostics.applied
+    ? fitNonnegativeRidge(normalizedWeightEntries(normalizedTraining.entries), FEATURE_DEFINITIONS, lambda)
+    : null;
+  const validationError = (model) => quantile(holdout.map((entry) =>
+    Math.abs(predictLog(entry.features, model) - Math.log(entry.price))), 0.5);
+  const baselineError = validationError(baselineFit);
+  const candidateError = candidateFit ? validationError(candidateFit) : null;
+  // Infer period movement only when it improves a later, unseen slice of this
+  // item's own history. Stable premiums are pooled by the candidate model; a
+  // noisy or confounded price trend is never forced into the production value.
+  const temporalAdjustmentAccepted = candidateError !== null && candidateError < baselineError;
+  const fitted = temporalAdjustmentAccepted ? candidateFit : baselineFit;
   const observations = holdout.map((entry) => {
     const predictedLog = predictLog(entry.features, fitted);
     const actualLog = Math.log(entry.price);
@@ -2453,6 +2471,9 @@ function temporalHoldoutValidation(entries, lambda) {
   );
   return {
     available: true,
+    temporal_adjustment_accepted: temporalAdjustmentAccepted,
+    baseline_median_log_error: baselineError,
+    period_model_median_log_error: candidateError,
     reason: null,
     train_count: training.length,
     holdout_count: holdout.length,
@@ -3152,6 +3173,7 @@ export function fitItemMarketModel({
   enemyDefense = 380,
   asOf = null,
   halfLifeDays = DEFAULT_HALF_LIFE_DAYS,
+  periodDays = DEFAULT_PERIOD_DAYS,
   maxRecords = DEFAULT_MAX_RECORDS,
   ridge = null,
 } = {}) {
@@ -3196,6 +3218,7 @@ export function fitItemMarketModel({
     // 이를 저품질 매물로 감점하면 잡잠재 거래를 과소표집해 옵션값이 부풀 수 있다.
     const qualityWeight = entry.features.option_quality.unconverted_combat_lines > 0 ? 0.75 : 1;
     entry.weight = timeWeight * floorWeight * qualityWeight;
+    entry.qualityWeight = floorWeight * qualityWeight;
   }
   // 목표 옵션과 가까운 매물만 고르는 방식이 아니다. 동일 장비 판매완료 자료를
   // 전부 사용하고, 비정상적으로 큰 자료에서만 최신 거래 순으로 성능 상한을 둔다.
@@ -3203,7 +3226,19 @@ export function fitItemMarketModel({
     (right.soldTime || 0) - (left.soldTime || 0) || right.price - left.price
   );
   const limit = Math.max(1, Math.floor(nonnegative(maxRecords) || DEFAULT_MAX_RECORDS));
-  const bounded = extracted.slice(0, limit);
+  const rawBounded = extracted.slice(0, limit);
+  const hasExplicitRidge = ridge !== null && ridge !== undefined && Number(ridge) >= 0;
+  const lambda = hasExplicitRidge ? Number(ridge) : DEFAULT_RIDGE;
+  const safePeriodDays = Number(periodDays) > 0 ? Number(periodDays) : DEFAULT_PERIOD_DAYS;
+  const validation = temporalHoldoutValidation(rawBounded, lambda, safePeriodDays);
+  const temporal = normalizeMarketPeriods(rawBounded, FEATURE_DEFINITIONS, { periodDays: safePeriodDays });
+  if (temporal.diagnostics.applied && validation.temporal_adjustment_accepted !== true) {
+    temporal.entries = rawBounded;
+    temporal.diagnostics = { ...temporal.diagnostics, applied: false,
+      reason: validation.available ? "temporal_validation_did_not_improve" : "insufficient_temporal_validation",
+      adjusted_sales: 0 };
+  }
+  const bounded = temporal.entries;
   const weightScale = bounded.length / Math.max(
     EPSILON,
     bounded.reduce((sum, entry) => sum + entry.weight, 0),
@@ -3211,11 +3246,6 @@ export function fitItemMarketModel({
   for (const entry of bounded) entry.weight *= weightScale;
 
   const effective = effectiveSampleSize(bounded);
-  const hasExplicitRidge = ridge !== null && ridge !== undefined && Number(ridge) >= 0;
-  const lambda = hasExplicitRidge
-    ? Number(ridge)
-    : DEFAULT_RIDGE;
-  const validation = temporalHoldoutValidation(bounded, lambda);
   const fitted = fitNonnegativeRidge(bounded, FEATURE_DEFINITIONS, lambda);
   const trainingSupports = Object.fromEntries(COMPONENTS.slice(1).map(([component]) => [
     component,
@@ -3250,6 +3280,8 @@ export function fitItemMarketModel({
     total_input_records: records.length,
     newest,
     safeHalfLife,
+    periodDays: safePeriodDays,
+    temporal_normalization: temporal.diagnostics,
     effective,
     lambda,
     fitted,
@@ -3277,6 +3309,7 @@ function cachedItemMarketModel(argumentsValue, records, targetFeatures) {
     enemyDefense: argumentsValue.enemyDefense,
     asOf: argumentsValue.asOf,
     halfLifeDays: argumentsValue.halfLifeDays,
+    periodDays: argumentsValue.periodDays,
     maxRecords: argumentsValue.maxRecords,
     ridge: argumentsValue.ridge,
   });
@@ -3289,6 +3322,7 @@ function cachedItemMarketModel(argumentsValue, records, targetFeatures) {
     enemyDefense: argumentsValue.enemyDefense,
     asOf: argumentsValue.asOf,
     halfLifeDays: argumentsValue.halfLifeDays,
+    periodDays: argumentsValue.periodDays,
     maxRecords: argumentsValue.maxRecords,
     ridge: argumentsValue.ridge,
   });
@@ -3325,9 +3359,10 @@ export function estimateItemMarketValue(argumentsValue = {}) {
     : cachedItemMarketModel({
         enemyDefense,
         asOf: argumentsValue.asOf ?? null,
-        halfLifeDays: argumentsValue.halfLifeDays ?? DEFAULT_HALF_LIFE_DAYS,
+        halfLifeDays: argumentsValue.halfLifeDays ?? comparables?.model_options?.halfLifeDays ?? DEFAULT_HALF_LIFE_DAYS,
+        periodDays: argumentsValue.periodDays ?? comparables?.model_options?.periodDays ?? DEFAULT_PERIOD_DAYS,
         maxRecords: argumentsValue.maxRecords ?? DEFAULT_MAX_RECORDS,
-        ridge: argumentsValue.ridge ?? null,
+        ridge: argumentsValue.ridge ?? comparables?.model_options?.ridge ?? null,
       }, records, targetFeatures);
   const trained = prepared.model;
   if (trained?.kind !== "item_market_fitted_model") {
@@ -4480,7 +4515,10 @@ export function estimateItemMarketValue(argumentsValue = {}) {
       used_records: bounded.length,
       latest_sale_at: trained.newest ? new Date(trained.newest).toISOString() : null,
       time_half_life_days: trained.safeHalfLife,
-      time_weighting: "exponential half-life",
+      time_weighting: trained.temporal_normalization?.applied
+        ? "recency weighted market calibration after shared stable premiums and component-specific period adjustment"
+        : "exponential half-life; insufficient evidence for period adjustment",
+      temporal_normalization: trained.temporal_normalization,
       training_scope: "all valid sold records of the exact same item; target-conditioned hierarchical local calibration",
       method: "component-family and semantic-option canonicalization; same-item market-derived baseline; time-weighted robust mixed-sign component ridge on log sold price; temporal holdout calibration; stat-family monotonic envelopes with consistent sparse-pair shrinkage; cross-star exact-option package floors; qualified direct or censored grade-only anchors and monotonic grade floors; Shapley total with grade-first counterfactual attribution",
       ridge: Number(trained.lambda.toFixed(4)),

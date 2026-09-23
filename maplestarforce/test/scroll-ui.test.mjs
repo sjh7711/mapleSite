@@ -474,7 +474,7 @@ test("놀긍떡작 대신 장비 전체와 분리된 놀긍첫작 계산을 제�
   assert.match(renderSource, /const usesSlots = method\.kind === "slot"/);
   assert.match(
     renderSource,
-    /if \(!isStandaloneFirst\) \{[\s\S]*settingsSectionWithHead\([\s\S]*"장비",[\s\S]*"equipment"[\s\S]*settingsSection\("장비", "equipment"/,
+    /if \(!isStandaloneFirst\) \{[\s\S]*settingsSection\("장비", "equipment"/,
   );
   assert.match(renderSource, /if \(usesChaos && !isStandaloneFirst\) \{[\s\S]*characterProfileCardForRender\(\)/);
   assert.doesNotMatch(source, /from "\.\.\/shared\/character-profile\.js"/u);
@@ -719,8 +719,8 @@ test("작 방식을 상단에 두고 장비·놀긍과 비용을 하단 두 열�
   );
   const renderSource = source.slice(source.indexOf("function render()"));
 
-  assert.match(renderSource, /const methodCard = settingsSection\(\s*"작 방식",\s*"method"/);
-  assert.match(renderSource, /equipmentSettingsCard = method\.kind === "return"/);
+  assert.match(renderSource, /const methodCard = settingsSectionWithHead\(\s*"작 방식",\s*"method"/);
+  assert.match(renderSource, /equipmentSettingsCard = settingsSection\("장비", "equipment"/);
   assert.match(renderSource, /chaosSettingsCard = settingsSection\(\s*method\.kind === "return" \? "" : "놀긍 설정",\s*"chaos"/);
   assert.match(renderSource, /costSettingsCard = settingsSection\(\s*"비용 설정",\s*"cost"/);
   assert.match(
@@ -1306,51 +1306,34 @@ test("놀긍리턴 부분 진행 입력은 카드 행을 유지한 채 필요한
   assert.match(css, /\.page--scroll input:disabled\s*\{[^}]*opacity:\s*0\.5/s);
 });
 
-test("놀긍리턴 입력값 초기화는 부분 진행 세 값만 0으로 되돌린다", async () => {
-  const source = await readFile(
-    new URL("../src/pages/scroll.js", import.meta.url),
-    "utf8",
-  );
-  const css = await readFile(
-    new URL("../src/calculator.css", import.meta.url),
-    "utf8",
-  );
-  const calculatorUi = await readFile(
-    new URL("../src/shared/calculator-ui.js", import.meta.url),
-    "utf8",
-  );
-  const resetStart = source.indexOf("function resetReturnProgressInputs()");
-  const resetEnd = source.indexOf("\nfunction ", resetStart + 1);
-  const resetSource = source.slice(resetStart, resetEnd);
-  const renderSource = source.slice(source.indexOf("function render()"));
-  const equipmentStart = renderSource.indexOf("const equipmentContent =");
-  const equipmentEnd = renderSource.indexOf('if (method.kind === "magical")');
-  const equipmentSource = renderSource.slice(equipmentStart, equipmentEnd);
-
-  assert.ok(resetStart >= 0 && resetEnd > resetStart);
-  assert.match(
-    resetSource,
-    /Object\.assign\(state,\s*\{[\s\S]*returnAppliedWorks:\s*0[\s\S]*returnCurrentAttack:\s*0[\s\S]*returnCurrentStat:\s*0/,
-  );
-  assert.match(resetSource, /render\(\)/);
-  assert.doesNotMatch(
-    resetSource,
-    /workCount|attackTarget|statTarget|returnFirst|chaos60Price|chaos100Price|returnPrice/,
-  );
-  assert.match(
-    equipmentSource,
-    /method\.kind === "return"[\s\S]*settingsSectionWithHead\([\s\S]*"장비",[\s\S]*"equipment",[\s\S]*returnProgressResetButton\(\)/,
-  );
-  assert.match(source, /resetAction\("입력값 초기화", resetReturnProgressInputs/);
-  assert.match(calculatorUi, /button\.type = "button"/);
-  assert.match(calculatorUi, /button\.dataset\.key = key/);
-  assert.match(calculatorUi, /addEventListener\("click", onClick\)/);
-  assert.match(source, /이미 적용한 작 수와 현재 적용된 상승량만 0으로 되돌립니다/);
-  assert.doesNotMatch(
-    source,
-    /returnStartMode|resetEquipment|calculationProgress|equipmentReset|현재 장비 처리|장비 초기화 후 처음부터|시작 전 장비 초기화/,
-  );
-  assert.doesNotMatch(css, /\.scroll-return-start/);
+test("주문서 목표 초기화는 시세와 작 방식을 보존하고 장비 버튼은 표시하지 않는다", async () => {
+  const source = await readFile(new URL("../src/pages/scroll.js", import.meta.url), "utf8");
+  const start = source.indexOf("function resetScrollTargets()");
+  const end = source.indexOf("\nfunction ", start + 1);
+  assert.ok(start >= 0 && end > start);
+  const initialSettings = {
+    itemLevel: 200, remaining: 8, returnAppliedWorks: 0, returnCurrentAttack: 0, returnCurrentStat: 0,
+    attackTarget: 6, statTarget: 2, stats: { STR: true, DEX: false },
+  };
+  const state = {
+    method: "chaosReturn", itemLevel: 250, remaining: 3, returnAppliedWorks: 2,
+    returnCurrentAttack: 12, returnCurrentStat: 7, attackTarget: 5, statTarget: 4,
+    returnPrice: 9999, chaos60Price: 555, maplePointsPerEok: 2300, cleanStock: 8,
+    stats: { STR: false, DEX: true },
+  };
+  let renders = 0;
+  const reset = new Function("state", "initialSettings", "render", `${source.slice(start, end)}; return resetScrollTargets;`)(state, initialSettings, () => { renders++; });
+  reset();
+  for (const [key, value] of Object.entries(initialSettings)) assert.deepEqual(state[key], value);
+  assert.equal(state.method, "chaosReturn");
+  assert.equal(state.returnPrice, 9999);
+  assert.equal(state.chaos60Price, 555);
+  assert.equal(state.maplePointsPerEok, 2300);
+  assert.equal(state.cleanStock, 8);
+  assert.equal(renders, 1);
+  state.stats.STR = false;
+  assert.equal(initialSettings.stats.STR, true);
+  assert.doesNotMatch(source, /returnProgressResetButton|reset-return-progress/);
 });
 
 test("놀긍리턴 비용 설정은 첫작 확률 선택 없이 60%와 100% 시세를 항상 받는다", async () => {

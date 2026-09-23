@@ -1,0 +1,24 @@
+[Unit]
+Description=Maple market incremental data refresh and model validation
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/maplestarforce
+Environment=MAPLE_MARKET_SYNC_CONFIG=/home/ubuntu/.config/maple-market-sync/config.json
+Environment=PATH=/home/ubuntu/.nvm/versions/node/v22.12.0/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/flock --nonblock /home/ubuntu/.local/state/maple-market-sync/service.lock /home/ubuntu/.nvm/versions/node/v22.12.0/bin/node /home/ubuntu/maplestarforce/tools/item-market-sync/service.mjs daemon
+Restart=always
+RestartSec=15
+TimeoutStopSec=30
+KillMode=control-group
+Nice=10
+NoNewPrivileges=true
+PrivateTmp=true
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

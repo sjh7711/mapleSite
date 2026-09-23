@@ -27,6 +27,7 @@ const ALWAYS_USEFUL_CODES = new Set([
   "DAMAGE",
   "BOSS_DAMAGE",
   "IGNORE_DEFENSE",
+  "CRITICAL_RATE",
   "CRITICAL_DAMAGE",
   "ITEM_DROP_RATE",
   "MESO_OBTAINED",
@@ -46,6 +47,7 @@ const TARGET_TYPES = Object.freeze({
   "DAMAGE:pct": "damage",
   "BOSS_DAMAGE:pct": "boss-damage",
   "IGNORE_DEFENSE:pct": "ignore-defense",
+  "CRITICAL_RATE:pct": "critical-rate",
   "CRITICAL_DAMAGE:pct": "critical-damage",
   "ITEM_DROP_RATE:pct": "drop",
   "MESO_OBTAINED:pct": "meso",
@@ -224,7 +226,8 @@ function familyAttackCode(family) {
 
 /**
  * 장비가 실제로 쓰일 직업 계열에 유효한 잠재만 목표 조건으로 만든다.
- * 공용 장신구의 계열은 전체 옵션 중 가치가 가장 큰 한 계열을 시장 모델이 고른다.
+ * 공용 장신구의 계열은 윗잠·에디 각각에 맞춰 시장 모델이 고른다.
+ * 크리티컬 확률 같은 부가 옵션도 입력 수치를 재현하는 조건에 포함한다.
  */
 export function buildUsefulPotentialConditions(section, family) {
   const usefulStats = FAMILY_STATS[family] || new Set();
@@ -287,6 +290,9 @@ export function buildUsefulPotentialConditions(section, family) {
     conditions: [...totals.entries()].map(([targetType, target]) => ({ targetType, target })),
     accepted_lines: accepted.length,
     ignored_lines: ignored.length,
+    accepted_options: accepted,
+    ignored_options: ignored,
+    family,
   };
 }
 
@@ -350,7 +356,7 @@ export function calculatePotentialOptionsExpectedCost({
     return {
       status: target.ignored_lines ? "excluded" : "not_applicable",
       expected_cost_meso: null,
-      basis: target.ignored_lines ? "이 장비에 유효한 입력 옵션 없음" : "입력한 옵션 없음",
+      basis: target.ignored_lines ? `${family} 계열 제작비 계산에 포함되는 입력 옵션 없음` : "입력한 옵션 없음",
       ...target,
     };
   }
@@ -377,6 +383,10 @@ export function calculatePotentialOptionsExpectedCost({
     family,
     characterLevel: Number(characterLevel),
     conditions: target.conditions,
+    // Equal aggregate conditions can come from different individual lines.
+    // Keep their accepted/excluded explanations separate in cached results.
+    accepted_options: target.accepted_options,
+    ignored_options: target.ignored_options,
   });
   let tableCache = POTENTIAL_EXPECTATION_CACHE.get(tables);
   if (!tableCache) {
@@ -415,7 +425,7 @@ export function calculatePotentialOptionsExpectedCost({
     const additionalOptionCost = Math.max(0, (result.expectedResets - 1) * result.resetCost);
     const output = calculated(
       additionalOptionCost,
-      `유효 옵션 ${target.accepted_lines}줄 동시 달성 · 등업 때 받은 첫 결과 제외`,
+      `${family} 계열 · 계산 대상 ${target.accepted_lines}줄의 합계 조건 동시 달성 · 등업 때 받은 첫 결과 제외`,
       { probability: result.probability, ...target },
     );
     tableCache.set(cacheKey, output);
@@ -512,7 +522,7 @@ export function calculateItemMarketExpectedCosts({
         section: item.potential,
         tables: potentialTables,
         itemLevel,
-        family,
+        family: canonical.training_profile_by_component?.potential_options || family,
       }),
       additional_grade: additionalGrade,
       additional_options: calculatePotentialOptionsExpectedCost({
@@ -520,7 +530,7 @@ export function calculateItemMarketExpectedCosts({
         section: item.additional_potential,
         tables: additionalTables,
         itemLevel,
-        family,
+        family: canonical.training_profile_by_component?.additional_options || family,
       }),
       scroll: calculateAutomaticScrollExpectedCost({
         target,

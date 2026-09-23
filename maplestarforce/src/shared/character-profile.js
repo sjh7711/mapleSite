@@ -1,3 +1,4 @@
+import { calculatorStorage, isSharedResult, registerResultShareProfile } from "./result-share-state.js";
 import { STAT_EQUIVALENCE } from "maple-core/potential";
 import { FULL_BOSS_DOPING } from "maple-core/stat-profile";
 import { calculateIgnoreDefenseEquivalent } from "maple-core/stat-efficiency";
@@ -80,6 +81,7 @@ const DEFAULT_PRESET_MANUAL = Object.freeze(
 const listeners = new Set();
 
 let saved = loadSaved();
+registerResultShareProfile(() => saved);
 let savedCharacterNames = loadSavedCharacterNames();
 let presetRequest = normalizePresetRequest(
   saved?.presetRequest ?? saved?.presetSelection,
@@ -251,18 +253,18 @@ export function buildCharacterConversionUrl(
 
 function loadSaved() {
   try {
-    const value = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    const value = JSON.parse(calculatorStorage.getItem(STORAGE_KEY));
     if (value?.character && value?.profiles?.fullBoss) {
-      localStorage.removeItem(LEGACY_STORAGE_KEY);
+      calculatorStorage.removeItem(LEGACY_STORAGE_KEY);
       return value;
     }
 
-    const legacy = JSON.parse(localStorage.getItem(LEGACY_STORAGE_KEY));
+    const legacy = JSON.parse(calculatorStorage.getItem(LEGACY_STORAGE_KEY));
     if (!legacy?.character || !legacy?.profiles?.fullBoss) return null;
     // 이 세 직업의 v1 프로필에는 두 번째 부스탯이 없어서 계산값을
     // 복원할 수 없다. 다시 조회하도록 폐기하고, 나머지는 v2로 옮긴다.
     if (isDualSubStatClass(legacy.character.className)) {
-      localStorage.removeItem(LEGACY_STORAGE_KEY);
+      calculatorStorage.removeItem(LEGACY_STORAGE_KEY);
       return null;
     }
     const migrated = {
@@ -279,11 +281,11 @@ function loadSaved() {
         ]),
       ),
     };
-    localStorage.setItem(
+    calculatorStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({ ...migrated, mode: PROFILE_MODE }),
     );
-    localStorage.removeItem(LEGACY_STORAGE_KEY);
+    calculatorStorage.removeItem(LEGACY_STORAGE_KEY);
     return migrated;
   } catch {
     return null;
@@ -293,12 +295,12 @@ function loadSaved() {
 function storeSaved() {
   try {
     if (saved) {
-      localStorage.setItem(
+      calculatorStorage.setItem(
         STORAGE_KEY,
         JSON.stringify({ ...saved, mode: PROFILE_MODE }),
       );
     }
-    else localStorage.removeItem(STORAGE_KEY);
+    else calculatorStorage.removeItem(STORAGE_KEY);
   } catch {
     // 저장 공간을 막은 브라우저에서도 이번 탭 계산은 계속한다.
   }
@@ -307,7 +309,7 @@ function storeSaved() {
 function loadSavedCharacterNames() {
   try {
     return normalizeSavedCharacterNames(
-      JSON.parse(localStorage.getItem(SAVED_NAMES_STORAGE_KEY)),
+      JSON.parse(calculatorStorage.getItem(SAVED_NAMES_STORAGE_KEY)),
     );
   } catch {
     return [];
@@ -317,7 +319,7 @@ function loadSavedCharacterNames() {
 function storeSavedCharacterNames() {
   try {
     if (savedCharacterNames.length) {
-      localStorage.setItem(
+      calculatorStorage.setItem(
         SAVED_NAMES_STORAGE_KEY,
         JSON.stringify({
           version: SAVED_CHARACTER_NAMES_VERSION,
@@ -325,7 +327,7 @@ function storeSavedCharacterNames() {
         }),
       );
     } else {
-      localStorage.removeItem(SAVED_NAMES_STORAGE_KEY);
+      calculatorStorage.removeItem(SAVED_NAMES_STORAGE_KEY);
     }
   } catch {
     // 저장 공간이 막혀도 이번 탭의 닉네임 목록은 유지한다.
@@ -740,6 +742,11 @@ export function xenonMainPercentToDamagePercent(
     : null;
 }
 
+export function levelTwoStatBonus(characterLevel) {
+  const level = Number(characterLevel);
+  return Number.isInteger(level) && level > 0 ? Math.floor(level / 9) * 2 : null;
+}
+
 function profileCoefficient(
   label,
   value,
@@ -749,10 +756,12 @@ function profileCoefficient(
     suffix = "%급",
     secondary = null,
     valueForAmount = null,
+    title = "",
   } = {},
 ) {
   if (!Number.isFinite(value)) return null;
   const item = element("div", "profile-coefficient");
+  if (title) item.title = title;
   const equivalents = element("div", "profile-coefficient__equivalents");
   const primaryValue = element("strong", "profile-coefficient__value");
   equivalents.append(primaryValue);
@@ -897,6 +906,7 @@ async function searchCharacter(
 }
 
 function scheduleEquipmentTooltipRefresh(characterName) {
+  if (isSharedResult()) return;
   const summary = saved?.equipmentSummary;
   const profile = saved?.profiles?.fullBoss;
   const needsTooltip = needsEquipmentTooltipRefresh(summary);
@@ -1178,6 +1188,7 @@ export function characterProfileCard({
   extraContent,
   collapseReferenceDetails = false,
   equipmentMetric = null,
+  onEquipmentSelect = null,
 } = {}) {
   if (onChange) listeners.add(onChange);
   const active = getActiveProfile();
@@ -1209,7 +1220,7 @@ export function characterProfileCard({
       });
       headActions.append(refreshEquipment);
     }
-    const reset = resetAction("현재 정보 초기화", () => {
+    const reset = resetAction("초기화", () => {
       saved = null;
       presetRequest = normalizePresetRequest({ mode: "auto" });
       pendingPresetRequest = null;
@@ -1304,6 +1315,16 @@ export function characterProfileCard({
       ));
     }
     const attackLabel = active.attackType === "magic" ? "마력" : "공격력";
+    const levelTwoAmount = levelTwoStatBonus(active.character.level);
+    const levelTwoCoefficient = (render, stat, perStatValue, options = {}) =>
+      levelTwoAmount === null ? null : render(
+        active.statModel === "standard" ? "렙당2" : `렙당2 (${stat})`,
+        levelTwoAmount * Number(perStatValue),
+        {
+          ...options,
+          title: `Lv.${active.character.level} · 캐릭터 기준 9레벨 당 ${stat} +2 → ${stat} +${levelTwoAmount}`,
+        },
+      );
     const xenonPotentialCoefficients =
       active.statModel === "xenon" &&
       equipmentMetric !== "flame" &&
@@ -1371,6 +1392,9 @@ export function characterProfileCard({
               { digits: 4 },
             )
           ),
+          ...["STR", "DEX", "LUK"].map((stat) =>
+            levelTwoCoefficient(xenonCoefficient, stat, direct.flatStatToDamagePercent[stat])
+          ),
           xenonCoefficient(
             `${attackLabel} +1`,
             Number(direct.flatAttackToDamagePercent),
@@ -1415,6 +1439,12 @@ export function characterProfileCard({
             }),
           )
           .filter(Boolean),
+        ...((active.statModel === "xenon" ? ["STR", "DEX", "LUK"] : ["STR"])
+          .map((stat) => levelTwoCoefficient(profileCoefficient, stat, direct.flatStatToDamagePercent[stat], {
+            digits: 3,
+            basis: specialBasis,
+            suffix: conventionalAddOption ? "점" : "%급",
+          })).filter(Boolean)),
       );
     } else {
       const flatMain = Number(eq.flatMainStatToPercent);
@@ -1474,6 +1504,7 @@ export function characterProfileCard({
           standardCoefficient("올스탯 +1%", eq.allStatPercentToMainPercent),
           ...subStatPercentCoefficients,
           standardCoefficient(`주스탯(${active.mainStat}) +1`, flatMain, { digits: 3 }),
+          levelTwoCoefficient(standardCoefficient, active.mainStat, flatMain),
           ...subStatCoefficients,
           standardCoefficient(`${attackLabel} +1`, flatAttack, { digits: 3 }),
         ].filter(Boolean),
@@ -1492,6 +1523,7 @@ export function characterProfileCard({
     const equipmentBoard = equipmentMetric
       ? characterEquipmentSummaryBoard(normalizedActive, equipmentMetric, {
           identity: equipmentIdentity,
+          onItemSelect: onEquipmentSelect,
         })
       : null;
     if (equipmentBoard) summary.append(equipmentBoard);

@@ -1,3 +1,4 @@
+import { calculatorStorage } from "./result-share-state.js";
 const STORAGE_KEY = "maplestarforce:potential-equipment:v1";
 
 function normalizedEquipment(value, fallback) {
@@ -15,7 +16,7 @@ function normalizedEquipment(value, fallback) {
 
 export function loadSharedPotentialEquipment(
   fallback,
-  storage = globalThis.localStorage,
+  storage = calculatorStorage,
 ) {
   try {
     const saved = JSON.parse(storage.getItem(STORAGE_KEY));
@@ -27,7 +28,7 @@ export function loadSharedPotentialEquipment(
 
 export function saveSharedPotentialEquipment(
   equipment,
-  storage = globalThis.localStorage,
+  storage = calculatorStorage,
 ) {
   try {
     storage.setItem(

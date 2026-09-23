@@ -1,3 +1,4 @@
 import { mountPotentialCalculator } from "../shared/potential-page.js";
+import { getSharedResultView } from "../shared/result-share-state.js";
 
-mountPotentialCalculator({ system: "additional" });
+mountPotentialCalculator({ system: getSharedResultView().system ?? "additional" });

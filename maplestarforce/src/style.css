@@ -436,7 +436,7 @@ details[open] > summary {
   min-width: 0;
 }
 
-/* 설정 · 준비할 메소 · 장비창을 한 덩어리로 화면에 붙여 둔다. */
+/* 왼쪽 장비 선택 목록은 별도로 화면에 붙여 둔다. */
 .layout__side {
   display: flex;
   flex-direction: column;
@@ -1438,7 +1438,8 @@ td:not(.empty):nth-last-child(-n + 2) {
 
 .menu-button,
 .drawer-backdrop,
-.drawer-close {
+.drawer-close,
+.mobile-result-bar--starforce {
   display: none;
 }
 
@@ -1468,10 +1469,10 @@ td:not(.empty):nth-last-child(-n + 2) {
     height: 40px;
     padding: 0 10px;
     background: var(--surface-soft, #171a21);
-    border: 1px solid var(--accent);
+    border: 1px solid var(--line);
     border-radius: 10px;
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
-    color: var(--accent);
+    color: var(--muted);
     font: inherit;
     font-size: 0.875rem;
     font-weight: 700;
@@ -1485,11 +1486,80 @@ td:not(.empty):nth-last-child(-n + 2) {
     pointer-events: none;
   }
 
-  .menu-button[aria-expanded="true"] {
-    border-color: var(--accent);
+  .mobile-result-bar--starforce:not([hidden]) {
+    position: fixed;
+    top: 12px;
+    right: 72px;
+    z-index: 45;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    max-width: calc(100vw - 84px);
+    height: 40px;
+    padding: 0 10px;
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    background: var(--card);
+    color: var(--text);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+    font: inherit;
+    cursor: pointer;
   }
 
-  /* 설정과 준비할 메소는 본문 위에 그대로 두고, 장비 목록만 서랍으로 만든다. */
+  .mobile-result-bar--starforce .mobile-result-bar__label {
+    display: none;
+  }
+
+  .mobile-result-bar--starforce .mobile-result-bar__summary {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-result-bar--starforce .mobile-result-bar__value {
+    font-size: 0.9375rem;
+  }
+
+  .mobile-result-bar--starforce .mobile-result-bar__action {
+    flex: none;
+    color: var(--accent);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .mobile-result-bar--starforce .mobile-result-bar__action::after {
+    content: " ↑";
+  }
+
+  .mobile-result-bar--starforce:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  body[data-drawer="open"] .mobile-result-bar--starforce,
+  body[data-toolnav-drawer="open"] .mobile-result-bar--starforce {
+    visibility: hidden;
+  }
+
+  .menu-button:active,
+  .menu-button:focus-visible {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: var(--accent-soft);
+  }
+
+  /* 터치 후 hover 색상이 남지 않도록 마우스가 있는 환경에만 적용한다. */
+  @media (hover: hover) and (pointer: fine) {
+    .menu-button:hover {
+      color: var(--accent);
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+  }
+
+  /* 장비 선택 목록만 서랍으로 만든다. */
   .layout__side {
     display: flex;
     position: static;
@@ -1666,11 +1736,6 @@ td:not(.empty):nth-last-child(-n + 2) {
     font-size: clamp(1.25rem, 5.6vw, 2.375rem);
   }
 
-  /* 굴려서 바꾸라는 안내는 휠이 없는 화면에서 뜻이 없다. */
-  .total__note--wheel {
-    display: none;
-  }
-
   /* 결과 표는 장비마다 카드로 편다. 값이 길어 가로로 밀면 읽기 어렵다. */
   #per-item thead {
     display: none;
@@ -1768,53 +1833,9 @@ td:not(.empty):nth-last-child(-n + 2) {
   font-size: 0.9375rem;
 }
 
-/* ── 휠로 바꿀 수 있다는 힌트 ────────────────────────────────────
-   손이 올라간 채 0.2초가 지나면 노란 테두리와 ↕ 가 함께 나타난다.
-   그때부터 휠이 값을 바꾼다. 터치 화면에는 hover가 없어 제외된다. */
-@media (hover: hover) {
-  .spare-input::before,
-  .dropdown::before {
-    content: "↕";
-    position: absolute;
-    top: 50%;
-    left: 5px;
-    transform: translateY(-50%);
-    color: var(--muted);
-    font-size: 0.75rem;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.18s ease;
-  }
-
-  /* 표시를 실제로 휠이 열린 상태에 맞춘다. 안내문 그대로
-     "테두리가 보이면 스크롤 가능"이 되도록. */
-  .spare-input:has(input[data-armed])::before,
-  .dropdown:has([data-armed])::before {
-    opacity: 0.85;
-  }
-
-  /* 고칠 수 없는 칸에는 알릴 것이 없다. */
-  .spare-input:has(input[readonly])::before {
-    content: none;
-  }
-
-}
-
-/* 실제 휠 조작이 활성화된 칸은 포인터 종류 판정과 무관하게 같은 노란
-   테두리를 쓴다. 하이브리드 터치·마우스 환경에서도 안내가 빠지지 않는다. */
-input[data-armed],
-.dropdown__button[data-armed] {
-  border-color: var(--accent);
-}
-
 input,
 .dropdown__button {
   transition: border-color 0.15s ease;
-}
-
-/* ↕ 는 글자 자체가 좁아 왼쪽 여백을 조금만 내주면 원래 폭 안에 들어간다. */
-.dropdown__button {
-  padding-left: 18px;
 }
 
 .item__head .dropdown,
@@ -1826,7 +1847,7 @@ input,
   padding-left: 20px;
 }
 
-/* 스페어값 칸의 위아래 화살표를 없앤다. 휠과 키보드로 바꿀 수 있어 자리만
+/* 스페어값 칸의 위아래 화살표를 없앤다. 직접 입력과 키보드로 바꿀 수 있어 자리만
    차지하고, 숫자를 오른쪽에 붙여 둔 정렬도 흐트러뜨린다. */
 .picker__row input::-webkit-outer-spin-button,
 .picker__row input::-webkit-inner-spin-button,
@@ -1840,12 +1861,6 @@ input,
 .spare-input input {
   -moz-appearance: textfield;
   appearance: textfield;
-}
-
-/* 잠그면 흰 테두리로 상태를 드러낸다. */
-.picker__lock[aria-pressed="true"] {
-  border-color: var(--text);
-  color: var(--text);
 }
 
 /* 장비창이 넓어진 만큼 오른쪽은 조금씩 줄인다. */
@@ -1870,12 +1885,12 @@ input,
   }
 }
 
-/* 자물쇠는 스페어값을 다루는 버튼과 한 줄에 둔다. */
+/* 스페어값 관리 버튼은 첫 장비 분류 제목 위에 한 줄로 둔다. */
 .picker__actions {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 8px;
-  margin-top: 12px;
+  margin: 0 0 12px;
 }
 
 .picker__actions .button--quiet {
@@ -1883,7 +1898,8 @@ input,
 }
 
 /* 두 버튼을 같은 크기로 나눠 갖는다. */
-.picker__actions > .button {
+.picker__actions > .button,
+.picker__actions > .chip {
   flex: 1 1 0;
   min-width: 0;
 }
@@ -1895,8 +1911,8 @@ input,
 }
 
 /* 좁은 칸에서는 총액 글자를 줄여야 식이 한 줄에 들어간다. */
-.layout__side .total {
-  font-size: 2rem;
+.card--total .total {
+  font-size: clamp(1.25rem, 5.6vw, 2rem);
 }
 
 
@@ -1941,26 +1957,6 @@ input,
 .item__stats strong {
   color: var(--text);
   font-weight: 600;
-}
-
-/* 조작 안내는 제목 옆 빈자리에 둔다.
-   .page__head p 규칙이 margin을 0으로 눌러 버리므로 더 좁혀서 적는다. */
-.page__head .page__hint {
-  /* 글자와 스위치를 나란히 둔다. */
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 0 auto;
-  color: var(--muted);
-  font-size: 0.9375rem;
-  text-align: right;
-}
-
-@media (max-width: 760px) {
-  /* 휠이 없는 화면에서는 알릴 것이 없다. */
-  .page__head .page__hint {
-    display: none;
-  }
 }
 
 .page__head {
@@ -2040,7 +2036,7 @@ input,
 /* ── 준비할 메소 상자 높이 줄이기 ──────────────────────────────
    금액 한 줄이 본문 줄높이(1.6)를 그대로 받아 위아래로 크게 벌어져 있었다.
    빈 줄로 남는 창고 문단도 여백만 차지한다. */
-.layout__side .total {
+.card--total .total {
   line-height: 1.2;
 }
 
@@ -2055,6 +2051,46 @@ input,
 .card--total .card__head {
   margin-bottom: 8px;
   gap: 6px;
+}
+
+/* 장착 장비 아래에서 시작하고, 강화 목록을 보는 동안 상단에 고정한다.
+   부모 강화 카드의 끝에서는 함께 올라가 다음 영역을 가리지 않는다. */
+.card--enhance > .card--total {
+  position: sticky;
+  top: 12px;
+  z-index: 10;
+  container-type: inline-size;
+  margin-bottom: 14px;
+  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.18);
+}
+
+.card--enhance > .card--total .total {
+  font-size: clamp(1.125rem, 7cqw, 2rem);
+}
+
+.card--enhance > .card--total .fee {
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+
+.card--enhance > .card--total .chips--multiplier {
+  min-width: 0;
+}
+
+@media (max-width: 760px) {
+  /* 모바일에서는 본문과 함께 스크롤하고, 결과 이동 버튼으로 돌아온다. */
+  .card--enhance > .card--total {
+    position: relative;
+    top: auto;
+    z-index: 1;
+    scroll-margin-top: 64px;
+    padding: 12px;
+  }
+
+  /* 장비 선택 목록은 서랍 안에 있으므로 본문에는 빈 행을 만들지 않는다. */
+  .layout > .layout__side {
+    display: contents;
+  }
 }
 
 /* 준비할 메소에서 줄인 높이를 목록의 장비명 버튼에 얹는다. */
@@ -2096,6 +2132,105 @@ input,
 .picker__row .spare-input--fill,
 .picker__row input {
   height: 100%;
+}
+
+.picker__part-control {
+  position: relative;
+  display: grid;
+  min-width: 0;
+}
+
+.picker__part-control > .picker__pick {
+  grid-template-columns: 14px 20px minmax(0, 1fr);
+  gap: 4px;
+  padding-left: 6px;
+  padding-right: 32px;
+}
+
+.picker__part-control > .picker__pick img {
+  width: 20px;
+  height: 20px;
+}
+
+.picker__group-menu,
+.equipment-group-dialog__close {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-input, #14161d);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.picker__group-menu {
+  position: absolute;
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+}
+
+.picker__group-menu:is(:hover, :focus-visible, :active),
+.equipment-group-dialog__close:is(:hover, :focus-visible, :active) {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.equipment-group-dialog {
+  position: fixed;
+  inset: auto;
+  width: 350px;
+  margin: 0;
+  padding: 14px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--text);
+  box-shadow: 0 12px 36px #0006;
+}
+
+.equipment-group-dialog::backdrop {
+  background: #0003;
+}
+
+.equipment-group-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.equipment-group-dialog__header h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.equipment-group-dialog__close {
+  width: 32px;
+  height: 32px;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.equipment-group-dialog__list {
+  display: grid;
+  gap: 8px;
+}
+
+.equipment-group-dialog .picker__row {
+  grid-template-columns: minmax(0, 1fr) 104px;
+}
+
+.equipment-group-dialog .picker__pick {
+  min-height: 44px;
 }
 
 .picker__unit {
@@ -2213,6 +2348,16 @@ input,
 .card__head .button--quiet:hover,
 .picker__actions .button--quiet:hover {
   background: var(--surface-hover, #2b3241);
+}
+
+/* %급 버튼과 같은 토글 칩을 사용한다. 상태 표시는 공통 ::before를 따른다. */
+.picker__actions .picker__lock {
+  justify-content: center;
+  min-height: 34px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  white-space: nowrap;
 }
 
 /* 삭제·초기화는 평소에는 중립색, 가리켰을 때만 위험색으로 표시한다. */
@@ -2370,15 +2515,13 @@ input,
   white-space: nowrap;
 }
 
-.chip--optimize strong,
-.chip--switch strong {
+.chip--optimize strong {
   margin-left: 4px;
   font-weight: 700;
   color: var(--muted);
 }
 
-.chip--optimize[aria-pressed="true"] strong,
-.chip--switch[aria-pressed="true"] strong {
+.chip--optimize[aria-pressed="true"] strong {
   color: var(--accent);
 }
 
@@ -2388,10 +2531,6 @@ input,
   flex-wrap: nowrap;
   align-items: flex-end;
   gap: 10px;
-}
-
-.chip--switch {
-  white-space: nowrap;
 }
 
 /* 성급은 세로로 길게 늘어놓으면 30줄이라 훑기 어렵다. 넓은 화면에서는
@@ -2571,17 +2710,26 @@ input,
 }
 
 .toolnav-toggle {
-  flex: none;
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  display: grid;
-  place-items: center;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   background: var(--surface-soft, #171a21);
-  color: var(--muted);
+  color: var(--text);
   border: 1px solid var(--line);
   border-radius: 8px;
+  font: inherit;
+  letter-spacing: inherit;
+  line-height: 1.25;
+  text-align: left;
   cursor: pointer;
+}
+
+.page__title-row h1 {
+  min-width: 0;
+  max-width: 100%;
 }
 
 .toolnav-toggle:hover,
@@ -2599,9 +2747,14 @@ input,
 }
 
 .toolnav-toggle__icon {
-  width: 16px;
+  flex: none;
+  width: 18px;
   display: grid;
-  gap: 3px;
+  gap: 4px;
+}
+
+.toolnav-toggle__label {
+  word-break: keep-all;
 }
 
 .toolnav-toggle__icon span {
@@ -2881,9 +3034,15 @@ body[data-toolnav-drawer="open"] .toolnav-backdrop {
 }
 
 /* ── 강화 목록 상단 도구와 캐릭터 장비창 ───────────────────── */
+.card--enhance {
+  container-name: starforce-enhance;
+  container-type: inline-size;
+}
+
 .enhance-toolbar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-areas: "lookup bulk reset";
   align-items: center;
   gap: 10px 12px;
   margin-bottom: 14px;
@@ -2897,6 +3056,9 @@ body[data-toolnav-drawer="open"] .toolnav-backdrop {
 }
 
 .enhance-toolbar__left {
+  grid-area: lookup;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -2905,8 +3067,7 @@ body[data-toolnav-drawer="open"] .toolnav-backdrop {
 }
 
 .enhance-toolbar__right {
-  justify-content: flex-end;
-  gap: 10px;
+  display: contents;
 }
 
 .enhance-toolbar .starforce-character {
@@ -2995,12 +3156,14 @@ body[data-toolnav-drawer="open"] .toolnav-backdrop {
 }
 
 .enhance-toolbar #bulk {
+  grid-area: bulk;
   flex: none;
   width: auto;
+  max-width: 100%;
   min-height: 52px;
   gap: 6px;
   padding: 4px 8px;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 
 .enhance-toolbar .bulk__label {
@@ -3040,6 +3203,8 @@ body[data-toolnav-drawer="open"] .toolnav-backdrop {
 }
 
 .enhance-toolbar #clear-items {
+  grid-area: reset;
+  justify-self: end;
   flex: none;
   width: auto;
   margin: 0;
@@ -3184,23 +3349,27 @@ button.character-equipment__slot:focus-visible {
   line-height: 1.2;
 }
 
-@media (max-width: 1280px) {
+/* 기본값만 다음 행으로 보내고 목록 리셋은 첫 행 오른쪽에 유지한다. */
+@container starforce-enhance (max-width: 680px) {
   .enhance-toolbar {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "lookup reset"
+      "bulk bulk";
   }
 
-  .enhance-toolbar__right {
-    justify-content: flex-start;
+  .enhance-toolbar #bulk {
+    justify-self: end;
   }
 }
 
-@media (max-width: 520px) {
+@container starforce-enhance (max-width: 420px) {
   .enhance-toolbar {
     grid-template-columns: auto minmax(0, 1fr);
     grid-template-areas:
-      "slots character"
-      "bulk bulk"
-      "reset reset";
+      "slots reset"
+      "character character"
+      "bulk bulk";
     gap: 8px 4px;
   }
 
@@ -3252,7 +3421,9 @@ button.character-equipment__slot:focus-visible {
     right: 3px;
     width: 22px;
   }
+}
 
+@media (max-width: 520px) {
   .character-equipment {
     --equipment-size: 36px;
     padding-right: 8px;

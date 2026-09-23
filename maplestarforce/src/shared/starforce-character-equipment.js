@@ -187,13 +187,14 @@ function exactCandidates(preset, equipment) {
 }
 
 function groupedCandidates(preset, equipment) {
-  const group = GROUP_PRESETS[preset.id];
+  const group = GROUP_PRESETS[preset.groupId ?? preset.id];
   if (group) {
     return equipment.filter(
       (item) =>
         item.level === preset.level &&
         item.name.startsWith(group.namePrefix) &&
-        group.parts.has(partOf(item)),
+        group.parts.has(partOf(item)) &&
+        (!preset.equipmentPart || partOf(item) === normalizedPart(preset.equipmentPart)),
     );
   }
 
@@ -317,6 +318,12 @@ export function calculatorPresetForEquipment(rawEquipment, presets) {
   );
   if (exact.length === 1) return exact[0];
   if (exact.length > 1) return null;
+
+  const specific = available.filter(
+    (preset) => preset.groupId && preset.equipmentPart && groupedCandidates(preset, [equipment]).length > 0,
+  );
+  if (specific.length === 1) return specific[0];
+  if (specific.length > 1) return null;
 
   const grouped = available.filter(
     (preset) => groupedCandidates(preset, [equipment]).length > 0,

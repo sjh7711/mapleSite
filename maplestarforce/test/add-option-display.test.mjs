@@ -144,7 +144,7 @@ test("저장 닉네임은 중첩 박스 없이 독립된 목록 칩으로 표시
   assert.match(source, /element\("li", "profile-saved-character"\)/);
   assert.match(source, /item\.dataset\.active = String\(isActive\)/);
   assert.doesNotMatch(source, /"profile-saved-label", "저장"/);
-  assert.match(source, /"현재 정보 초기화"/);
+  assert.match(source, /"초기화"/);
   assert.match(css, /\.profile-saved-names\s*{[^}]*list-style: none/s);
   assert.match(css, /\.profile-saved-character\[data-active="true"\]/);
   assert.doesNotMatch(css, /profile-saved-character__remove[^}]*border-left/s);

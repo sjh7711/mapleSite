@@ -1,3 +1,4 @@
+import { calculatorStorage, registerResultShare } from "./result-share-state.js";
 import {
   POTENTIAL_GRADES,
   POTENTIAL_PARTS,
@@ -35,6 +36,7 @@ import {
   getPotentialTargetInfo,
   getPotentialTargetTypesForRow,
   isCompletePotentialTarget,
+  mergePotentialTargets,
   migratePrimePotentialTargetSets,
   migratePotentialTargetChanceDefault,
   normalizePotentialTargetChance,
@@ -97,7 +99,7 @@ function formatPotentialResetMeso(value, methodInfo) {
 
 function safeLoad(key, fallback) {
   try {
-    return { ...fallback, ...JSON.parse(localStorage.getItem(key)) };
+    return { ...fallback, ...JSON.parse(calculatorStorage.getItem(key)) };
   } catch {
     return structuredClone(fallback);
   }
@@ -105,7 +107,7 @@ function safeLoad(key, fallback) {
 
 function safeSave(key, value) {
   try {
-    localStorage.setItem(key, JSON.stringify(value));
+    calculatorStorage.setItem(key, JSON.stringify(value));
   } catch {
     // 비공개 모드처럼 저장이 막힌 경우 현재 탭에서만 유지한다.
   }
@@ -113,7 +115,7 @@ function safeSave(key, value) {
 
 function safeLoadList(key) {
   try {
-    const value = JSON.parse(localStorage.getItem(key));
+    const value = JSON.parse(calculatorStorage.getItem(key));
     return Array.isArray(value) ? value : [];
   } catch {
     return [];
@@ -122,7 +124,7 @@ function safeLoadList(key) {
 
 function hasSavedState(key) {
   try {
-    return localStorage.getItem(key) !== null;
+    return calculatorStorage.getItem(key) !== null;
   } catch {
     return false;
   }
@@ -286,6 +288,13 @@ function mountPotentialSystem({ system, onSystemChange }) {
     state.primeTargetSets = migratePrimePotentialTargetSets(state.primeTargetSets);
     state.primeTargetMode = "sum";
   }
+  // 기존 방식별 목표는 현재 선택한 방식의 값으로 한 번 합친다.
+  // 이후에는 프라임의 첫 칸을 포함해 같은 세 칸을 계속 보관한다.
+  if (state.sharedTargetsRevision !== 1 && state.resetMethod === "prime") {
+    state.targetSets = structuredClone(state.primeTargetSets);
+  }
+  state.sharedTargetsRevision = 1;
+  delete state.primeTargetSets;
   delete state.primeLineTargets;
   if (!displayedResetMethods(system, state.grade).some(
     (method) => method.id === state.resetMethod,
@@ -354,12 +363,10 @@ function mountPotentialSystem({ system, onSystemChange }) {
     saveSharedPotentialEquipment(state);
   }
 
+  registerResultShare(() => ({ local: { [storageKey]: state } }));
+
   function persistTargetPresets() {
     safeSave(targetPresetStorageKey, savedTargetPresets);
-  }
-
-  function targetSetsKey() {
-    return state.resetMethod === "prime" ? "primeTargetSets" : "targetSets";
   }
 
   function activeResetMethod() {
@@ -405,11 +412,11 @@ function mountPotentialSystem({ system, onSystemChange }) {
     };
   }
 
-  function update(mutator, { reload = false } = {}) {
+  function update(mutator, { reload = false, normalizeTargets = false } = {}) {
     mutator();
     persist();
     render();
-    if (reload) ensureTables();
+    if (reload) ensureTables({ normalizeTargets });
   }
 
   function numberControl(key, value, onValue, options = {}) {
@@ -469,13 +476,13 @@ function mountPotentialSystem({ system, onSystemChange }) {
 
   function normalizeTargetSets() {
     if (availableTargetTypes.length === 0) return false;
-    return state[targetSetsKey()].reduce(
+    return state.targetSets.reduce(
       (changed, targetSet) => normalizeTargetSet(targetSet) || changed,
       false,
     );
   }
 
-  async function ensureTables() {
+  async function ensureTables({ normalizeTargets = false } = {}) {
     const key = tableKey();
     if (key === loadedKey && (tables || tableState === "missing")) return;
     const thisRequest = ++requestId;
@@ -505,7 +512,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
             { system },
           )
         : [];
-      const normalizedTarget = normalizeTargetSets();
+      const normalizedTarget = normalizeTargets && normalizeTargetSets();
       if (normalizedTarget) persist();
       tableMessage = next
         ? ""
@@ -538,6 +545,14 @@ function mountPotentialSystem({ system, onSystemChange }) {
             : "",
         })),
     ];
+    if (target.type && !targetOptions.some((option) => option.value === target.type)) {
+      targetOptions.push({
+        value: target.type,
+        label: getPotentialTargetInfo(target.type)?.label ?? target.type,
+        disabled: true,
+        disabledReason: firstLineDisabled ? "첫 번째 칸은 계산에서 제외합니다." : "현재 재설정 방식에서는 사용할 수 없습니다.",
+      });
+    }
     const select = searchableSelect(targetOptions, target.type, (value) => {
       if (value && !allowedTypes.includes(value)) return;
       update(() => {
@@ -583,8 +598,8 @@ function mountPotentialSystem({ system, onSystemChange }) {
       targets: targets.map((target, index) => targetControl(
         target, index, targetSet, { keyPrefix, groupLabel: label },
       )),
-      onRemove: state[targetSetsKey()].length > 1 ? () => update(() => {
-        state[targetSetsKey()].splice(setIndex, 1);
+      onRemove: state.targetSets.length > 1 ? () => update(() => {
+        state.targetSets.splice(setIndex, 1);
       }) : null,
     });
     const equivalenceText = state.showEquivalence && getPotentialProfile()
@@ -644,11 +659,11 @@ function mountPotentialSystem({ system, onSystemChange }) {
     const part = searchableSelect(partOptions, state.part, (value) => {
       update(() => {
         state.part = Number(value);
-      }, { reload: true });
+      }, { reload: true, normalizeTargets: true });
     }, { key: "part", ariaLabel: "장비 부위", placeholder: "부위 검색" });
     const level = numberControl("item-level", state.itemLevel, (value) => {
       state.itemLevel = Math.max(0, Math.min(250, Math.round(value)));
-    }, { min: "0", max: "250", update: { reload: true } });
+    }, { min: "0", max: "250", update: { reload: true, normalizeTargets: true } });
     const systemPicker = chipRow(
       chip("윗잠", system === "regular", () => {
         if (system !== "regular") onSystemChange("regular");
@@ -678,7 +693,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
           }).canRankUp) {
             state.calculationMode = "options";
           }
-        }, { reload: true });
+        }, { reload: true, normalizeTargets: true });
       }),
     );
     const gradePicker = chipRow(gradeChips);
@@ -809,10 +824,10 @@ function mountPotentialSystem({ system, onSystemChange }) {
     chancePicker.setAttribute("role", "group");
     chancePicker.setAttribute("aria-label", "등급 상승 확률 적용 방식");
     const targetGradePicker = chipRow(
-      targetGrades.map((grade) =>
+      Object.keys(POTENTIAL_GRADES).slice(1).map((grade) =>
         chip(gradeButtonLabel(grade), targetGrade === grade, () => {
           update(() => { state.rankTargetGrade = grade; });
-        }),
+        }, !targetGrades.includes(grade)),
       ),
     );
     targetGradePicker.setAttribute("role", "group");
@@ -858,12 +873,12 @@ function mountPotentialSystem({ system, onSystemChange }) {
     if (state.calculationMode === "rank-up") {
       return rankUpTargetCard();
     }
-    const activeTypes = state[targetSetsKey()].flatMap((targetSet) =>
+    const activeTypes = state.targetSets.flatMap((targetSet) =>
       targetSet.targets.map((target) => target.type),
     );
     const profile = getPotentialProfile();
     const setList = element("div", "option-sets");
-    state[targetSetsKey()].forEach((targetSet, setIndex) => {
+    state.targetSets.forEach((targetSet, setIndex) => {
       if (setIndex > 0) {
         const separator = element("div", "option-set-or", "또는");
         separator.setAttribute("aria-hidden", "true");
@@ -874,16 +889,16 @@ function mountPotentialSystem({ system, onSystemChange }) {
     const addSet = element("button", "button option-set-add", "+ 옵션 세트 추가");
     addSet.type = "button";
     addSet.disabled =
-      state[targetSetsKey()].length >= MAX_TARGET_SETS ||
+      state.targetSets.length >= MAX_TARGET_SETS ||
       tableState !== "ready" ||
       availableTargetTypes.length === 0;
-    addSet.title = state[targetSetsKey()].length >= MAX_TARGET_SETS
+    addSet.title = state.targetSets.length >= MAX_TARGET_SETS
       ? `옵션 세트는 최대 ${MAX_TARGET_SETS}개까지 만들 수 있습니다.`
       : "다른 성공 조건을 추가합니다.";
     addSet.addEventListener("click", () => update(() => {
-      if (state[targetSetsKey()].length >= MAX_TARGET_SETS) return;
+      if (state.targetSets.length >= MAX_TARGET_SETS) return;
       const targetSet = { targets: structuredClone(defaultTargets) };
-      state[targetSetsKey()].push(targetSet);
+      state.targetSets.push(targetSet);
       normalizeTargetSet(targetSet);
     }));
     const equivalenceToggle = toggleChip(
@@ -899,7 +914,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
       ? "%급 계산 결과 표시 전환"
       : "내 캐릭터 정보를 불러오면 사용할 수 있습니다.";
     const resetTargets = resetAction("목표 초기화", () => update(() => {
-      state[targetSetsKey()] = [{ targets: structuredClone(defaultTargets) }];
+      state.targetSets = [{ targets: structuredClone(defaultTargets) }];
     }), {
       className: "button--compact",
       title: "모든 옵션 세트를 지우고 빈 세트 하나로 되돌립니다.",
@@ -937,7 +952,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
         preset && presetTargetSets.length === preset.targetSets.length,
       );
       const isApplied = presetIsValid &&
-        targetSetsEqual(state[targetSetsKey()], presetTargetSets);
+        targetSetsEqual(state.targetSets, presetTargetSets);
       const presetName = POTENTIAL_PARTS[state.part];
       const presetAttackLabel = preset?.kind === "accessory"
         ? ""
@@ -962,7 +977,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
         : "선택한 공식 확률표에서 정옵션을 만들 수 없습니다.";
       applyPreset.addEventListener("click", () => {
         if (!presetIsValid || isApplied) return;
-        const hasConfiguredTargets = state[targetSetsKey()].some(
+        const hasConfiguredTargets = state.targetSets.some(
           (targetSet) => targetSet.targets.some((target) =>
             target.type || target.value !== ""
           ),
@@ -978,7 +993,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
           )
         ) return;
         update(() => {
-          state[targetSetsKey()] = structuredClone(presetTargetSets);
+          state.targetSets = structuredClone(presetTargetSets);
           normalizeTargetSets();
         });
       });
@@ -1103,9 +1118,9 @@ function mountPotentialSystem({ system, onSystemChange }) {
   }
 
   function completeTargets(targets, prime = activeResetMethod().fixedFirstLine) {
-    return targets.flatMap((target, index) =>
+    return mergePotentialTargets(targets.flatMap((target, index) =>
       isCompletePotentialTarget(target) && (!prime || index > 0)
-        ? [{ type: target.type, value: target.value }] : []);
+        ? [{ type: target.type, value: target.value }] : []));
   }
 
   function targetSetsEqual(left, right) {
@@ -1207,7 +1222,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
   }
 
   function savedTargetPresetCard() {
-    const currentTargetSets = state[targetSetsKey()]
+    const currentTargetSets = state.targetSets
       .map((targetSet) => completeTargets(targetSet.targets))
       .filter((targets) => targets.length > 0);
     const nameInput = document.createElement("input");
@@ -1249,7 +1264,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
         attackType: state.attackType,
         characterLevel: Math.round(state.characterLevel),
         enemyDefense: Number(state.enemyDefense),
-        targetSets: structuredClone(state[targetSetsKey()]),
+        targetSets: structuredClone(state.targetSets),
         expectation,
         savedAt: new Date().toISOString(),
       });
@@ -1328,7 +1343,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
             state.enemyDefense = preset.enemyDefense ?? state.enemyDefense;
             state.rankProgressByGrade = { rare: 0, epic: 0, unique: 0 };
             state.rankTargetGrade = "";
-            state[targetSetsKey()] = targetSets;
+            state.targetSets = targetSets;
           }, { reload: true });
         });
         const removeButton = element("button", "icon-button target-preset-library__remove", "×");
@@ -1733,7 +1748,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
       return section;
     }
     const section = createResultCard("기댓값");
-    const activeTargetSets = state[targetSetsKey()]
+    const activeTargetSets = state.targetSets
       .map((targetSet, index) => ({
         number: index + 1,
         targets: completeTargets(targetSet.targets),
@@ -1747,6 +1762,15 @@ function mountPotentialSystem({ system, onSystemChange }) {
       const empty = element("div", "result-empty", tableMessage);
       empty.dataset.tone = tableState === "error" ? "error" : "";
       section.append(empty);
+      return section;
+    }
+
+    const incompatibleTarget = state.targetSets.some(({ targets }) => targets.some((target, index) =>
+      target.type && !(activeResetMethod().fixedFirstLine && index === 0) &&
+      !targetTypesForRow(targets, index).includes(target.type)
+    ));
+    if (incompatibleTarget) {
+      section.append(element("div", "result-empty", "현재 재설정 방식에서 사용할 수 없는 목표 옵션이 있습니다. 목표 옵션을 변경해 주세요."));
       return section;
     }
 
@@ -1858,6 +1882,7 @@ export function mountPotentialCalculator({ system: initialSystem = "regular" } =
     cleanup?.();
     const canonical = new URL("../potential/", window.location.href);
     if (system !== "regular") canonical.searchParams.set("system", system);
+    canonical.hash = window.location.hash;
     window.history.replaceState(window.history.state, "", canonical);
     cleanup = system === "combined"
       ? mountCombinedPotentialSystem({ onSystemChange: switchSystem })

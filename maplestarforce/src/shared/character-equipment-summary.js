@@ -1532,12 +1532,20 @@ export function getEquipmentTooltipPlacement({
   const rightSpace = rightBoundary - equipment.right - gap;
   const canFloatLeft = leftSpace >= tooltipWidth;
   const canFloatRight = rightSpace >= tooltipWidth;
-  const canFloatVertically = tooltipHeight <= viewportHeight - margin * 2;
-  if (!canFloatVertically) {
-    return { placement: "inline" };
-  }
   const anchorOnLeft = anchor.left + anchor.width / 2 <
     equipment.left + equipment.width / 2;
+  const minimumTop = Math.max(margin, equipment.top ?? margin);
+  const availableBottom = Math.min(
+    Number.isFinite(protectedTop) ? protectedTop - gap : viewportHeight - margin,
+    viewportHeight - margin,
+  );
+  const top = Math.round(Math.max(minimumTop, Math.min(
+    anchor.top + anchor.height / 2 - tooltipHeight / 2,
+    availableBottom - tooltipHeight,
+  )));
+  // 세로 공간이 부족해도 옆에 놓고, 하단 환산 영역과 겹치는 높이만 확보한다.
+  const reserveBelow = Number.isFinite(protectedTop)
+    ? Math.max(0, Math.ceil(top + tooltipHeight + gap - protectedTop)) : 0;
   // 인게임 장비창과 같은 방향 감각을 유지한다. 왼쪽 장비의 설명은
   // 장비판 왼쪽, 오른쪽 장비의 설명은 장비판 오른쪽을 우선한다.
   const canFloatPreferredSide = anchorOnLeft ? canFloatLeft : canFloatRight;
@@ -1545,14 +1553,11 @@ export function getEquipmentTooltipPlacement({
     const left = anchorOnLeft
       ? equipment.left - tooltipWidth - gap
       : equipment.right + gap;
-    const top = Math.max(margin, Math.min(
-      anchor.top + anchor.height / 2 - tooltipHeight / 2,
-      viewportHeight - tooltipHeight - margin,
-    ));
     return {
       placement: anchorOnLeft ? "left" : "right",
       left: Math.round(left),
-      top: Math.round(top),
+      top,
+      reserveBelow,
     };
   }
 
@@ -1560,13 +1565,6 @@ export function getEquipmentTooltipPlacement({
   // 이때 방향보다 원본 장비 칸이 계속 보이는 것이 우선이다. 선호 방향에
   // 장비와 겹치지 않게 둘 수 없다면 반대편에 붙이고, 양쪽 모두 불가능할
   // 때만 인라인으로 내린다.
-  const overlayBottom = Math.min(
-    Number.isFinite(protectedTop) ? protectedTop - gap : viewportHeight - margin,
-    viewportHeight - margin,
-  );
-  const maximumOverlayTop = overlayBottom - tooltipHeight;
-  if (maximumOverlayTop < margin) return { placement: "inline" };
-
   const anchorRight = Number.isFinite(anchor.right)
     ? anchor.right
     : anchor.left + anchor.width;
@@ -1579,12 +1577,11 @@ export function getEquipmentTooltipPlacement({
   const overlaySide = sideOrder.find(fitsOnSide);
   if (!overlaySide) return { placement: "inline" };
   const left = overlaySide === "left" ? leftOfAnchor : rightOfAnchor;
-  const preferredTop = anchor.top + anchor.height / 2 - tooltipHeight / 2;
-  const top = Math.max(margin, Math.min(preferredTop, maximumOverlayTop));
   return {
     placement: "overlay",
     left: Math.round(left),
-    top: Math.round(top),
+    top,
+    reserveBelow,
   };
 }
 
@@ -1593,6 +1590,9 @@ function createEquipmentTooltipController(grid, board, inlineReference) {
   tooltip.id = `profile-equipment-tooltip-${++equipmentTooltipSequence}`;
   tooltip.setAttribute("role", "tooltip");
   tooltip.hidden = true;
+  const spacer = element("div", "profile-equipment__tooltip-space");
+  spacer.setAttribute("aria-hidden", "true");
+  spacer.hidden = true;
   let activeSlot = null;
   let pinnedSlot = null;
   let renderRevision = 0;
@@ -1624,22 +1624,24 @@ function createEquipmentTooltipController(grid, board, inlineReference) {
       viewportHeight,
       leftBoundary: margin,
       rightBoundary: viewportWidth - margin,
-      protectedTop: Math.min(protectedArea.top, equipment.bottom),
+      // 현재 확보한 공간을 빼야 다시 배치할 때 높이가 누적되지 않는다.
+      protectedTop: Math.min(protectedArea.top - spacer.offsetHeight, equipment.bottom + gap),
       margin,
       gap,
     });
     tooltip.dataset.placement = placement.placement;
+    spacer.hidden = !placement.reserveBelow;
+    spacer.style.height = `${placement.reserveBelow ?? 0}px`;
     if (placement.placement === "inline") {
       if (tooltip.parentElement !== board) {
         board.insertBefore(tooltip, inlineReference);
       }
       return;
     }
-    // 카드의 stacking context 안에 두면 고정 메뉴가 툴팁을 가릴 수 있다.
-    // 바깥 배치일 때는 body 직속 최상위 레이어로 옮겨 메뉴 위에 표시한다.
+    // body에 두어 카드의 stacking context를 벗어나고, 문서와 함께 스크롤한다.
     if (tooltip.parentElement !== document.body) document.body.append(tooltip);
-    tooltip.style.left = `${placement.left}px`;
-    tooltip.style.top = `${placement.top}px`;
+    tooltip.style.left = `${placement.left + window.scrollX}px`;
+    tooltip.style.top = `${placement.top + window.scrollY}px`;
   };
   const draw = (item, lineGrades = null) => {
     renderEquipmentTooltip(tooltip, item, lineGrades);
@@ -1660,6 +1662,7 @@ function createEquipmentTooltipController(grid, board, inlineReference) {
     tooltip.style.pointerEvents = pin ? "auto" : "none";
     if (activeSlot === slot && !tooltip.hidden) return true;
     activeSlot = slot;
+    window.addEventListener("resize", position, { passive: true });
     const revision = ++renderRevision;
     draw(item);
     tooltip.hidden = false;
@@ -1678,10 +1681,13 @@ function createEquipmentTooltipController(grid, board, inlineReference) {
   const hide = (slot) => {
     if (slot && activeSlot !== slot) return;
     document.removeEventListener("click", dismissOutside, true);
+    window.removeEventListener("resize", position);
     renderRevision += 1;
     tooltip.hidden = true;
     activeSlot = null;
     pinnedSlot = null;
+    spacer.hidden = true;
+    spacer.style.height = "0px";
     if (board.isConnected && inlineReference.parentElement === board) {
       board.insertBefore(tooltip, inlineReference);
     } else {
@@ -1707,7 +1713,7 @@ function createEquipmentTooltipController(grid, board, inlineReference) {
   tooltip.addEventListener("keydown", (event) => {
     if (event.key === "Escape") hide();
   });
-  return { tooltip, show, hide, togglePinned, hideUnlessPinned, position };
+  return { tooltip, spacer, show, hide, togglePinned, hideUnlessPinned, position };
 }
 
 function equipmentSlot(
@@ -1833,7 +1839,7 @@ function bindEquipmentSlotInteraction(
   });
   slot.addEventListener("click", () => {
     tooltipController.togglePinned(item, slot);
-    activate();
+    onActivate(item, slot, true);
   });
 }
 
@@ -1895,7 +1901,7 @@ export function getCharacterEquipmentConversionLabel(profile, mode) {
   return "장착 장비 환산 (주스탯 %)";
 }
 
-export function characterEquipmentSummaryBoard(profile, mode, { identity } = {}) {
+export function characterEquipmentSummaryBoard(profile, mode, { identity, onItemSelect } = {}) {
   const summary = profile?.equipmentSummary;
   if (!summary || !Array.isArray(summary.items) || !summary.items.length) {
     return null;
@@ -1936,11 +1942,12 @@ export function characterEquipmentSummaryBoard(profile, mode, { identity } = {})
     detail.panel,
   );
   let activeSlot = null;
-  const activate = (item, slot) => {
+  const activate = (item, slot, selected = false) => {
     if (activeSlot) activeSlot.dataset.active = "false";
     activeSlot = slot;
     activeSlot.dataset.active = "true";
     detail.render(item);
+    if (selected && onItemSelect) onItemSelect(item);
   };
   const offensiveSlots = new Set(["무기", "보조무기", "엠블렘"]);
   const renderedSlots = BOARD_SLOTS.map(([name, row, column]) => {
@@ -1994,7 +2001,7 @@ export function characterEquipmentSummaryBoard(profile, mode, { identity } = {})
     activeSlot.dataset.active = "true";
   }
   board.dataset.metricMode = mode;
-  board.append(caption, grid, tooltipController.tooltip, detail.panel);
+  board.append(caption, grid, tooltipController.tooltip, tooltipController.spacer, detail.panel);
   const fitQuickValues = () => {
     for (const value of board.querySelectorAll(
       ".profile-equipment__quick-value-text",

@@ -20,6 +20,20 @@ export {
 
 export const MESO_PER_EOK = 100_000_000;
 
+const EQUIPMENT_GROUP_PARTS = {
+  "eternal-hat": [
+    { id: "eternal-part-hat", name: "모자", equipmentPart: "모자", icon: "./equipments/모상하견.png" },
+    { id: "eternal-part-top", name: "상의", equipmentPart: "상의", icon: "./equipments/eternal-top.png" },
+    { id: "eternal-part-bottom", name: "하의", equipmentPart: "하의", icon: "./equipments/eternal-bottom.png" },
+    { id: "eternal-part-shoulder", name: "견장", equipmentPart: "어깨장식", icon: "./equipments/eternal-shoulder.png" },
+  ],
+  "eternal-glove": [
+    { id: "eternal-part-glove", name: "장갑", equipmentPart: "장갑", icon: "./equipments/장신망.png" },
+    { id: "eternal-part-shoes", name: "신발", equipmentPart: "신발", icon: "./equipments/eternal-shoes.png" },
+    { id: "eternal-part-cape", name: "망토", equipmentPart: "망토", icon: "./equipments/eternal-cape.png" },
+  ],
+};
+
 /**
  * 버튼으로 고르는 장비 목록. 레벨은 계산에 쓰이고 price는 스페어값 기본값이다.
  * 시세는 계속 바뀌므로 이 값은 어디까지나 출발점이고, 실제 값은 이용자가
@@ -51,18 +65,24 @@ export const EQUIPMENT_PRESETS = [
   { id: "level-135", name: "135제", level: 135, price: 3, folded: true },
   { id: "level-145", name: "145제", level: 145, price: 4.5, folded: true },
   { id: "level-150", name: "150제", level: 150, price: 0.1, folded: true },
-].map((preset) => ({
+].flatMap((preset) => {
   // 아이콘 파일 이름은 표시되는 장비 이름을 그대로 쓴다. id를 쓰면 이름이 바뀌었을 때
   // 파일명이 실제 장비와 어긋나 무슨 그림인지 알기 어려워진다.
-  icon: `./equipments/${encodeURIComponent(preset.name)}.png`,
-  ...preset,
-}));
+  const group = { icon: `./equipments/${encodeURIComponent(preset.name)}.png`, ...preset };
+  return [group, ...(EQUIPMENT_GROUP_PARTS[preset.id] ?? []).map((part) => ({
+    ...group, ...part, groupId: preset.id,
+  }))];
+});
+
+export function equipmentGroupMembers(groupId) {
+  return EQUIPMENT_PRESETS.filter((preset) => preset.groupId === groupId);
+}
 
 /** 레벨별로 묶어 고르기 쉽게 만든다. */
 export function groupPresetsByLevel() {
   const groups = new Map();
   for (const preset of EQUIPMENT_PRESETS) {
-    if (preset.folded) continue;
+    if (preset.folded || preset.groupId) continue;
     if (!groups.has(preset.level)) groups.set(preset.level, []);
     groups.get(preset.level).push(preset);
   }

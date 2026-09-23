@@ -1,3 +1,4 @@
+import { calculatorStorage, registerResultShare } from "./result-share-state.js";
 import {
   POTENTIAL_GRADES,
   POTENTIAL_PARTS,
@@ -10,6 +11,7 @@ import { loadPotentialTables } from "./potential-tables.js";
 import {
   getPotentialTargetInfo,
   isCompletePotentialTarget,
+  mergePotentialTargets,
   orderPotentialTargetTypes,
   summarizePotentialTargetEquivalents,
 } from "./potential-target-ui.js";
@@ -60,7 +62,7 @@ const MAX_SAVED_TARGET_PRESETS = 20;
 
 function safeLoad(key, fallback) {
   try {
-    return { ...fallback, ...JSON.parse(localStorage.getItem(key)) };
+    return { ...fallback, ...JSON.parse(calculatorStorage.getItem(key)) };
   } catch {
     return structuredClone(fallback);
   }
@@ -68,7 +70,7 @@ function safeLoad(key, fallback) {
 
 function safeSave(key, value) {
   try {
-    localStorage.setItem(key, JSON.stringify(value));
+    calculatorStorage.setItem(key, JSON.stringify(value));
   } catch {
     // 저장이 막힌 환경에서는 현재 화면에서만 유지한다.
   }
@@ -76,7 +78,7 @@ function safeSave(key, value) {
 
 function safeLoadList(key) {
   try {
-    const value = JSON.parse(localStorage.getItem(key));
+    const value = JSON.parse(calculatorStorage.getItem(key));
     return Array.isArray(value) ? value : [];
   } catch {
     return [];
@@ -153,6 +155,8 @@ export function mountCombinedPotentialSystem({ onSystemChange }) {
 
   saveSharedPotentialEquipment(state);
 
+  registerResultShare(() => ({ local: { [storageKey]: state } }));
+
   function persistTargetPresets() {
     safeSave(targetPresetStorageKey, savedTargetPresets);
   }
@@ -185,12 +189,9 @@ export function mountCombinedPotentialSystem({ onSystemChange }) {
   }
 
   function allowedTypesForRow(index, { includeProfileTargets = false } = {}) {
-    const previousTypes = new Set(
-      state.targets.slice(0, index).map((target) => target.type).filter(Boolean),
-    );
     const hasProfile = includeProfileTargets || Boolean(getActiveProfile({ capability: "potentialEquivalence" }));
     return availableTargetTypes.filter((type) =>
-      !previousTypes.has(type) && (type !== "stat-equivalent" || hasProfile)
+      type !== "stat-equivalent" || hasProfile
     );
   }
 
@@ -413,7 +414,7 @@ export function mountCombinedPotentialSystem({ onSystemChange }) {
   }
 
   function completeTargets() {
-    return state.targets.filter(isCompletePotentialTarget);
+    return mergePotentialTargets(state.targets);
   }
 
   function targetSummary(target) {

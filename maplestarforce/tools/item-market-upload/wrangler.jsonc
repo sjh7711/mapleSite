@@ -1,0 +1,12 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "maple-market-upload",
+  "main": "worker.js",
+  "compatibility_date": "2026-09-21",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "secrets": { "required": ["UPLOAD_TOKEN", "REGISTER_TOKEN"] },
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "kv_namespaces": [{ "binding": "ROUTE", "id": "40eaa1bd79554e25b5c991b0f3f7a647" }]
+}

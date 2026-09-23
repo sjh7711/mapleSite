@@ -121,7 +121,7 @@ test("목표 프리셋은 계산 결과 아래에서 저장·불러오기·삭�
   assert.match(source, /현재 목표 저장/);
   assert.match(source, /저장된 목표 프리셋/);
   assert.match(source, /저장 당시 기댓값/);
-  assert.match(source, /state\[targetSetsKey\(\)\] = targetSets/);
+  assert.match(source, /state\.targetSets = targetSets/);
   assert.match(source, /savedTargetPresets = savedTargetPresets\.filter/);
   assert.match(source, /const results = \[resultCard\(\)\]/);
   assert.match(source, /state\.calculationMode === "options"[\s\S]*results\.push\(savedTargetPresetCard\(\)\)/);

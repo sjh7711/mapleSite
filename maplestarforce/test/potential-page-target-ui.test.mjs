@@ -16,6 +16,7 @@ import {
   getPotentialTargetInfo,
   getPotentialTargetTypesForRow,
   isCompletePotentialTarget,
+  mergePotentialTargets,
   migratePotentialTargetChanceDefault,
   normalizePotentialTargetChance,
   orderPotentialTargetTypes,
@@ -405,6 +406,56 @@ test("주스탯%급은 캐릭터 정보가 있을 때 첫 줄에만 허용한다
     }),
     [],
   );
+});
+
+test("앞 칸의 공격력 목표를 다른 칸에서도 선택할 수 있다", () => {
+  const availableTargetTypes = ["attack-power-percent", "boss-damage", "stat-equivalent"];
+  const targets = [
+    { type: "attack-power-percent", value: "12" },
+    { type: "attack-power-percent", value: "9" },
+    { type: "", value: "" },
+  ];
+  for (const index of [1, 2]) {
+    assert.deepEqual(getPotentialTargetTypesForRow({ availableTargetTypes, targets, index, hasProfile: true }),
+      ["attack-power-percent", "boss-damage"]);
+  }
+});
+
+test("중복 목표는 입력을 보존하며 합산하고 방무는 중첩 공식으로 합친다", () => {
+  const targets = [
+    { type: "attack-power-percent", value: "12" },
+    { type: "attack-power-percent", value: "9" },
+    { type: "boss-damage", value: 30 },
+    { type: "ignore-defense", value: 40 },
+    { type: "ignore-defense", value: 40 },
+    { type: "", value: "" },
+    { type: "damage", value: "" },
+  ];
+  const saved = structuredClone(targets);
+  assert.deepEqual(mergePotentialTargets(targets), [
+    { type: "attack-power-percent", value: 21 },
+    { type: "boss-damage", value: 30 },
+    { type: "ignore-defense", value: 64 },
+  ]);
+  assert.deepEqual(targets, saved);
+  assert.deepEqual(mergePotentialTargets(mergePotentialTargets(targets)), mergePotentialTargets(targets));
+});
+
+test("12%와 9%의 중복 입력은 21% 목표와 같은 확률이며 12% 한 줄만으로 성공하지 않는다", () => {
+  const tables = [
+    [{ name: "공격력 +12%", probability: 50 }, { name: "기타", probability: 50 }],
+    [{ name: "공격력 +9%", probability: 50 }, { name: "기타", probability: 50 }],
+    [{ name: "기타", probability: 100 }],
+  ];
+  const merged = mergePotentialTargets([
+    { type: "attack-power-percent", value: 12 }, { type: "attack-power-percent", value: 9 },
+  ]).map(({ type, value }) => ({ targetType: type, target: value }));
+  const context = { tables, itemLevel: 200, grade: "legendary", mainStat: "STR" };
+  const split = calculatePotentialExpected({ ...context, targets: merged });
+  const total = calculatePotentialExpected({ ...context, targetType: "attack-power-percent", target: 21 });
+  assert.equal(split.rawProbability, 0.25);
+  assert.equal(split.probability, total.probability);
+  assert.equal(split.expectedResets, total.expectedResets);
 });
 
 test("모든 성공 조건은 같은 행에서 오름차순과 내림차순을 선택한다", async () => {

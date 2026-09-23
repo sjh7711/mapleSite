@@ -1,3 +1,4 @@
+import { calculatorStorage, registerResultShare } from "../shared/result-share-state.js";
 import {
   SOUL_REFORM_2026_09_17, calculateSoulAmplificationPath,
   calculateSoulPotentialRankUpExpected, calculateSoulPotentialExpected,
@@ -27,14 +28,14 @@ const STAGES = SOUL_REFORM_2026_09_17.amplification.stages;
 const LIVE_RULES = { asOfDate: "2026-09-17", maintenanceCompleted: true };
 const defaults = {
   mode: "amplification", currentStage: 0, targetStage: 4, failures: 0,
-  etherPrices: [0, 0, 0, 0],
+  etherPrices: [18, 18, 18, 70],
   grade: "legendary", toGrade: "legendary", resetCount: 0, miracle: false,
   potentialStage: 4, chance: 80, chanceAverage: true,
   targets: [{ type: "attack-power-percent", value: 16 }],
 };
 let state = structuredClone(defaults);
 try {
-  const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+  const saved = JSON.parse(calculatorStorage.getItem(STORAGE_KEY));
   if (saved && typeof saved === "object") {
     state = { ...state, ...saved,
       grade: saved.grade ?? (saved.mode === "rank-up" ? saved.fromGrade : defaults.grade),
@@ -48,7 +49,11 @@ state.targetStage = Math.round(clamp(state.targetStage, state.currentStage + 1, 
 state.failures = Math.round(clamp(state.failures, 0, STAGES[state.currentStage].guaranteeAfterFailures));
 state.potentialStage = Math.round(clamp(state.potentialStage, 1, 4));
 state.chance = clamp(state.chance, 0.01, 99.99, 80);
-state.etherPrices = Array.from({ length: 4 }, (_, i) => Math.max(0, Number(state.etherPrices?.[i]) || 0));
+state.etherPrices = Array.from({ length: 4 }, (_, i) => {
+  const price = state.etherPrices?.[i];
+  return price !== null && price !== undefined && Number.isFinite(Number(price))
+    ? Math.max(0, Number(price)) : defaults.etherPrices[i];
+});
 delete state.etherStocks;
 state.chanceAverage = state.chanceAverage === true;
 if (!GRADE_ORDER.includes(state.grade)) state.grade = defaults.grade;
@@ -75,7 +80,7 @@ state.targets = Array.from({ length: 3 }, (_, index) => {
 
 const root = document.querySelector("#tool");
 renderToolNav(document.querySelector("#toolnav"), "soul");
-function save() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {} }
+function save() { try { calculatorStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {} }
 function update(fn) { fn(); save(); render(); }
 function input(key, extra = {}) {
   const control = numberInput(state[key], (value) => update(() => { state[key] = value; }), extra);
@@ -83,8 +88,8 @@ function input(key, extra = {}) {
   return control;
 }
 function select(key, options, onChange = () => {}) {
-  const picker = chipRow(...options.map(({ value, label }) => chip(label, state[key] === value,
-    () => update(() => { state[key] = value; onChange(); }))));
+  const picker = chipRow(...options.map(({ value, label, disabled = false }) => chip(label, state[key] === value,
+    () => update(() => { state[key] = value; onChange(); }), disabled)));
   picker.setAttribute("role", "group");
   picker.dataset.key = `soul-${key}`;
   return picker;
@@ -158,10 +163,12 @@ function settingsCard() {
 function amplificationControls() {
   const currentConfig = STAGES[state.currentStage];
   const target = card("증폭 목표",
-    row(field("목표 증폭 단계", select("targetStage", stageOptions(state.currentStage + 1)))),
+    row(field("목표 증폭 단계", select("targetStage", stageOptions(1).map((option) => ({
+      ...option, disabled: option.value <= state.currentStage,
+    }))))),
     row(field("현재 단계 실패 횟수", input("failures", { min: "0", max: String(currentConfig.guaranteeAfterFailures), step: "1" }))),
   );
-  const prices = row(...STAGES.slice(state.currentStage, state.targetStage).map((config) => {
+  const prices = row(...STAGES.map((config) => {
     const index = config.stage - 1;
     const price = numberInput(state.etherPrices[index], (value) => update(() => { state.etherPrices[index] = value; }), { min: "0", step: "0.01" });
     price.dataset.key = `soul-ether-price-${index}`;
@@ -169,7 +176,7 @@ function amplificationControls() {
   }));
   prices.classList.add("soul-ether-prices");
   const costs = cardWithHead("에테르 비용 설정", resetAction("가격 초기화", () => update(() => {
-    state.etherPrices = [0, 0, 0, 0];
+    state.etherPrices = [...defaults.etherPrices];
   }), { className: "button--compact" }), prices,
   note("에테르 가격이 0이면 증폭에 직접 소비하는 메소만 합산합니다."));
   const column = element("div", "calculator-column");
@@ -192,8 +199,10 @@ function rankUpControls() {
     state.resetCount = 0;
   }), { className: "button--compact", key: "soul-reset-rank-progress" }),
     row(field("확률 적용", chancePicker)),
-    row(field("목표 등급", select("toGrade", GRADE_ORDER.slice(GRADE_ORDER.indexOf(state.grade) + 1)
-      .map((value) => ({ value, label: value === "legendary" ? "레전" : GRADES[value] }))))),
+    row(field("목표 등급", select("toGrade", GRADE_ORDER.slice(1).map((value) => ({
+      value, label: value === "legendary" ? "레전" : GRADES[value],
+      disabled: GRADE_ORDER.indexOf(value) <= GRADE_ORDER.indexOf(state.grade),
+    }))))),
     progress,
   );
 }
@@ -240,7 +249,7 @@ function soulReachControl(result) {
   });
 }
 
-function soulProgressReachControl(result, amplification) {
+function soulProgressReachControl(result, amplification, onSelectionChange = () => {}) {
   const calculate = amplification ? calculateSoulAmplificationReachForChance : calculateSoulPotentialRankUpReachForChance;
   const initial = calculate(result, state.chance / 100);
   const averageChance = Number(clamp(initial.averageAttemptChance * 100, 0.01, 99.99).toFixed(2));
@@ -263,8 +272,54 @@ function soulProgressReachControl(result, amplification) {
       attemptsMetric.querySelector("strong").textContent = formatAttempts(reach.attempts);
       costMetric.querySelector("span").textContent = `${label} 비용`;
       costMetric.querySelector("strong").textContent = formatMeso(reach.cost);
+      onSelectionChange({ chance: value / 100, average, label });
     }, onCommit: save,
   });
+}
+
+function soulProgressStageDetails(result, amplification) {
+  const calculate = amplification ? calculateSoulAmplificationReachForChance : calculateSoulPotentialRankUpReachForChance;
+  const attemptLabel = amplification ? "시도" : "재설정";
+  const panel = details("단계별 기댓값");
+  panel.dataset.detailsKey = amplification ? "soul-amplification" : "soul-rank-up";
+  const rows = result.stages.map((stage) => {
+    const attempts = resultLine(`평균 ${attemptLabel}`, "-");
+    const cost = resultLine("평균 비용", "-");
+    if (amplification) {
+      panel.append(element("h3", "", `${stage.stage}단계 증폭`),
+        resultLine("다음 시도 성공 확률", formatProbability(stage.currentSuccessProbability)),
+        attempts,
+        resultLine("성공 보장까지 최대 시도", `${stage.maximumAttempts}회`),
+        cost);
+    } else {
+      panel.append(element("h3", "", `${GRADES[stage.fromGrade]} → ${GRADES[stage.toGrade]}`),
+        resultLine("등급 업 확률", formatProbability(stage.probability, 4)),
+        resultLine("1회 비용", formatMeso(stage.resetCostMeso)),
+        attempts, cost);
+    }
+    const average = {
+      attempts: amplification ? stage.expected.attempts : stage.expectedAttempts,
+      cost: amplification ? stage.costs.totalMeso : stage.expectedCostMeso,
+    };
+    // Keep each single-stage plan stable so moving the slider reuses its distribution.
+    return { average, plan: { stages: [stage] }, attempts, cost };
+  });
+  const explanation = note("각 단계에 선택한 확률을 각각 적용합니다. 단계별 비용의 합은 전체 목표 도달 비용과 다를 수 있습니다.");
+  panel.append(explanation);
+  return {
+    panel,
+    update({ chance, average, label }) {
+      for (const row of rows) {
+        const reach = average ? row.average : calculate(row.plan, chance);
+        row.attempts.firstElementChild.textContent = `${label} ${attemptLabel}`;
+        row.attempts.lastElementChild.textContent = amplification
+          ? `${reach.attempts.toFixed(2)}회` : formatAttempts(reach.attempts);
+        row.cost.firstElementChild.textContent = `${label} 비용`;
+        row.cost.lastElementChild.textContent = formatMeso(reach.cost);
+      }
+      explanation.hidden = average;
+    },
+  };
 }
 
 function results() {
@@ -275,35 +330,21 @@ function results() {
         currentStage: Number(state.currentStage), targetStage: Number(state.targetStage), currentFailures: Number(state.failures),
         etherPriceMesoByStage: Object.fromEntries(state.etherPrices.map((price, i) => [i + 1, Number(price) * EOK])),
       });
+      const stages = soulProgressStageDetails(result, true);
       section.append(metricGrid(metric("평균 증폭 시도", formatAttempts(result.expected.attempts)), metric("평균 총비용", formatMeso(result.costs.totalMeso))),
-        soulProgressReachControl(result, true),
+        soulProgressReachControl(result, true, stages.update),
         resultLine("증폭 소비 메소", formatMeso(result.costs.attemptMeso)), resultLine("에테르 구매 비용", formatMeso(result.costs.etherMeso)));
-      const stageDetails = details("단계별 기댓값");
-      stageDetails.dataset.detailsKey = "soul-amplification";
-      for (const stage of result.stages) {
-        stageDetails.append(element("h3", "", `${stage.stage}단계 증폭`),
-          resultLine("다음 시도 성공 확률", formatProbability(stage.currentSuccessProbability)),
-          resultLine("평균 시도", `${stage.expected.attempts.toFixed(2)}회`),
-          resultLine("성공 보장까지 최대 시도", `${stage.maximumAttempts}회`),
-          resultLine("평균 비용", formatMeso(stage.costs.totalMeso)));
-      }
-      section.append(stageDetails);
+      section.append(stages.panel);
     } else if (state.mode === "rank-up") {
       const result = calculateSoulPotentialRankUpExpected({ ...LIVE_RULES, fromGrade: state.grade, toGrade: state.toGrade,
         currentResetCount: Number(state.resetCount), miracle: state.miracle });
+      const stages = soulProgressStageDetails(result, false);
       section.append(metricGrid(metric("평균 재설정", formatAttempts(result.expectedAttempts)), metric("평균 총비용", formatMeso(result.expectedCostMeso))),
-        soulProgressReachControl(result, false),
+        soulProgressReachControl(result, false, stages.update),
         resultLine("목표 등급", `${GRADES[state.grade]} → ${GRADES[state.toGrade]}`, true),
         resultLine("확률 적용", state.miracle ? "미라클 타임" : "일반 확률"),
         resultLine("성공 보장까지 최대 재설정", `${result.maximumAttempts}회`));
-      const stageDetails = details("단계별 기댓값");
-      stageDetails.dataset.detailsKey = "soul-rank-up";
-      for (const stage of result.stages) stageDetails.append(element("h3", "", `${GRADES[stage.fromGrade]} → ${GRADES[stage.toGrade]}`),
-        resultLine("등급 업 확률", formatProbability(stage.probability, 4)),
-        resultLine("1회 비용", formatMeso(stage.resetCostMeso)),
-        resultLine("평균 재설정", formatAttempts(stage.expectedAttempts)),
-        resultLine("평균 비용", formatMeso(stage.expectedCostMeso)));
-      section.append(stageDetails);
+      section.append(stages.panel);
     } else {
       const targets = state.targets.filter(isCompletePotentialTarget);
       if (!targets.length) {
@@ -334,3 +375,5 @@ function render() {
 }
 save();
 render();
+
+registerResultShare(() => ({ local: { [STORAGE_KEY]: state } }));

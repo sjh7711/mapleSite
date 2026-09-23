@@ -354,8 +354,9 @@ test("일반 놀긍과 리턴을 구분할 수 없는 벡터는 임의 비용을
   assert.match(result.basis, /구분할 수 없음/u);
 });
 
-test("프리미엄 악세서리와 놀긍이 겹치는 순수 공·마 벡터는 시세 없이는 계산하지 않는다", () => {
+test("프리미엄 악세서리 시세를 명시적으로 비우면 계산하지 않는다", () => {
   const result = calculateAutomaticScrollExpectedCost({
+    settings: { premiumAccessoryPrice: 0 },
     target: target({
       category: "반지",
       level: 160,
@@ -367,6 +368,87 @@ test("프리미엄 악세서리와 놀긍이 겹치는 순수 공·마 벡터는
   assert.equal(result.method, "premium_accessory");
   assert.equal(result.expected_cost_meso, null);
   assert.match(result.basis, /장당 시세가 없음/u);
+});
+
+test("프리미엄 악세서리 기본 비용은 공식 6,000만 메소를 사용한다", () => {
+  const result = calculateAutomaticScrollExpectedCost({
+    target: target({ category: "반지", level: 160, maximum: 3, scroll: { attack_flat: 12 } }),
+  });
+  assert.equal(result.status, "calculated");
+  assert.equal(result.expected_cost_meso, 180_000_000);
+  assert.equal(result.evidence.finish_chance, 1);
+  const highRoll = calculateAutomaticScrollExpectedCost({
+    target: target({ category: "반지", level: 160, maximum: 3, scroll: { attack_flat: 15 } }),
+  });
+  assert.ok(highRoll.expected_cost_meso > result.expected_cost_meso);
+  assert.ok(Math.abs(highRoll.evidence.finish_chance - 0.15 ** 3) < 1e-12);
+});
+
+test("말랑신쫑 루컨마는 실제 이력과 별도로 놀긍 첫작+프악공 목표 제작비를 계산한다", () => {
+  const result = calculateAutomaticScrollExpectedCost({
+    target: target({ category: "얼굴장식", requiredJob: "공용", level: 160, maximum: 6,
+      scroll: { str_flat: 4, dex_flat: 2, int_flat: 5, luk_flat: 1, attack_flat: 25, magic_attack_flat: 2 } }),
+  });
+  assert.equal(result.status, "calculated");
+  assert.equal(result.method, "chaos_first_premium_goal");
+  assert.equal(result.assessment, "goal_reproduction");
+  assert.equal(result.evidence.exact_history_identified, false);
+  assert.equal(result.evidence.useful_target.primary, "str_flat");
+  assert.equal(result.evidence.useful_target.attack, 25);
+  assert.equal(result.evidence.premium_works, 5);
+  assert.ok(result.evidence.ignored_stat_keys.includes("int_flat"));
+  assert.ok(result.expected_cost_meso > 300_000_000, "첫작 및 실패 비용은 프악공 5회에 추가된다");
+  assert.match(result.basis, /실제 작 이력 미확정/u);
+});
+
+test("놀긍+프악공 비용에는 완작 목표 미달 후 다시 제작하는 비용까지 포함한다", () => {
+  const item = target({ category: "얼굴장식", requiredJob: "공용", level: 160, maximum: 6,
+    scroll: { str_flat: 4, attack_flat: 25 } });
+  const result = calculateAutomaticScrollExpectedCost({ target: item });
+  // Independently enumerate the six accepted first-roll thresholds and all
+  // 2^5 premium outcomes, including every failed full craft and reset.
+  const chaos = [[0,.183827],[1,.330081],[2,.238669],[3,.138661],[4,.049438],[6,.059324]];
+  const statChance = .049438 + .059324;
+  const reset = 16_000_000;
+  const costs = chaos.map(([minimum]) => {
+    const accepted = chaos.filter(([value]) => value >= minimum);
+    const chance = accepted.reduce((sum, [, p]) => sum + p, 0);
+    let finish = 0;
+    for (const [attack, p] of accepted) {
+      for (let bits = 0; bits < 32; bits += 1) {
+        let total = attack, weight = p / chance;
+        for (let roll = 0; roll < 5; roll += 1) {
+          const five = bits & (1 << roll);
+          total += five ? 5 : 4;
+          weight *= five ? .15 : .85;
+        }
+        if (total >= 25) finish += weight;
+      }
+    }
+    const firstHit = .6 * statChance * chance;
+    const firstCost = 500_000 / firstHit + (1 / firstHit - 1) * reset;
+    return (firstCost + 300_000_000 + (1 - finish) * reset) / finish;
+  });
+  assert.ok(Math.abs(result.expected_cost_meso - Math.min(...costs)) < .01);
+});
+
+test("놀긍+프악마와 불가능한 첫작 목표를 구분한다", () => {
+  const magic = calculateAutomaticScrollExpectedCost({
+    target: target({ category: "펜던트", requiredJob: "마법사", level: 160, maximum: 6,
+      scroll: { int_flat: 4, magic_attack_flat: 25 } }),
+  });
+  assert.equal(magic.method, "chaos_first_premium_goal");
+  assert.match(magic.method_label, /프악마/u);
+  for (const options of [
+    { category: "얼굴장식", scroll: { str_flat: 7, attack_flat: 25 } },
+    { category: "얼굴장식", scroll: { str_flat: 4, attack_flat: 32 } },
+    { category: "망토", scroll: { str_flat: 4, attack_flat: 25 } },
+  ]) {
+    const result = calculateAutomaticScrollExpectedCost({
+      target: target({ requiredJob: "공용", level: 160, maximum: 6, ...options }),
+    });
+    assert.notEqual(result.method, "chaos_first_premium_goal");
+  }
 });
 
 test("매지컬 일반 결과와 전 부위 +11 리턴작을 구분해 계산한다", () => {

@@ -1,3 +1,4 @@
+import { calculatorStorage, registerResultShare } from "../shared/result-share-state.js";
 import {
   ADD_OPTION_TABLES_SNAPSHOT,
   BLACK_FLAME_MESO,
@@ -29,6 +30,7 @@ import {
   searchableSelect,
   note,
   renderWithFocus,
+  resetAction,
   resultCard as createResultCard,
   resultLine,
   row,
@@ -80,7 +82,7 @@ const defaults = {
 
 function loadState() {
   try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    const parsed = JSON.parse(calculatorStorage.getItem(STORAGE_KEY));
     const stored = parsed && typeof parsed === "object" ? parsed : {};
     const next = {
       ...defaults,
@@ -99,7 +101,7 @@ const root = document.querySelector("#tool");
 
 function save() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    calculatorStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch {
     // 저장할 수 없어도 현재 계산은 유지한다.
   }
@@ -514,7 +516,7 @@ function setupSection(title, className, ...children) {
 }
 
 function equipmentSection() {
-  return setupSection(
+  const section = setupSection(
     "장비",
     "add-option-setup-section--equipment",
     chipRow(
@@ -526,6 +528,13 @@ function equipmentSection() {
     targetSection(),
     note("보스 장비는 일반 장비보다 추가옵션 단계가 2단계 높게 붙습니다."),
   );
+  const heading = section.firstElementChild;
+  const head = element("div", "card__head");
+  heading.replaceWith(head);
+  head.append(heading, resetAction("초기화", () => update(() => {
+    for (const key of ["weapon", "itemLevel", "boss", "target", "tier", "damagePercent"]) state[key] = defaults[key];
+  }), { key: "reset-add-option-targets", title: "목표와 장비 입력값만 기본값으로 되돌립니다. 시세와 캐릭터 정보는 유지합니다." }));
+  return section;
 }
 
 function targetSection() {
@@ -698,3 +707,5 @@ function render() {
 const unsubscribe = subscribeCharacterProfile(render);
 window.addEventListener("pagehide", unsubscribe, { once: true });
 render();
+
+registerResultShare(() => ({ local: { [STORAGE_KEY]: state } }));

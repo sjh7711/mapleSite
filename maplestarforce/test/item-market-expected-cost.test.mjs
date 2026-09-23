@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   allocateSharedExpectedCostRecovery,
@@ -7,6 +8,7 @@ import {
   buildUsefulPotentialConditions,
   calculateItemMarketExpectedCosts,
   calculatePotentialGradeExpectedCost,
+  calculatePotentialOptionsExpectedCost,
   expectedCostRecoveryPercent,
 } from "../src/shared/item-market-expected-cost.js";
 
@@ -111,6 +113,64 @@ test("직업 계열의 공마와 유틸리티 옵션만 남긴다", () => {
     ["drop", "magic-power-percent"],
   );
   assert.equal(result.ignored_lines, 1);
+});
+
+function emblemAdditionalTables() {
+  const read = (file) => JSON.parse(readFileSync(new URL(`../public/potential-tables/${file}`, import.meta.url)));
+  const index = read("index.json");
+  return read("additional-legendary-2-120.json").map((line) => line.map(([name, probability]) => ({
+    name: index.names[name], probability,
+  })));
+}
+
+test("레테그네의 미트라 에디 마력 21%와 INT 9%를 세 줄 모두 포함한다", () => {
+  const magic = (value) => ({ code: "MAGIC_ATTACK", unit: "pct", value });
+  const result = calculateItemMarketExpectedCosts({
+    target: targetItem({
+      requiredJob: "마법사", category: "엠블렘", level: 200,
+      potential: { grade: "legendary", lines: [magic(12), magic(9), magic(9)] },
+      additional: { grade: "legendary", lines: [magic(12), { code: "INT", unit: "pct", value: 9 }, magic(9)] },
+    }),
+    additionalTables: emblemAdditionalTables(), storage: null,
+  }).components.additional_options;
+  assert.equal(result.status, "calculated");
+  assert.equal(result.accepted_lines, 3);
+  assert.equal(result.ignored_lines, 0);
+  assert.deepEqual(result.conditions, [
+    { targetType: "magic-power-percent", target: 21 }, { targetType: "int-percent", target: 9 },
+  ]);
+});
+
+test("보우신쫑의 미트라 에디 크확 9%를 포함해 실제 도달 확률과 비용을 계산한다", () => {
+  const attack = (value) => ({ code: "ATTACK", unit: "pct", value });
+  const options = { system: "additional", itemLevel: 200, family: "DEX", tables: emblemAdditionalTables() };
+  const result = calculatePotentialOptionsExpectedCost({ ...options,
+    section: { grade: "legendary", lines: [attack(12), { code: "CRITICAL_RATE", unit: "pct", value: 9 }, attack(9)] },
+  });
+  const withoutCritical = calculatePotentialOptionsExpectedCost({ ...options,
+    section: { grade: "legendary", lines: [attack(12), attack(9)] },
+  });
+  assert.equal(result.status, "calculated");
+  assert.equal(result.accepted_lines, 3);
+  assert.equal(result.ignored_lines, 0);
+  assert.deepEqual(result.conditions, [
+    { targetType: "attack-power-percent", target: 21 }, { targetType: "critical-rate", target: 9 },
+  ]);
+  assert.ok(result.probability > 0 && result.probability < withoutCritical.probability);
+  assert.ok(result.expected_cost_meso > withoutCritical.expected_cost_meso);
+});
+
+test("공용 장비는 윗잠과 에디 계열을 각각 골라 다른 계열 주스탯을 잘못 제외하지 않는다", () => {
+  const result = calculateItemMarketExpectedCosts({
+    target: targetItem({ requiredJob: "공용",
+      potential: { grade: "legendary", lines: [{ code: "STR", unit: "pct", value: 36 }] },
+      additional: { grade: "legendary", lines: [{ code: "INT", unit: "pct", value: 9 }] },
+    }), storage: null,
+  });
+  assert.equal(result.components.potential_options.family, "STR");
+  assert.equal(result.components.additional_options.family, "INT");
+  assert.equal(result.components.additional_options.accepted_lines, 1);
+  assert.equal(result.components.additional_options.ignored_lines, 0);
 });
 
 test("등업 기댓값은 레어 시작 메소 재설정 비용으로 계산한다", () => {
