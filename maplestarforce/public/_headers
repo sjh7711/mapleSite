@@ -11,13 +11,9 @@
   Content-Type: application/xml
   X-Content-Type-Options: nosniff
 
-/sitemap.xml/
-  Content-Type: application/xml
-  X-Content-Type-Options: nosniff
-
-# 기존 사이트맵과 같은 내용·헤더로 새 URL의 처리 상태를 비교한다.
-/sitemap-pages.xml
-  Content-Type: application/xml
+# XML 처리 상태와 무관하게 읽을 수 있는 Google 지원 텍스트 사이트맵이다.
+/sitemap.txt
+  Content-Type: text/plain; charset=utf-8
   X-Content-Type-Options: nosniff
 
 # 파일 이름에 해시가 붙어 있어 내용이 바뀌면 이름도 바뀐다. 영구 캐시해도 안전하다.

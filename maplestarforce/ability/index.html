@@ -15,6 +15,7 @@
     <link rel="icon" type="image/png" href="../tool-icons/large-boss-medal.png" />
     <link rel="stylesheet" href="../src/style.css" />
     <link rel="stylesheet" href="../src/calculator.css" />
+    <link rel="stylesheet" href="../src/calculator-guide.css" />
   </head>
   <body class="page--calculator page--ability">
     <main data-calculator="ability" class="page" google-side-rail-overlap="false">
@@ -26,6 +27,32 @@
       <div class="calculator-shell">
         <div id="tool" class="layout__main"></div>
       </div>
+      <article class="calculator-guide" aria-labelledby="ability-guide-title" hidden>
+        <header class="calculator-guide__header">
+          <h2 id="ability-guide-title">어빌리티 계산기 이용 안내</h2>
+          <p>목표 세 줄과 잠금 상태, 사용할 재설정 수단을 바꾸며 명성치와 서큘레이터 운용 방법을 비교할 수 있습니다.</p>
+        </header>
+        <div class="calculator-guide__grid">
+          <section>
+            <h3>조건 입력 방법</h3>
+            <ol>
+              <li>직업 프리셋을 불러오거나 각 줄의 옵션·등급·최소 수치를 직접 정합니다.</li>
+              <li>명성치, 고급 재설정 또는 사용할 수 있는 서큘레이터를 선택하고 이미 확보한 줄은 실제 상태에 맞게 잠급니다.</li>
+              <li>보유 수량과 명성치·서큘레이터의 메소 환산값을 입력하면 가능한 진행 경로를 같은 기준으로 비교할 수 있습니다.</li>
+            </ol>
+          </section>
+          <section>
+            <h3>추천 결과 해석</h3>
+            <p>1회 성공 확률과 평균 소모량은 현재 목표와 잠금 조건을 기준으로 합니다. 추천 진행 순서는 입력한 보유 자원과 환산 가격에서 비용을 비교한 결과이므로, 입력 조건이 바뀌면 추천도 달라질 수 있습니다.</p>
+            <p>평균 비용과 특정 확률까지 필요한 비용은 서로 다른 지표입니다. 실제 결과를 적용하거나 유지할 때에는 현재 줄의 옵션과 수치를 다시 대조해 주세요.</p>
+          </section>
+          <section>
+            <h3>계산 전 확인사항</h3>
+            <p>어빌리티 등급, 줄 위치, 잠금 개수와 재설정 방식에 따라 가능한 결과와 소모 자원이 달라집니다. 프리셋은 빠른 입력을 위한 출발점이므로 자신의 직업 운용과 목표에 맞는지 확인해야 합니다.</p>
+            <p>명성치 재설정 확률의 근거는 <a href="/sources/">데이터·확률 출처</a>에서, 무작위 결과와 평균값에 관한 공통 설명은 <a href="/about/#usage">이용 안내</a>에서 볼 수 있습니다.</p>
+          </section>
+        </div>
+      </article>
       <!-- site-footer -->
     </main>
     <script type="module" src="../src/shared/calculator-entry.js"></script>

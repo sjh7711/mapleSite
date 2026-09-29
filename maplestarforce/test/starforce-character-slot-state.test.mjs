@@ -57,11 +57,13 @@ test("강화 목록 슬롯을 바꾸면 장비 강조와 캐릭터 입력 상태
   );
 });
 
-test("상단에는 1·2·3, 캐릭터 조회, 기본값과 목록 리셋만 순서대로 둔다", () => {
+test("오른쪽 상단은 슬롯·캐릭터 조회·목록 리셋, 왼쪽은 기본값·스페어값 리셋을 둔다", () => {
   assert.match(
     markup,
-    /<div id="slots"[\s\S]*<form id="starforce-character"[\s\S]*<div id="bulk"[\s\S]*id="clear-items"/u,
+    /<div id="slots"[\s\S]*<form id="starforce-character"[\s\S]*id="clear-items"/u,
   );
+  assert.match(markup, /class="picker__actions"[\s\S]*id="bulk"[\s\S]*id="reset-prices"[\s\S]*id="picker"/u);
+  assert.doesNotMatch(markup, /id="prices-lock"/u);
   assert.doesNotMatch(markup, />\s*강화 목록\s*</u);
   assert.match(
     markup,
@@ -114,10 +116,10 @@ test("캐릭터 조회 중에는 상단 폭을 바꾸지 않고 필요한 영역
   );
 });
 
-test("좁은 강화 목록은 리셋을 첫 줄에 유지하고 닉네임과 기본값을 아래에 배치한다", () => {
+test("좁은 강화 목록은 리셋을 첫 줄에 유지하고 닉네임을 아래에 배치한다", () => {
   assert.match(
     styles,
-    /@container starforce-enhance \(max-width: 420px\) \{[\s\S]*?grid-template-areas:\s*"slots reset"\s*"character character"\s*"bulk bulk";/u,
+    /@container starforce-enhance \(max-width: 420px\) \{[\s\S]*?grid-template-areas:\s*"slots reset"\s*"character character";/u,
   );
   assert.match(
     styles,
@@ -129,7 +131,7 @@ test("좁은 강화 목록은 리셋을 첫 줄에 유지하고 닉네임과 기
   );
   assert.match(
     styles,
-    /@media \(max-width: 380px\) \{[\s\S]*?\.enhance-toolbar #bulk \{[\s\S]*?gap: 4px;[\s\S]*?padding-right: 6px;[\s\S]*?padding-left: 6px;/u,
+    /@media \(max-width: 380px\) \{[\s\S]*?\.picker__actions #bulk \{[\s\S]*?gap: 4px;[\s\S]*?padding-right: 6px;[\s\S]*?padding-left: 6px;/u,
   );
 });
 
@@ -199,27 +201,24 @@ test("닉네임 입력은 6글자와 내부 초기화 버튼을 담고 캐릭터
   );
   assert.match(
     styles,
-    /\.enhance-toolbar \.bulk \.dropdown__button \{[\s\S]*?height: 42px;[\s\S]*?white-space: nowrap;/u,
+    /\.picker__actions \.bulk \.dropdown__button \{[\s\S]*?height: 42px;[\s\S]*?white-space: nowrap;/u,
   );
   assert.match(
     styles,
-    /\.enhance-toolbar \.bulk \.dropdown__button \{[\s\S]*?display: flex;[\s\S]*?justify-content: space-between;/u,
+    /\.picker__actions \.bulk \.dropdown__button \{[\s\S]*?display: flex;[\s\S]*?justify-content: space-between;/u,
+  );
+  assert.match(styles, /grid-template-areas: "lookup reset";/u);
+  assert.match(
+    styles,
+    /\.picker__actions \.bulk \.field--inline \+ \.field--inline \{[\s\S]*?margin-left: 4px;/u,
   );
   assert.match(
     styles,
-    /@container starforce-enhance \(max-width: 680px\) \{[\s\S]*?grid-template-areas:\s*"lookup reset"\s*"bulk bulk";/u,
+    /\.picker__actions \.bulk__label \{[\s\S]*?font-size: 15px;/u,
   );
   assert.match(
     styles,
-    /\.enhance-toolbar \.bulk \.field--inline \+ \.field--inline \{[\s\S]*?margin-left: 4px;/u,
-  );
-  assert.match(
-    styles,
-    /\.enhance-toolbar \.bulk__label \{[\s\S]*?font-size: 15px;/u,
-  );
-  assert.match(
-    styles,
-    /\.enhance-toolbar \.bulk \.field--inline \{[\s\S]*?font-size: 15px;/u,
+    /\.picker__actions \.bulk \.field--inline \{[\s\S]*?font-size: 15px;/u,
   );
   assert.match(
     styles,

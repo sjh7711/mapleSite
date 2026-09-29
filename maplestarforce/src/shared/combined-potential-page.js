@@ -458,7 +458,9 @@ export function mountCombinedPotentialSystem({ onSystemChange }) {
         return fallback;
       }
     });
-    return summarizePotentialTargetEquivalents(equivalents);
+    return summarizePotentialTargetEquivalents(
+      equivalents, profile.character?.name,
+    );
   }
 
   function manualCharacterSettings() {

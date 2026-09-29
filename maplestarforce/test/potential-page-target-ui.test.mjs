@@ -339,19 +339,19 @@ test("화면 라벨은 고정 표현 없이 % 유무로 수치 옵션을 구분�
   );
 });
 
-test("세트 환산은 가능한 조건만 합산하고 제외한 목표 이름을 표시한다", () => {
+test("세트 환산은 캐릭터 이름과 환산 가능한 합계 및 제외한 목표를 표시한다", () => {
   assert.equal(
     summarizePotentialTargetEquivalents([
       { label: "INT 8%", mainStatPercent: 8, attackPercent: 1.5 },
       { label: "크리티컬 확률 10%", mainStatPercent: null, attackPercent: null },
-    ]),
-    "조건 기준 환산 · 주스탯 8%급 · 공/마 1.5%급 · 환산 제외: 크리티컬 확률 10%",
+    ], "말랑신쫑"),
+    "말랑신쫑 기준 환산 · 주스탯 8%급 · 공/마 1.5%급 · 환산 제외: 크리티컬 확률 10%",
   );
   assert.equal(
     summarizePotentialTargetEquivalents([
       { label: "방어력 12%", mainStatPercent: null, attackPercent: null },
-    ]),
-    "조건 기준 환산 · 환산 가능한 조건 없음 · 환산 제외: 방어력 12%",
+    ], "말랑신쫑"),
+    "말랑신쫑 기준 환산 · 환산 가능한 조건 없음 · 환산 제외: 방어력 12%",
   );
 });
 

@@ -15,6 +15,7 @@
     <link rel="icon" type="image/webp" href="../tool-icons/soul.webp" />
     <link rel="stylesheet" href="../src/style.css" />
     <link rel="stylesheet" href="../src/calculator.css" />
+    <link rel="stylesheet" href="../src/calculator-guide.css" />
   </head>
   <body class="page--calculator page--soul">
     <main data-calculator="soul" class="page" google-side-rail-overlap="false">
@@ -26,6 +27,32 @@
       <div class="calculator-shell">
         <div id="tool" class="layout__main"></div>
       </div>
+      <article class="calculator-guide" aria-labelledby="soul-guide-title" hidden>
+        <header class="calculator-guide__header">
+          <h2 id="soul-guide-title">소울 계산기 이용 안내</h2>
+          <p>소울 증폭, 소울 잠재능력 등급 상승과 목표 옵션 재설정을 각각 현재 진행 상태부터 계산할 수 있습니다.</p>
+        </header>
+        <div class="calculator-guide__grid">
+          <section>
+            <h3>계산 종류별 입력</h3>
+            <ol>
+              <li>소울 증폭은 현재·목표 단계, 현재 단계의 실패 횟수와 단계별 에테르 가격을 입력합니다.</li>
+              <li>등급 상승은 현재·목표 등급, 누적 재설정 횟수와 미라클 타임 적용 여부를 실제 상태에 맞춥니다.</li>
+              <li>잠재능력 옵션 계산은 현재 등급과 증폭 단계, 원하는 옵션과 최소 수치를 선택합니다.</li>
+            </ol>
+          </section>
+          <section>
+            <h3>진행 결과 해석</h3>
+            <p>평균 시도·재설정과 평균 총비용은 현재 진행도를 반영한 장기 평균입니다. 단계별 성공 확률, 에테르 구매 비용과 재설정 비용을 함께 보면 어느 구간의 부담이 큰지 확인할 수 있습니다.</p>
+            <p>성공 보장까지의 최대 횟수가 표시되는 계산과 확률별 도달 횟수는 의미가 다릅니다. 옵션 계산에서 근사값이라고 안내하는 항목은 화면의 설명 범위 안에서 활용해 주세요.</p>
+          </section>
+          <section>
+            <h3>규칙과 가격 기준</h3>
+            <p>계산 결과는 사이트에 반영된 소울 규칙과 공식 옵션 분포를 기준으로 하며, 이후 업데이트와 동시에 갱신되지 않을 수 있습니다. 에테르 등 거래 가격은 직접 확인한 값으로 바꿔야 합니다.</p>
+            <p>반영한 업데이트와 소울 잠재능력 확률표는 <a href="/sources/">데이터·확률 출처</a>에서 확인할 수 있습니다. 기댓값의 공통 한계는 <a href="/about/#usage">이용 안내</a>를 참고해 주세요.</p>
+          </section>
+        </div>
+      </article>
       <!-- site-footer -->
     </main>
     <script type="module" src="../src/shared/calculator-entry.js"></script>

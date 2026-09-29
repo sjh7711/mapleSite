@@ -1424,7 +1424,7 @@ test("특수 스킬 반지 한 칸은 대각선으로 나뉜 두 독립 버튼�
   );
   assert.match(
     styles,
-    /profile-equipment__special-ring-pair::after[\s\S]*linear-gradient\([\s\S]*to bottom right/u,
+    /profile-equipment__special-ring-pair::after[^}]*clip-path: polygon\(/u,
   );
 });
 

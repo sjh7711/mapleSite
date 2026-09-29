@@ -3,9 +3,25 @@
     <a href="/about/">소개·문의</a>
     <a href="/privacy/">개인정보처리방침</a>
     <a href="/sources/">데이터·확률 출처</a>
-    <a href="/about/#usage">이용 안내</a>
+    <span class="site-footer__link-group">
+      <a href="/about/#usage">이용 안내</a>
+      <button
+        id="google-consent-settings"
+        class="site-footer__privacy-button"
+        type="button"
+        aria-describedby="google-consent-status google-consent-fallback"
+      >Google 광고 개인정보 설정</button>
+    </span>
   </nav>
+  <div class="site-footer__privacy">
+    <span id="google-consent-status" class="site-footer__privacy-feedback" role="status" aria-live="polite"></span>
+    <span id="google-consent-fallback" class="site-footer__privacy-feedback" hidden>
+      현재 이 방문에서는 Google 동의 설정을 불러오지 못했습니다.
+      <a href="/">광고 코드가 있는 계산기 페이지에서 다시 시도</a>하거나
+      <a href="https://myadcenter.google.com/">Google 내 광고 센터</a>를 확인해 주세요.
+    </span>
+  </div>
+  <p>Maple Starforce · 메이플스토리 비공식 계산기 · <a href="https://openapi.nexon.com/ko/">Data based on NEXON Open API</a></p>
   <p class="site-footer__contact">문의 <a id="contact-mail" href="mailto:apfhd159862@naver.com">apfhd159862@naver.com</a><!-- contact-copy --></p>
-  <p>Maple Starforce · 메이플스토리 비공식 계산기</p>
-  <p>캐릭터 정보: <a href="https://openapi.nexon.com/ko/">Data based on NEXON Open API</a></p>
+  <script type="module" src="/src/shared/privacy-controls.js"></script>
 </footer>

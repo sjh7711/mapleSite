@@ -1,5 +1,7 @@
 /* 다크 테마의 회색 글씨도 본문과 보조 정보의 구분을 유지하며 밝게 한다. */
 :root {
+  --summary-border: rgba(255, 255, 255, 0.24);
+  --summary-bg: #282d36;
   --text-strong: #f4f6fa;
   --text-secondary: #c5cede;
   --text-disabled: #a1adbf;
@@ -9,6 +11,8 @@
 }
 
 :root[data-theme="light"] {
+  --summary-border: rgba(0, 0, 0, 0.25);
+  --summary-bg: #edf0f5;
   color-scheme: light;
   --bg: #f4f5f8;
   --card: #ffffff;
@@ -54,6 +58,21 @@
 :root[data-theme] .page .search-select[data-disabled="true"] .search-select__input {
   background-color: var(--surface-disabled);
   border-color: var(--border-disabled);
+}
+
+/* 자동 강화 전략은 조작을 잠가도 선택 결과의 강조를 유지한다. */
+:root[data-theme] .page .item__strategy .chip[data-kind]:disabled {
+  background-color: var(--surface-input, #14161d);
+  border-color: var(--line);
+  color: var(--muted);
+  opacity: 0.35;
+}
+
+:root[data-theme] .page .item__strategy .chip[data-kind]:disabled[aria-pressed="true"] {
+  background-color: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+  opacity: 1;
 }
 
 /* 비활성 표시는 배경과 글자색으로 구분하고, 부모·자식의 투명도를 겹치지 않는다. */

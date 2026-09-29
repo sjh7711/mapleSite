@@ -12,6 +12,7 @@
     <link rel="icon" type="image/png" href="../tool-icons/black-cube.png" />
     <link rel="stylesheet" href="../src/style.css" />
     <link rel="stylesheet" href="../src/calculator.css" />
+    <link rel="stylesheet" href="../src/calculator-guide.css" />
   </head>
   <body class="page--calculator">
     <main data-calculator="potential" class="page" google-side-rail-overlap="false">
@@ -23,6 +24,32 @@
       <div class="calculator-shell">
         <div id="tool" class="layout__main"></div>
       </div>
+      <article class="calculator-guide" aria-labelledby="potential-guide-title" hidden>
+        <header class="calculator-guide__header">
+          <h2 id="potential-guide-title">잠재능력 계산기 이용 안내</h2>
+          <p>윗잠·아랫잠의 장비 조건과 목표 옵션 조합을 정해 재설정 한 번의 성공 확률과 필요한 평균 자원을 비교할 수 있습니다.</p>
+        </header>
+        <div class="calculator-guide__grid">
+          <section>
+            <h3>목표 설정 방법</h3>
+            <ol>
+              <li>잠재능력 종류, 장비 부위·레벨, 현재 등급과 재설정 방식을 선택합니다.</li>
+              <li>원하는 옵션과 최소 수치를 목표 세트에 넣습니다. 목표 세트가 여러 개라면 계산 결과에 표시되는 성공 판정 조건을 함께 확인합니다.</li>
+              <li>캐릭터를 불러와 개인 환산값을 쓰거나, 캐릭터 정보 없이 제공되는 입력값으로 비교할 수 있습니다.</li>
+            </ol>
+          </section>
+          <section>
+            <h3>확률과 비용 해석</h3>
+            <p>1회 성공 확률은 현재 설정으로 한 번 재설정했을 때 목표가 나올 확률입니다. 평균 재설정 횟수와 평균 비용은 같은 조건을 오래 반복했을 때의 중심값이며 성공을 보장하는 횟수가 아닙니다.</p>
+            <p>목표 도달 확률을 선택해 보는 값은 평균과 목적이 다릅니다. 첫 줄 상태 등에 따라 범위로 표시되면 화면의 설명과 성공 조건을 함께 읽어 주세요.</p>
+          </section>
+          <section>
+            <h3>적용 범위와 자료</h3>
+            <p>계산기는 장비 조건에 맞는 옵션 분포와 선택한 재설정 방식을 반영합니다. 캐릭터 능력치 환산은 비교를 돕기 위한 사이트 계산 결과이며, 큐브 자체 가격 등 결과에서 제외됐다고 안내하는 비용은 별도로 고려해야 합니다.</p>
+            <p>사용한 확률표는 <a href="/sources/">데이터·확률 출처</a>에서 확인하고, 패치 차이와 기댓값 주의사항은 <a href="/about/#usage">이용 안내</a>를 참고해 주세요.</p>
+          </section>
+        </div>
+      </article>
       <!-- site-footer -->
     </main>
     <script type="module" src="../src/shared/calculator-entry.js"></script>

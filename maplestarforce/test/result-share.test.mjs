@@ -33,21 +33,32 @@ test("shared writes and removals leave native local/session storage byte-for-byt
     storage.setItem(key(suffix), '{"edited":true}');
     storage.removeItem("private");
     storage.setItem("new-shared-key", "value");
+    assert.equal(storage.enablePersistence(), false);
     assert.deepEqual([...persistent.values], before);
   }
 });
 
-test("ordinary visits persist changes; blocked storage still supports sharing", () => {
-  const persistent = native();
+test("ordinary visits defer writes until calculator interaction; blocked storage keeps an in-memory fallback", () => {
+  const persistent = native({ removed: "keep-until-interaction" });
   const storage = createCalculatorStorage(() => persistent);
   storage.setItem("key", "1");
+  storage.removeItem("removed");
+  assert.equal(persistent.getItem("key"), null);
+  assert.equal(persistent.getItem("removed"), "keep-until-interaction");
+  assert.equal(storage.getItem("key"), "1");
+  assert.equal(storage.getItem("removed"), null);
+  assert.equal(storage.enablePersistence(), true);
   assert.equal(persistent.getItem("key"), "1");
+  assert.equal(persistent.getItem("removed"), null);
   persistent.setItem("key", "2");
   assert.equal(storage.getItem("key"), "2");
+  storage.setItem("key", "3");
+  assert.equal(persistent.getItem("key"), "3");
   storage.removeItem("key");
   assert.equal(persistent.getItem("key"), null);
   const blocked = createCalculatorStorage(() => { throw new Error("blocked"); });
   blocked.setItem("key", "3");
+  blocked.enablePersistence();
   assert.equal(blocked.getItem("key"), "3");
 });
 

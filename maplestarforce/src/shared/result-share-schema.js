@@ -3,7 +3,7 @@
 // Unknown fields are retained in a final map, so nothing is silently discarded.
 const fields = (text) => Object.freeze(text.split(/\s+/).filter(Boolean));
 const SCHEMAS = Object.freeze({
-  // wheel 필드는 기존 공유 링크의 위치를 보존하기 위한 예약 자리다.
+  // wheel·pricesLocked 필드는 기존 공유 링크의 위치를 보존하기 위한 예약 자리다.
   starforce: fields(`event mvp pc multiplier customMultipliers priceOverrides wheelEnabled wheelDefaultRevision pricesLocked foldedOpen bulk`),
   bulk: fields(`startStar targetStar`),
   items: fields(`slots slot`),

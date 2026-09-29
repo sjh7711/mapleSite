@@ -308,7 +308,8 @@ input:focus {
 }
 
 .card--total {
-  background: linear-gradient(180deg, var(--surface-hover, #1f2330), var(--card));
+  background: var(--summary-bg);
+  border: 2px solid var(--summary-border);
 }
 
 .total {
@@ -449,6 +450,7 @@ details[open] > summary {
 
 /* 화면보다 길면 이 안에서만 스크롤한다. 짧으면 스크롤바가 나오지 않는다. */
 .card--picker {
+  padding-top: 10px;
   min-height: 0;
   overflow-y: auto;
   scrollbar-width: thin;
@@ -734,7 +736,9 @@ details[open] > summary {
 .chip[data-kind="toggle"][aria-pressed="true"]::before {
   border-color: var(--accent);
   background: var(--accent);
-  box-shadow: inset 0 0 0 2px #14161d;
+  padding: 2px;
+  background-clip: content-box;
+  box-sizing: border-box;
 }
 
 .chip:disabled {
@@ -868,7 +872,6 @@ details[open] > summary {
   border: 1px solid var(--accent);
   border-radius: 8px;
   padding: 4px;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
 }
 
 .dropdown__option {
@@ -987,7 +990,6 @@ details[open] > summary {
   border: 1px solid var(--line);
   border-radius: 9px;
   background: var(--surface-soft, #171a22);
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35);
 }
 
 .search-select__options[hidden] {
@@ -1339,7 +1341,6 @@ details[open] > summary {
 .picker__pick[data-character-match="true"],
 .picker__row[data-character-match="true"] .picker__pick {
   border-color: var(--accent);
-  box-shadow: inset 0 0 0 1px var(--accent-soft);
 }
 
 
@@ -1471,7 +1472,6 @@ td:not(.empty):nth-last-child(-n + 2) {
     background: var(--surface-soft, #171a21);
     border: 1px solid var(--line);
     border-radius: 10px;
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
     color: var(--muted);
     font: inherit;
     font-size: 0.875rem;
@@ -1501,7 +1501,6 @@ td:not(.empty):nth-last-child(-n + 2) {
     border-radius: 10px;
     background: var(--card);
     color: var(--text);
-    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
     font: inherit;
     cursor: pointer;
   }
@@ -1623,7 +1622,7 @@ td:not(.empty):nth-last-child(-n + 2) {
     top: 0;
     z-index: 2;
     width: calc(100% + 24px);
-    margin: 0 -12px 12px;
+    margin: 0 -12px 6px;
     padding: 13px;
     background: var(--bg);
     color: var(--muted);
@@ -1885,23 +1884,51 @@ input,
   }
 }
 
-/* 스페어값 관리 버튼은 첫 장비 분류 제목 위에 한 줄로 둔다. */
+/* 기본 강화 구간과 초기화 버튼을 장비 목록 오른쪽 위에 나란히 둔다. */
 .picker__actions {
   display: flex;
-  align-items: stretch;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 8px;
-  margin: 0 0 12px;
+  margin: 0 0 6px;
+}
+
+.picker__level--controls {
+  margin-bottom: 0;
+}
+
+.picker__level--controls > span {
+  flex: none;
+}
+
+.picker__level--controls .picker__actions {
+  min-width: 0;
+  margin: 0;
+  font-weight: 400;
+  letter-spacing: normal;
+}
+
+/* 좁은 장비 목록에서는 기본값 설정 아래에 레벨 제목을 둔다. */
+@media (max-width: 1080px) {
+  .picker__level--controls {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 6px;
+  }
 }
 
 .picker__actions .button--quiet {
   margin-top: 0;
 }
 
-/* 두 버튼을 같은 크기로 나눠 갖는다. */
-.picker__actions > .button,
-.picker__actions > .chip {
-  flex: 1 1 0;
-  min-width: 0;
+.picker__actions #reset-prices {
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 34px;
+  padding: 6px 10px;
+  font-size: 0.8125rem;
+  white-space: nowrap;
 }
 
 /* 왼쪽 열이 좁으니 설정 세 항목은 세로로 쌓는다. */
@@ -2061,7 +2088,23 @@ input,
   z-index: 10;
   container-type: inline-size;
   margin-bottom: 14px;
-  box-shadow: 0 5px 16px rgba(0, 0, 0, 0.18);
+}
+
+/* 박스 위 12px 틈으로 지나가는 내용만 살짝 흐리게 한다.
+   절대 위치의 기준은 테두리 안쪽이므로 2px 테두리만큼 더 올린다. */
+@media (min-width: 761px) {
+  .card--enhance > .card--total::before {
+    content: "";
+    position: absolute;
+    top: -14px;
+    left: -2px;
+    right: -2px;
+    height: 12px;
+    background: color-mix(in srgb, var(--bg) 20%, transparent);
+    -webkit-backdrop-filter: blur(3px);
+    backdrop-filter: blur(3px);
+    pointer-events: none;
+  }
 }
 
 .card--enhance > .card--total .total {
@@ -2193,7 +2236,6 @@ input,
   border-radius: 12px;
   background: var(--card);
   color: var(--text);
-  box-shadow: 0 12px 36px #0006;
 }
 
 .equipment-group-dialog::backdrop {
@@ -2348,16 +2390,6 @@ input,
 .card__head .button--quiet:hover,
 .picker__actions .button--quiet:hover {
   background: var(--surface-hover, #2b3241);
-}
-
-/* %급 버튼과 같은 토글 칩을 사용한다. 상태 표시는 공통 ::before를 따른다. */
-.picker__actions .picker__lock {
-  justify-content: center;
-  min-height: 34px;
-  padding: 5px 8px;
-  border-radius: 8px;
-  font-size: 0.875rem;
-  white-space: nowrap;
 }
 
 /* 삭제·초기화는 평소에는 중립색, 가리켰을 때만 위험색으로 표시한다. */
@@ -2554,9 +2586,11 @@ input,
   }
 
   .dropdown__list[data-columns="6"] .dropdown__option {
-    padding: 9px 4px;
+    min-width: 0;
+    padding: 9px 2px;
     text-align: center;
     font-size: 1.0625rem;
+    white-space: nowrap;
     /* 칸이 촘촘해 글자만으로는 경계가 흐리다. 옅은 테두리로 칸을 나눈다. */
     border: 1px solid var(--line);
   }
@@ -2607,7 +2641,6 @@ input,
   overscroll-behavior: contain;
   background: var(--bg);
   border-right: 1px solid var(--line);
-  box-shadow: 14px 0 32px rgba(0, 0, 0, 0.35);
   visibility: hidden;
   transform: translateX(-105%);
   transition:
@@ -2654,14 +2687,12 @@ input,
   height: 30px;
   object-fit: contain;
   image-rendering: pixelated;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.42));
 }
 
 .toolnav__icon--starforce {
   fill: #ffd928;
   stroke: #eeb400;
   stroke-width: 1.15;
-  filter: drop-shadow(0 0 3px rgba(255, 210, 0, 0.38));
 }
 
 .toolnav__label {
@@ -2806,7 +2837,6 @@ body[data-toolnav-drawer="open"] .toolnav-backdrop {
     background: var(--surface-overlay, rgba(27, 30, 38, 0.96));
     border: 1px solid var(--line);
     border-radius: 12px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
     visibility: visible;
     transform: none;
   }
@@ -2826,7 +2856,6 @@ body[data-toolnav-drawer="open"] .toolnav-backdrop {
     border: 1px solid var(--line);
     border-radius: 7px;
     background: var(--surface-soft, #171a21);
-    box-shadow: 0 7px 18px rgba(0, 0, 0, 0.38);
     color: var(--text);
     font-size: 0.8125rem;
     opacity: 0;
@@ -2882,7 +2911,6 @@ body[data-toolnav-drawer="open"] .toolnav-backdrop {
     padding: 0;
     border: 0;
     background: none;
-    box-shadow: none;
     color: inherit;
     font-size: inherit;
     opacity: 1;
@@ -3041,8 +3069,8 @@ body[data-toolnav-drawer="open"] .toolnav-backdrop {
 
 .enhance-toolbar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
-  grid-template-areas: "lookup bulk reset";
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "lookup reset";
   align-items: center;
   gap: 10px 12px;
   margin-bottom: 14px;
@@ -3155,9 +3183,8 @@ body[data-toolnav-drawer="open"] .toolnav-backdrop {
   max-width: 72px;
 }
 
-.enhance-toolbar #bulk {
-  grid-area: bulk;
-  flex: none;
+.picker__actions #bulk {
+  flex: 0 1 auto;
   width: auto;
   max-width: 100%;
   min-height: 52px;
@@ -3166,26 +3193,27 @@ body[data-toolnav-drawer="open"] .toolnav-backdrop {
   flex-wrap: wrap;
 }
 
-.enhance-toolbar .bulk__label {
+.picker__actions .bulk__label {
+  flex-basis: auto;
   font-size: 15px;
 }
 
-.enhance-toolbar .bulk .field--inline {
+.picker__actions .bulk .field--inline {
   flex: none;
   gap: 4px;
   font-size: 15px;
 }
 
-.enhance-toolbar .bulk .field--inline + .field--inline {
+.picker__actions .bulk .field--inline + .field--inline {
   margin-left: 4px;
 }
 
-.enhance-toolbar .bulk .dropdown {
+.picker__actions .bulk .dropdown {
   flex: none;
   width: 72px;
 }
 
-.enhance-toolbar .bulk .dropdown__button {
+.picker__actions .bulk .dropdown__button {
   position: relative;
   display: flex;
   align-items: center;
@@ -3197,9 +3225,42 @@ body[data-toolnav-drawer="open"] .toolnav-backdrop {
   white-space: nowrap;
 }
 
-.enhance-toolbar .bulk .dropdown__button::after {
+.picker__actions .bulk .dropdown__button::after {
   flex: none;
   float: none;
+}
+
+@media (max-width: 760px) {
+  .picker__actions #bulk {
+    flex-basis: 100%;
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+/* 왼쪽으로 옮긴 기본값 목록은 상자 왼쪽부터 펼쳐 화면 밖으로 벗어나지 않게 한다. */
+@media (min-width: 761px) {
+  .picker__actions {
+    flex-wrap: nowrap;
+  }
+
+  .picker__actions #bulk {
+    min-width: 0;
+    flex-wrap: nowrap;
+  }
+
+  .picker__actions .bulk {
+    position: relative;
+  }
+
+  .picker__actions .bulk .dropdown {
+    position: static;
+  }
+
+  .picker__actions .bulk .dropdown__list[data-columns="6"]:not([hidden]) {
+    left: 0;
+    right: auto;
+  }
 }
 
 .enhance-toolbar #clear-items {
@@ -3221,10 +3282,9 @@ body[data-toolnav-drawer="open"] .toolnav-backdrop {
   width: min(100%, 356px);
   margin: 2px auto 18px;
   padding: 10px 12px 12px;
-  background: linear-gradient(180deg, var(--surface-soft, #171b24) 0%, var(--surface-input, #13161d) 100%);
+  background: var(--surface-soft, #171b24);
   border: 1px solid var(--line);
   border-radius: 12px;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
 }
 
 .character-equipment__caption {
@@ -3264,7 +3324,7 @@ body[data-toolnav-drawer="open"] .toolnav-backdrop {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: radial-gradient(circle at 50% 62%, var(--surface-hover, #252c39) 0%, var(--surface-soft, #171b24) 70%);
+  background: var(--surface-soft, #171b24);
   border: 1px solid var(--border-soft, rgba(255, 255, 255, 0.06));
   border-radius: 8px;
 }
@@ -3349,27 +3409,13 @@ button.character-equipment__slot:focus-visible {
   line-height: 1.2;
 }
 
-/* 기본값만 다음 행으로 보내고 목록 리셋은 첫 행 오른쪽에 유지한다. */
-@container starforce-enhance (max-width: 680px) {
-  .enhance-toolbar {
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas:
-      "lookup reset"
-      "bulk bulk";
-  }
-
-  .enhance-toolbar #bulk {
-    justify-self: end;
-  }
-}
-
+/* 좁은 강화 목록에서는 캐릭터 조회를 슬롯 아래에 배치한다. */
 @container starforce-enhance (max-width: 420px) {
   .enhance-toolbar {
     grid-template-columns: auto minmax(0, 1fr);
     grid-template-areas:
       "slots reset"
-      "character character"
-      "bulk bulk";
+      "character character";
     gap: 8px 4px;
   }
 
@@ -3394,16 +3440,6 @@ button.character-equipment__slot:focus-visible {
     flex: 1 1 auto;
     width: auto;
     max-width: none;
-  }
-
-  .enhance-toolbar .bulk {
-    grid-area: bulk;
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .enhance-toolbar .bulk__label {
-    flex-basis: auto;
   }
 
   .enhance-toolbar #clear-items {
@@ -3448,6 +3484,30 @@ button.character-equipment__slot:focus-visible {
     grid-template-columns: 1fr;
   }
 
+  /* PC의 좁은 장비 목록에서도 기본값과 초기화를 한 줄에 유지한다. */
+  .picker__actions {
+    gap: 6px;
+  }
+
+  .picker__actions #bulk {
+    gap: 4px;
+    padding-right: 6px;
+    padding-left: 6px;
+  }
+
+  .picker__actions .bulk .field--inline + .field--inline {
+    margin-left: 0;
+  }
+
+  .picker__actions .bulk .dropdown {
+    width: 64px;
+  }
+
+  .picker__actions .bulk .dropdown__button {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
   .enhance-toolbar__left,
   .enhance-toolbar__right {
     flex-wrap: wrap;
@@ -3462,18 +3522,18 @@ button.character-equipment__slot:focus-visible {
     padding-left: 8px;
   }
 
-  .enhance-toolbar #bulk {
+  .picker__actions #bulk {
     gap: 4px;
     padding-right: 6px;
     padding-left: 6px;
   }
 
-  .enhance-toolbar .bulk .field--inline + .field--inline {
+  .picker__actions .bulk .field--inline + .field--inline {
     margin-left: 0;
   }
 
-  .enhance-toolbar .bulk .dropdown {
-    width: 68px;
+  .picker__actions .bulk .dropdown {
+    width: 64px;
   }
 
   .character-equipment {
@@ -3513,8 +3573,37 @@ button.character-equipment__slot:focus-visible {
   min-height: 40px;
   color: var(--text);
 }
+.site-footer__link-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 20px;
+  max-width: 100%;
+}
+.site-footer__privacy-button {
+  min-height: 40px;
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+.site-footer__privacy-button:hover { color: var(--accent); }
+.site-footer__privacy-button:disabled {
+  color: var(--muted);
+  cursor: wait;
+}
+.site-footer__privacy-feedback {
+  display: block;
+}
+.site-footer__privacy-feedback:not(:empty) { margin: 2px 0 8px; }
+.site-footer__privacy-feedback[hidden] { display: none; }
 .site-footer a:hover { color: var(--accent); }
 .site-footer a:focus-visible,
+.site-footer__privacy-button:focus-visible,
 .info-content a:focus-visible,
 .info-nav a:focus-visible,
 .info-home:focus-visible {

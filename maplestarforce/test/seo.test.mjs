@@ -40,24 +40,34 @@ test("모든 페이지가 기능을 구분하는 파비콘을 선언한다", asy
   }
 });
 
-test("사이트맵은 공개 계산기와 안내 페이지를 중복 없이 포함한다", async () => {
-  const sitemap = await read("../public/sitemap.xml");
+test("XML과 텍스트 사이트맵은 같은 공개 URL을 중복 없이 포함한다", async () => {
+  const [sitemap, textSitemap] = await Promise.all([
+    read("../public/sitemap.xml"),
+    read("../public/sitemap.txt"),
+  ]);
   const locations = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/gu)].map(
     (match) => match[1],
   );
+  const textLocations = textSitemap.trimEnd().split(/\r?\n/u);
 
   assert.deepEqual(locations, PUBLIC_URLS);
+  assert.deepEqual(textLocations, PUBLIC_URLS);
+  assert.equal(textSitemap, PUBLIC_URLS.join("\n") + "\n");
   assert.equal(new Set(locations).size, locations.length);
+  assert.equal(new Set(textLocations).size, textLocations.length);
   assert.doesNotMatch(sitemap, /item-market/u);
   assert.doesNotMatch(sitemap, /sitemap-submit/u);
+  assert.doesNotMatch(sitemap, /<lastmod>/u);
+  assert.doesNotMatch(sitemap, /<changefreq>/u);
 });
 
 test("robots와 운영 기능 플래그가 사이트맵 공개 범위를 지킨다", async () => {
-  const [robots, productionEnv, headers, redirects] = await Promise.all([
+  const [robots, productionEnv, headers, redirects, vite] = await Promise.all([
     read("../public/robots.txt"),
     read("../.env.production"),
     read("../public/_headers"),
     read("../public/_redirects"),
+    read("../vite.config.js"),
   ]);
 
   assert.match(robots, /User-agent:\s*\*/u);
@@ -66,15 +76,34 @@ test("robots와 운영 기능 플래그가 사이트맵 공개 범위를 지킨�
     robots,
     /Sitemap:\s*https:\/\/starforce\.pages\.dev\/sitemap\.xml/u,
   );
+  assert.match(
+    robots,
+    /Sitemap:\s*https:\/\/starforce\.pages\.dev\/sitemap\.txt/u,
+  );
   assert.match(productionEnv, /VITE_ITEM_MARKET_ENABLED=false/u);
   assert.match(
     headers,
     /\/sitemap\.xml\s+Content-Type:\s*application\/xml/u,
   );
   assert.match(
-    redirects,
-    /\/sitemap\.xml\/\s+\/sitemap\.xml\s+200/u,
+    headers,
+    /\/sitemap\.txt\s+Content-Type:\s*text\/plain; charset=utf-8/u,
   );
+  assert.doesNotMatch(headers, /\/sitemap\.xml\//u);
+  assert.doesNotMatch(headers, /\/sitemap-pages\.xml/u);
+  assert.match(
+    redirects,
+    /^\/sitemap\.xml\/\s+\/sitemap\.xml\s+301$/mu,
+  );
+  assert.doesNotMatch(
+    redirects,
+    /^\/sitemap\.xml\/\s+\/sitemap\.xml\s+200$/mu,
+  );
+  assert.match(
+    redirects,
+    /^\/sitemap-pages\.xml\s+\/sitemap\.xml\s+301$/mu,
+  );
+  assert.doesNotMatch(vite, /sitemap-pages\.xml/u);
   assert.match(
     redirects,
     /\/additional\/\s+\/potential\/\?system=additional\s+301/u,

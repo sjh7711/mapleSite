@@ -22,36 +22,67 @@ const isRecord = (value) => value !== null && typeof value === "object" && !Arra
 
 export function createCalculatorStorage(nativeStorage) {
   let isolated = false;
+  let persistenceEnabled = false;
   const memory = new Map();
+  const removed = new Set();
+  const flush = () => {
+    if (isolated || !persistenceEnabled) return;
+    let storage;
+    try { storage = nativeStorage(); } catch { return; }
+    for (const key of [...removed]) {
+      try {
+        storage.removeItem(key);
+        removed.delete(key);
+      } catch { /* retry on the next calculator change */ }
+    }
+    for (const [key, value] of [...memory]) {
+      try {
+        storage.setItem(key, value);
+        memory.delete(key);
+      } catch { /* retain the in-memory fallback and retry later */ }
+    }
+  };
   return {
     isolate(values = {}) {
       isolated = true;
       memory.clear();
+      removed.clear();
       for (const [key, value] of Object.entries(values)) memory.set(key, JSON.stringify(value));
     },
+    enablePersistence() {
+      if (isolated || persistenceEnabled) return false;
+      persistenceEnabled = true;
+      flush();
+      return true;
+    },
     getItem(key) {
+      if (memory.has(key)) return memory.get(key);
+      if (isolated || removed.has(key)) return null;
       if (!isolated) {
         try { return nativeStorage().getItem(key); } catch { /* blocked storage */ }
       }
-      return memory.get(key) ?? null;
+      return null;
     },
     setItem(key, value) {
       memory.set(key, String(value));
-      if (!isolated) {
-        try { nativeStorage().setItem(key, String(value)); } catch { /* tab-only fallback */ }
-      }
+      removed.delete(key);
+      flush();
     },
     removeItem(key) {
       memory.delete(key);
-      if (!isolated) {
-        try { nativeStorage().removeItem(key); } catch { /* blocked storage */ }
-      }
+      removed.add(key);
+      flush();
     },
   };
 }
 
 export const calculatorStorage = createCalculatorStorage(() => globalThis.localStorage);
 export const calculatorSessionStorage = createCalculatorStorage(() => globalThis.sessionStorage);
+export function enableCalculatorStoragePersistence() {
+  const local = calculatorStorage.enablePersistence();
+  const session = calculatorSessionStorage.enablePersistence();
+  return local || session;
+}
 let shared = false;
 let sharedView = {};
 let capture = () => ({});

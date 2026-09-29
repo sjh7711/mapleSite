@@ -52,11 +52,11 @@ const elements = {
   mvp: document.querySelector("#mvp"),
   pc: document.querySelector("#pc"),
   picker: document.querySelector("#picker"),
+  pickerActions: document.querySelector(".picker__actions"),
   items: document.querySelector("#items"),
   bulk: document.querySelector("#bulk"),
   slots: document.querySelector("#slots"),
   resetPrices: document.querySelector("#reset-prices"),
-  pricesLock: document.querySelector("#prices-lock"),
   clearItems: document.querySelector("#clear-items"),
   totalCost: document.querySelector("#total-cost"),
   totalScaled: document.querySelector("#total-scaled"),
@@ -179,8 +179,6 @@ const state = {
   multiplier: 1,
   customMultipliers: [],
   priceOverrides: {},
-  // 값을 다 맞춰 두면 목록 전체를 잠가 실수로 건드리지 않게 한다.
-  pricesLocked: false,
   // 다시 그려도 그 외 레벨 서랍이 접히지 않도록 상태를 들고 있는다.
   foldedOpen: false,
   // 장비를 담을 때 쓰는 기본 구간이자, 목록 전체를 한 번에 맞추는 값.
@@ -190,9 +188,10 @@ const state = {
   slot: 0,
   ...load(),
 };
-// 예전 설정과 공유 링크의 휠 허용 값은 더 이상 사용하거나 저장하지 않는다.
+// 예전 설정과 공유 링크의 휠 허용·가격 잠금 값은 더 이상 사용하거나 저장하지 않는다.
 delete state.wheelEnabled;
 delete state.wheelDefaultRevision;
+delete state.pricesLocked;
 
 // 코드 곳곳이 state.items 를 쓰고 있어 그 이름을 그대로 두고,
 // 지금 고른 자리를 가리키도록 연결한다.
@@ -353,14 +352,10 @@ function syncPriceInputs(presetId, value, sourceInput, scope = document) {
   }
 }
 
-/** 잠금 중에는 현재 강화목록만 수정하고 좌측에 저장한 가격은 보존한다. */
+/** 장비 목록과 현재 강화 목록의 같은 장비 가격을 함께 갱신한다. */
 function setSharedPrice(presetId, value, sourceInput) {
   const nextValue = Math.max(0, Number(value) || 0);
   updateMatchingEquipmentPrices(state.items, presetId, nextValue);
-  if (state.pricesLocked) {
-    syncPriceInputs(presetId, nextValue, sourceInput, elements.items);
-    return;
-  }
   // 예전 묶음 장비를 수정해도 새 부위별 가격은 함께 변하지 않게 한다.
   for (const part of equipmentGroupMembers(presetId)) {
     if (!Object.hasOwn(state.priceOverrides, part.id)) {
@@ -1000,21 +995,18 @@ function pickerRow(preset, { inOverlay = false } = {}) {
     if (addItem(preset.id) && inOverlay) equipmentGroupDialog?.close();
   });
 
-  // 상점 고정가이거나 목록을 잠가 둔 경우에는 같은 모양을 두되 고쳐지지만 않게 한다.
-  const locked = preset.npcSpare || state.pricesLocked;
+  // 상점 고정가 장비만 가격을 직접 수정할 수 없다.
   const input = numberInput(
     priceOf(preset.id),
     (value) => {
       setSharedPrice(preset.id, value, input);
       update();
     },
-    locked
+    preset.npcSpare
       ? {
           readOnly: true,
           className: "input--locked",
-          title: preset.npcSpare
-            ? "상점에서 정해진 값이라 바꿀 수 없습니다."
-            : "목록이 잠겨 있습니다. 스페어값 잠금 버튼으로 풀 수 있습니다.",
+          title: "상점에서 정해진 값이라 바꿀 수 없습니다.",
         }
       : { stepFor: spareStep },
   );
@@ -1066,15 +1058,20 @@ function orderPickerGroups(groups) {
   return [...groups].sort((left, right) => rank(left.level) - rank(right.level));
 }
 
-function pickerGroup(group) {
+function pickerGroup(group, index) {
   const box = document.createElement("div");
   box.className = "picker__group";
 
-  const heading = document.createElement("p");
+  const heading = document.createElement("div");
   heading.className = "picker__level";
   const levelName = document.createElement("span");
   levelName.textContent = `${group.level}제`;
   heading.append(levelName);
+  if (index === 0) {
+    // 첫 그룹 제목과 기본값 설정을 같은 줄에 두고, 기존 제어와 이벤트를 유지한다.
+    heading.classList.add("picker__level--controls");
+    heading.append(elements.pickerActions);
+  }
 
   const body = document.createElement("div");
   body.className = "picker__group-body";
@@ -1236,16 +1233,6 @@ function renderCharacterEquipment() {
   );
   elements.characterEquipment.replaceChildren(caption, grid);
   elements.characterEquipment.hidden = false;
-}
-
-/** 목록 전체를 잠그는 자물쇠. 첫 장비 분류 위 스페어값 리셋 옆에 둔다. */
-function renderLock() {
-  const on = state.pricesLocked === true;
-  elements.pricesLock.textContent = "스페어값 잠금";
-  elements.pricesLock.setAttribute("aria-pressed", String(on));
-  elements.pricesLock.title = on
-    ? "잠금 상태에서는 오른쪽 영역의 스페어값을 수정해도 왼쪽 장비 목록의 가격은 바뀌지 않습니다.\n클릭하면 잠금을 해제합니다."
-    : "왼쪽 장비 목록의 가격을 잠급니다.\n잠금 상태에서는 오른쪽 영역의 스페어값을 수정해도 왼쪽 장비 목록의 가격은 바뀌지 않습니다.";
 }
 
 function renderItems(
@@ -1856,12 +1843,6 @@ function renderPc() {
 // 예전에 저장된 값이 목록에서 빠졌을 수 있으니 되돌려 놓는다.
 if (!SELECTABLE_EVENTS.includes(state.event)) state.event = "shining";
 
-elements.pricesLock.addEventListener("click", () => {
-  state.pricesLocked = state.pricesLocked !== true;
-  renderLock();
-  renderPicker();
-  save();
-});
 elements.resetPrices.addEventListener("click", () => {
   state.priceOverrides = {};
   for (const item of state.items) {
@@ -1955,7 +1936,6 @@ elements.contactCopy.addEventListener("click", async () => {
 
 renderToolNav(document.querySelector("#toolnav"), "starforce");
 
-renderLock();
 renderEvents();
 renderMvp();
 renderPc();

@@ -647,7 +647,9 @@ function mountPotentialSystem({ system, onSystemChange }) {
         return fallback;
       }
     });
-    return summarizePotentialTargetEquivalents(equivalents);
+    return summarizePotentialTargetEquivalents(
+      equivalents, activeProfile.character?.name,
+    );
   }
 
   function equipmentCard() {

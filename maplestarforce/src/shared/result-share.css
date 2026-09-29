@@ -33,7 +33,6 @@
   background: var(--bg);
   color: var(--text);
   font-size: 0.875rem;
-  box-shadow: 0 4px 18px #0003;
 }
 .result-share-status:empty { display: none; }
 .result-share-banner {

@@ -105,7 +105,8 @@ export function isCompletePotentialTarget(target) {
 }
 
 /** 환산 가능한 조건만 합산하고, 제외한 조건은 이름을 숨기지 않는다. */
-export function summarizePotentialTargetEquivalents(items) {
+export function summarizePotentialTargetEquivalents(items, characterName) {
+  const basis = `${characterName || "내 캐릭터"} 기준 환산`;
   const values = Array.isArray(items) ? items : [];
   const converted = values.filter(({ mainStatPercent, attackPercent }) =>
     Number.isFinite(mainStatPercent) && Number.isFinite(attackPercent)
@@ -122,7 +123,7 @@ export function summarizePotentialTargetEquivalents(items) {
 
   if (converted.length === 0) {
     return values.length > 0
-      ? `조건 기준 환산 · 환산 가능한 조건 없음${excluded}`
+      ? `${basis} · 환산 가능한 조건 없음${excluded}`
       : "";
   }
 
@@ -137,7 +138,7 @@ export function summarizePotentialTargetEquivalents(items) {
     (sum, equivalent) => sum + equivalent.attackPercent,
     0,
   );
-  return `조건 기준 환산 · 주스탯 ${format(main)}%급 · 공/마 ${format(attack)}%급${excluded}`;
+  return `${basis} · 주스탯 ${format(main)}%급 · 공/마 ${format(attack)}%급${excluded}`;
 }
 
 /** 잠재·에디셔널의 긴 목표 목록에서 주요 특수 옵션을 먼저 표시한다. */

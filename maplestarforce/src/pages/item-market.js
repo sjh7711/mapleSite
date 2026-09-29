@@ -326,6 +326,21 @@ const market = {
 };
 let requestSequence = 0;
 let potentialRequestSequence = 0;
+// 입력 화면 갱신과 추정 계산을 분리한다. 마지막 결과는 다시 계산할 때까지 유지한다.
+const calculation = {
+  revision: 0,
+  resultRevision: -1,
+  request: 0,
+  running: false,
+  result: null,
+};
+
+function invalidateCalculation({ clear = false } = {}) {
+  calculation.revision += 1;
+  calculation.request += 1;
+  calculation.running = false;
+  if (clear) calculation.result = null;
+}
 
 function save() {
   try {
@@ -337,6 +352,7 @@ function save() {
 
 function update(mutator) {
   mutator();
+  invalidateCalculation();
   save();
   render();
 }
@@ -501,6 +517,7 @@ function normalizePotentialSelections(sectionKey) {
 }
 
 async function refreshPotentialAvailability() {
+  invalidateCalculation();
   const request = ++potentialRequestSequence;
   const itemName = state.itemName;
   const meta = selectedItemMeta();
@@ -576,6 +593,7 @@ async function refreshPotentialAvailability() {
     normalized = normalizePotentialSelections(job.sectionKey) || normalized;
   }
   if (normalized) save();
+  invalidateCalculation();
   render();
 }
 
@@ -655,6 +673,7 @@ function applyTradeDefaults(defaultsValue = market.tradeDefaults) {
 }
 
 async function loadSelectedItem(itemName) {
+  invalidateCalculation({ clear: true });
   const sequence = ++requestSequence;
   resetPotentialAvailability();
   resetStatPeerComparison();
@@ -752,10 +771,12 @@ async function refreshStatPeerComparables(sequence, itemName, currentLoaded) {
   market.statPeerData = peerData;
   market.statPeerStatus = Object.keys(peerData).length === peerEntries.length ? "ready" : "partial";
   market.statPeerError = errors[0] || "";
+  invalidateCalculation();
   render();
 }
 
 async function loadCatalog() {
+  invalidateCalculation({ clear: true });
   market.catalogStatus = "loading";
   market.error = "";
   render();
@@ -809,6 +830,7 @@ function selectCharacterEquipment(item) {
     loadSelectedItem(item.name);
   } else {
     requestSequence += 1;
+    invalidateCalculation({ clear: true });
     resetPotentialAvailability();
     resetStatPeerComparison();
     market.data = null;
@@ -892,6 +914,14 @@ function equipmentCard() {
     disabled: !state.itemName,
     title: "장비명은 유지하고 입력한 강화 옵션만 초기화합니다.",
   });
+  const calculate = element("button", "button button--compact market-calculate", calculation.running ? "계산 중…" : "계산 시작");
+  calculate.type = "button";
+  calculate.id = "market-calculate";
+  calculate.dataset.key = "market-calculate";
+  calculate.disabled = calculation.running || Boolean(calculationProblem());
+  calculate.addEventListener("click", startCalculation);
+  const actions = element("div", "market-equipment-actions");
+  actions.append(calculate, reset);
   const meta = selectedItemMeta();
   const equipmentSettings = row(
     field("장비명", equipmentPicker(), "market-item-field"),
@@ -938,7 +968,7 @@ function equipmentCard() {
   equipmentLayout.append(equipmentArtwork(), equipmentSettings);
   const section = cardWithHead(
     "장비",
-    reset,
+    actions,
     equipmentLayout,
   );
   if (market.catalogStatus === "error") {
@@ -1747,25 +1777,56 @@ function resultPlaceholder(message, tone = "") {
   return section;
 }
 
-function resultCard() {
-  if (!state.itemName) return resultPlaceholder("장비를 선택하면 옵션별 시장 반영액을 계산합니다.");
-  if (market.itemStatus === "loading") return resultPlaceholder("시세 계산을 준비하는 중입니다.");
-  if (market.itemStatus === "error") return resultPlaceholder(market.error, "error");
-  if (!market.data) return resultPlaceholder("현재 이 장비의 시세를 계산할 수 없습니다.", "error");
+function calculationProblem() {
+  if (!state.itemName) return { message: "장비를 선택하고 옵션을 입력한 뒤 계산 시작을 눌러주세요." };
+  if (market.itemStatus === "loading") return { message: "시세 계산을 준비하는 중입니다." };
+  if (market.itemStatus === "error") return { message: market.error, tone: "error" };
+  if (!market.data) return { message: "현재 이 장비의 시세를 계산할 수 없습니다.", tone: "error" };
+  if (market.statPeerStatus === "loading") return { message: "비교 장비의 시세 자료를 불러오는 중입니다." };
   for (const sectionKey of ["potential", "additional"]) {
     if (state[sectionKey].grade === "none") continue;
     const availability = market.potentialAvailability[sectionKey];
     if (availability.status === "loading" || availability.status === "idle") {
-      return resultPlaceholder("공식 잠재 옵션 목록을 불러오는 중입니다.");
+      return { message: "공식 잠재 옵션 목록을 불러오는 중입니다." };
     }
     if (availability.status !== "ready") {
-      return resultPlaceholder(
-        availability.error || "공식 잠재 옵션 목록을 확인할 수 없습니다.",
-        "error",
-      );
+      return {
+        message: availability.error || "공식 잠재 옵션 목록을 확인할 수 없습니다.",
+        tone: "error",
+      };
     }
   }
 
+  return null;
+}
+
+function startCalculation() {
+  if (calculation.running || calculationProblem()) return;
+  const request = ++calculation.request;
+  calculation.running = true;
+  render();
+  // 계산 중 표시를 먼저 그린다. 그 사이 입력이나 자료가 바뀌면 이 요청을 취소한다.
+  requestAnimationFrame(() => setTimeout(() => {
+    if (request !== calculation.request) return;
+    try {
+      calculation.result = calculateResultCard();
+    } catch (error) {
+      calculation.result = resultPlaceholder(error?.message || "시세 계산에 실패했습니다. 다시 계산해 주세요.", "error");
+    }
+    calculation.resultRevision = calculation.revision;
+    calculation.running = false;
+    render();
+  }, 0));
+}
+
+function resultCard() {
+  const problem = calculationProblem();
+  if (problem) return resultPlaceholder(problem.message, problem.tone);
+  if (calculation.running) return resultPlaceholder("경매장 추정가를 계산하는 중입니다.");
+  return calculation.result || resultPlaceholder("옵션 입력을 마친 뒤 계산 시작을 눌러주세요.");
+}
+
+function calculateResultCard() {
   const profile = getCalculationProfile({
     mainStat: state.mainStat,
     subStat: state.subStat,
@@ -1925,12 +1986,22 @@ function render() {
     profile,
   );
   const result = element("aside", "calculator-result");
+  result.setAttribute("aria-busy", String(calculation.running));
+  if (calculation.result && calculation.resultRevision !== calculation.revision &&
+      !calculation.running && !calculationProblem()) {
+    const status = note("입력이 변경되었습니다. 아래는 이전 결과입니다. 계산 시작을 눌러 갱신하세요.", "market-result-status");
+    status.setAttribute("role", "status");
+    result.append(status);
+  }
   result.append(resultCard());
   grid.append(controls, result);
   renderWithFocus(root, [grid]);
 }
 
-const unsubscribe = subscribeCharacterProfile(render);
+const unsubscribe = subscribeCharacterProfile(() => {
+  invalidateCalculation();
+  render();
+});
 window.addEventListener("pagehide", unsubscribe, { once: true });
 render();
 loadCatalog();

@@ -46,21 +46,6 @@ function staticToolNav({ itemMarketEnabled }) {
   };
 }
 
-// 다른 URL에서 동일한 XML을 비교한다. 원본만 관리해 두 파일의 차이를 막는다.
-function sitemapComparisonFile() {
-  return {
-    name: "sitemap-comparison-file",
-    apply: "build",
-    async generateBundle() {
-      this.emitFile({
-        type: "asset",
-        fileName: "sitemap-pages.xml",
-        source: await readFile(resolve(__dirname, "public/sitemap.xml")),
-      });
-    },
-  };
-}
-
 // 빌드된 HTML에 안내 링크를 넣어 JavaScript 없이도 읽을 수 있게 한다.
 function sharedSiteFooter() {
   return {
@@ -160,7 +145,6 @@ export default defineConfig(({ mode }) => {
       sharedTheme(),
       staticToolNav({ itemMarketEnabled }),
       sharedSiteFooter(),
-      sitemapComparisonFile(),
       pruneItemMarketDeploymentData({ enabled: itemMarketEnabled }),
     ],
     build: {

@@ -59,6 +59,14 @@ test("프로필 v1은 일반 직업만 v2로 옮기고 저장 닉네임은 보�
     );
 
     assert.deepEqual(ordinaryModule.getActiveProfile().subStats, ["DEX"]);
+    // Loading the page may prepare the migration in memory, but must not alter
+    // persistent storage until the visitor operates a calculator control.
+    assert.ok(ordinaryStorage.getItem(PROFILE_V1));
+    assert.equal(ordinaryStorage.getItem(PROFILE_V2), null);
+    const { enableCalculatorStoragePersistence } = await import(
+      new URL("../src/shared/result-share-state.js", import.meta.url)
+    );
+    enableCalculatorStoragePersistence();
     assert.equal(ordinaryStorage.getItem(PROFILE_V1), null);
     assert.ok(ordinaryStorage.getItem(PROFILE_V2));
     assert.deepEqual(

@@ -273,7 +273,8 @@ test("캐릭터 환산을 공유하고 프로필 구독은 페이지 생명주�
   assert.match(source, /"부스탯 2"/u);
   assert.match(source, /statModel: state\.statModel/u);
   assert.match(source, /manualSpecialEquivalence\(\)/u);
-  assert.equal((source.match(/subscribeCharacterProfile\(render\)/gu) || []).length, 1);
+  assert.equal((source.match(/subscribeCharacterProfile\(/gu) || []).length, 1);
+  assert.match(source, /subscribeCharacterProfile\(\(\) => \{\s*invalidateCalculation\(\);\s*render\(\);/u);
   assert.match(source, /window\.addEventListener\("pagehide", unsubscribe/u);
 });
 

@@ -1,4 +1,7 @@
-import { initializeResultShare } from "./result-share-state.js";
+import {
+  enableCalculatorStoragePersistence,
+  initializeResultShare,
+} from "./result-share-state.js";
 import { installResultShare } from "./result-share-ui.js";
 import "./result-share.css";
 
@@ -12,6 +15,33 @@ const entries = {
   pet: () => import("../pages/pet.js"),
   soul: () => import("../pages/soul.js"),
 };
+
+// Calculators may render and normalize defaults on import. Keep those writes in
+// memory until a real visitor operates a calculator control; page view alone
+// must not create or replace local/session storage entries.
+function installCalculatorStorageActivation() {
+  const page = document.querySelector("[data-calculator]");
+  if (!page) return;
+  const events = ["pointerdown", "keydown", "click", "input", "change"];
+  const cleanup = () => {
+    for (const type of events) document.removeEventListener(type, activate, true);
+  };
+  const activate = (event) => {
+    if (event.isTrusted === false || !(event.target instanceof Element)) return;
+    const control = event.target.closest(
+      'input, select, textarea, button, [role="button"], [contenteditable="true"]',
+    );
+    if (!control || !page.contains(control)) return;
+    if (control.closest(".site-footer, .calculator-guide, .toolnav, .page__head")) return;
+    enableCalculatorStoragePersistence();
+    cleanup();
+  };
+  for (const type of events) {
+    document.addEventListener(type, activate, { capture: true, passive: true });
+  }
+}
+
+installCalculatorStorageActivation();
 
 async function start() {
   const tool = document.querySelector("[data-calculator]")?.dataset.calculator;
