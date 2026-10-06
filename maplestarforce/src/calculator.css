@@ -594,27 +594,6 @@
   font-size: .72rem;
 }
 
-.page--ability .ability-basis {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 5px;
-  margin-top: 10px;
-  padding-top: 9px;
-  border-top: 1px solid var(--border-soft, rgba(43, 48, 60, 0.55));
-  color: var(--muted);
-  font-size: 0.72rem;
-}
-
-.page--ability .ability-basis a {
-  color: var(--text-secondary, #b9c4d8);
-  text-underline-offset: 3px;
-}
-
-.page--ability .ability-basis a:hover {
-  color: var(--accent);
-}
-
 .page--calculator .calculator-grid--potential .calculator-result {
   display: flex;
   flex-direction: column;

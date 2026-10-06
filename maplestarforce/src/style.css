@@ -3565,6 +3565,13 @@ button.character-equipment__slot:focus-visible {
   margin-bottom: 10px;
 }
 
+.site-footer__actions {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+}
+
 .site-footer p { margin: 4px 0; }
 .site-footer a { color: inherit; text-underline-offset: 4px; }
 .site-footer__links a {
@@ -3572,13 +3579,6 @@ button.character-equipment__slot:focus-visible {
   align-items: center;
   min-height: 40px;
   color: var(--text);
-}
-.site-footer__link-group {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 20px;
-  max-width: 100%;
 }
 .site-footer__privacy-button {
   min-height: 40px;

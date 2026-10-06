@@ -8,8 +8,7 @@ import {
 
 export const MIN_PET_TARGET_CHANCE_PERCENT = 0.01;
 export const MAX_PET_TARGET_CHANCE_PERCENT = 99.99;
-// 잠재능력 확률 바와 같은 공통 비교점인 1 - e^-1을 기본값으로 쓴다.
-// 2·3마리 목표에서는 평균 경로 수와 직접 대응하는 값은 아니다.
+// Manual-input fallback only. Average mode uses the net-cost CDF for its settings.
 export const DEFAULT_PET_TARGET_CHANCE_PERCENT = 63.21;
 const WONDER_BERRY_BUNDLE_SIZE = 11;
 

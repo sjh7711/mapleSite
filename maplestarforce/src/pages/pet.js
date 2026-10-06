@@ -1,3 +1,4 @@
+import { createPetMeanChanceRequest } from "../shared/pet-mean-chance-request.js";
 import { calculatorStorage, registerResultShare } from "../shared/result-share-state.js";
 import {
   PET_PROBABILITIES,
@@ -41,6 +42,7 @@ let percentilePendingKey = "";
 let percentileErrorKey = "";
 let percentileErrorMessage = "";
 let percentileRequestId = 0;
+const meanChanceRequest = createPetMeanChanceRequest(() => refreshResult());
 const defaults = {
   targetCount: 1,
   wonderBlackEvent: false,
@@ -112,9 +114,6 @@ function loadState() {
     loaded.resultMode = loaded.resultMode === "chance"
       ? "chance"
       : "average";
-    if (loaded.resultMode === "average") {
-      loaded.targetChancePercent = DEFAULT_PET_TARGET_CHANCE_PERCENT;
-    }
     loaded.outputTradeability = saved &&
         Object.hasOwn(saved, "outputTradeability")
       ? normalizeOutputTradeability(saved.outputTradeability)
@@ -291,6 +290,7 @@ function petReachChanceControl(
   result,
   {
     recoveryEntered,
+    meanEstimate,
     getProjection = (chancePercent) =>
       calculatePetTargetChanceProjection(result, chancePercent),
     onViewChange = () => {},
@@ -318,7 +318,10 @@ function petReachChanceControl(
     if (state.resultMode !== "chance") {
       progressLabel.textContent = "현재 계산 기준";
       progressValue.textContent = "평균 기댓값";
-      progressHint.textContent = "목표를 달성할 때까지 계속 진행";
+      progressHint.textContent = !meanEstimate ? "평균 비용 이내 성공 확률 계산 중…"
+        : meanEstimate.error ? "평균 비용 기준 확률을 계산하지 못했습니다."
+        : meanEstimate.method === "simulation" ? "평균 비용 이내 성공 확률 · 20만 회 시뮬레이션 추정"
+        : "평균 비용 이내 성공 확률 · 페이백·회수액 반영";
       return null;
     }
     const projection = getProjection(chancePercent);
@@ -396,13 +399,14 @@ function petReachChanceControl(
     min: MIN_PET_TARGET_CHANCE_PERCENT,
     max: MAX_PET_TARGET_CHANCE_PERCENT,
     average: state.resultMode !== "chance",
-    averageValue: DEFAULT_PET_TARGET_CHANCE_PERCENT,
+    averageValue: meanEstimate?.chance == null ? null : meanEstimate.chance * 100,
+    averagePlaceholder: meanEstimate?.error ? "—" : "계산 중",
     resetTitle: "장기 평균 기댓값으로 돌아갑니다.",
     metrics: [progressMetric, costMetric],
     normalize: (value, fallback) => normalizePetTargetChance(value, fallback),
     onChange: (value, { average, phase, control, metrics }) => {
       controlNode = control;
-      state.targetChancePercent = value;
+      if (value !== null) state.targetChancePercent = value;
       state.resultMode = average ? "average" : "chance";
       costMetric.hidden = average;
       metrics.classList.toggle("reach-control__metrics--single", average);
@@ -1548,7 +1552,7 @@ function resultCard() {
     context = calculateResultContext();
   } catch (error) {
     return createResultCard(
-      "계산 결과",
+      "기댓값",
       element("div", "result-empty", error.message),
     );
   }
@@ -1562,12 +1566,14 @@ function resultCard() {
     mesoMarketResult,
     result: baseResult,
   } = context;
+  const meanEstimate = meanChanceRequest.request(percentileCostOptions(context));
   const view = resultView(context);
   if (view.pending || view.error) {
     const recoveryEntered = baseResult.costs.recoveryMesoEquivalent > 0;
     return createResultCard(
-      "계산 결과",
+      "기댓값",
       petReachChanceControl(baseResult, {
+        meanEstimate,
         recoveryEntered,
         getProjection: (chancePercent) => {
           const request = calculateChanceView(context, chancePercent);
@@ -1980,8 +1986,9 @@ function resultCard() {
   ];
   resultContent.append(...resultContentParts.filter(Boolean));
   const cardNode = createResultCard(
-    "계산 결과",
+    "기댓값",
     petReachChanceControl(baseResult, {
+      meanEstimate,
       recoveryEntered,
       getProjection: (chancePercent) =>
         calculateChanceView(context, chancePercent).result?.projection ?? null,
@@ -2004,6 +2011,6 @@ function render() {
 }
 
 render();
-window.addEventListener("pagehide", stopPercentileWorker, { once: true });
+window.addEventListener("pagehide", () => { stopPercentileWorker(); meanChanceRequest.stop(); }, { once: true });
 
 registerResultShare(() => ({ local: { [STORAGE_KEY]: state } }));

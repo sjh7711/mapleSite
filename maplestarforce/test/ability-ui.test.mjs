@@ -176,8 +176,8 @@ test("목표 도달 확률의 평균으로 보기는 평균 재설정과 같은 
   assert.match(component, /reset\.hidden = averageMode/u);
   assert.match(source, /targetChanceAverage: true/u);
   assert.match(source, /function averageEquivalentTargetChancePercent/u);
-  assert.match(source, /const expectedResets = 1 \/ probability/u);
-  assert.match(source, /1 - \(\(1 - probability\) \*\* expectedResets\)/u);
+  assert.match(source, /calculateGeometricMeanChance\(probability\)/u);
+  assert.match(source, /const label = averageMode \? "평균"/u);
   assert.match(source, /averageMode\s*\? result\.expectedResets\s*:\s*state\.method === "abyss" \? calculateAbilityAbyssAttemptsForChance/su);
   assert.match(
     source,

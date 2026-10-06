@@ -5304,3 +5304,5 @@ export function calculatePetExpectation(options = {}) {
 
   return result;
 }
+
+export { calculatePetMeanCostChance } from "./pet-reach.js";

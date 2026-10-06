@@ -603,7 +603,7 @@ function sourceCost(source) {
 }
 
 function resultCard() {
-  const section = createResultCard("계산 결과");
+  const section = createResultCard("기댓값");
   let result;
   try {
     const activeProfile = getActiveProfile();

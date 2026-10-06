@@ -1,3 +1,4 @@
+import { calculateGeometricMeanChance } from "maple-core/potential";
 import { calculatorStorage, isSharedResult, getSharedResultView, registerResultShare } from "../shared/result-share-state.js";
 import {
   ABILITY_GRADES,
@@ -302,11 +303,7 @@ function normalizeInventory(value) {
 }
 
 function averageEquivalentTargetChancePercent(probability) {
-  if (!Number.isFinite(probability) || probability <= 0) return TARGET_CHANCE_DEFAULT;
-  if (probability >= 1) return TARGET_CHANCE_MAX;
-  const expectedResets = 1 / probability;
-  const chance = 1 - ((1 - probability) ** expectedResets);
-  return normalizeTargetChance(Number((chance * 100).toFixed(2)));
+  return Number(((calculateGeometricMeanChance(probability) ?? 0) * 100).toFixed(2));
 }
 
 function update(mutator) {
@@ -823,20 +820,6 @@ function formatOdds(probability) {
   if (!Number.isFinite(probability) || probability <= 0) return "1 / ∞ · 0%";
   const odds = (1 / probability).toLocaleString("ko-KR", { maximumFractionDigits: 1 });
   return `1 / ${odds} · ${formatProbability(probability, 8)}`;
-}
-
-function abilityBasis() {
-  const basis = element("div", "ability-basis");
-  const probabilityLink = element("a", "", "공식 어빌리티 확률");
-  probabilityLink.href = "https://maplestory.nexon.com/Guide/OtherProbability/ability/reputevalue";
-  probabilityLink.target = "_blank";
-  probabilityLink.rel = "noreferrer";
-  const guideLink = element("a", "", "어빌리티 가이드");
-  guideLink.href = "https://maplestory.nexon.com/Guide/N23GameInformation/Articles/392";
-  guideLink.target = "_blank";
-  guideLink.rel = "noreferrer";
-  basis.append(probabilityLink, element("span", "", "·"), guideLink);
-  return basis;
 }
 
 function placementRecommendationStep(result) {
@@ -1597,7 +1580,7 @@ function abilityRouteComparison(comparison, selectedId, onSelect) {
     entries.push({ route, cost, costLabel, badge, costFields, useValue, finishValue, finishExplanation, itemMethod });
   }
   const selected = comparison.routes.find((route) => route.id === selectedId) ?? comparison.routes[0];
-  const averageChance = () => normalizeTargetChance(Number(((selected.result.reach?.averageChance ?? .8) * 100).toFixed(2)));
+  const averageChance = () => Number(((selected.result.reach?.averageChance ?? .8) * 100).toFixed(2));
   const paint = (percent, average) => {
     const breakdowns = entries.map(({ route: { result } }) => average
       ? { totalMeso: result.expectedTotalMeso, honorMeso: result.expectedHonorMeso, resetMeso: result.expectedMeso, abyssMeso: result.expectedAbyssMeso }
@@ -1672,7 +1655,7 @@ function optimalResultCard() {
     chaosCount: state.chaosCount,
     abyssCount: state.abyssCount,
   });
-  const section = createResultCard("계산 결과");
+  const section = createResultCard("기댓값");
   section.classList.add("ability-result-card", "ability-strategy-result");
   if (request.status === "loading") {
     section.append(element("div", "result-empty", "최적 전략을 계산하는 중…"));
@@ -1812,7 +1795,6 @@ function optimalResultCard() {
         ? "명성치 환산 비용·재설정 메소·평균 사용한 심서큘의 가치를 합산합니다."
         : "명성치 환산 비용과 재설정 메소를 합산해 비교합니다. 보유 서큘레이터는 추가 비용 0원으로 계산합니다.",
     ),
-    abilityBasis(),
   );
   if (result.expectedCirculators.abyss > 0 && !["economic-adaptive", "practical-fixed", "unlimited-reference"].includes(result.strategyMode)) section.append(note(
     result.flexibleComparison
@@ -1823,8 +1805,8 @@ function optimalResultCard() {
 }
 
 function abilityReachChanceControl(result) {
-  const averageChance = () => state.method === "abyss"
-    ? normalizeTargetChance(Number((calculateAbilityAbyssChanceWithin(result, result.expectedResets) * 100).toFixed(2)))
+  const averageChance = () => result.complete ? 100 : state.method === "abyss"
+    ? Number((calculateAbilityAbyssChanceWithin(result, result.expectedResets) * 100).toFixed(2))
     : averageEquivalentTargetChancePercent(result.probability);
   const initialChancePercent = state.targetChanceAverage
     ? averageChance()
@@ -1844,9 +1826,10 @@ function abilityReachChanceControl(result) {
         : state.method === "abyss" ? calculateAbilityAbyssAttemptsForChance(result, chance)
           : calculateAbilityAttemptsForChance(result.probability, chance);
     const resource = attempts * result.resourcePerReset;
-    attemptsMetric.querySelector("span").textContent = `${chancePercent.toLocaleString("ko-KR", { maximumFractionDigits: 2 })}% 도달 재설정`;
+    const label = averageMode ? "평균" : `${chancePercent.toLocaleString("ko-KR", { maximumFractionDigits: 2 })}% 도달`;
+    attemptsMetric.querySelector("span").textContent = `${label} 재설정`;
     attemptsMetric.querySelector("strong").textContent = formatAttempts(attempts);
-    resourceMetric.querySelector("span").textContent = `${chancePercent.toLocaleString("ko-KR", { maximumFractionDigits: 2 })}% 도달 ${["honor", "advanced"].includes(state.method) ? "명성치" : "서큘레이터"}`;
+    resourceMetric.querySelector("span").textContent = `${label} ${["honor", "advanced"].includes(state.method) ? "명성치" : "서큘레이터"}`;
     resourceMetric.querySelector("strong").textContent = formatResource(resource);
   };
 
@@ -1879,7 +1862,7 @@ function resultCard() {
     swapLower: !valueOnlyMethod() && state.swapLower,
     halfHonor: state.halfHonor,
   });
-  const section = createResultCard("계산 결과");
+  const section = createResultCard("기댓값");
   section.classList.add("ability-result-card");
   if (result.error) {
     section.append(element("div", "result-empty", result.error));
@@ -1939,7 +1922,6 @@ function resultCard() {
   if (state.method === "abyss") section.append(note(
     "현재 수치는 목표 미달 상태의 공식 분포로 평균합니다. 동일 결과 재추첨을 반영하며, 세 줄이 모두 목표에 도달할 때만 새 결과를 적용하는 기준입니다.",
   ));
-  section.append(abilityBasis());
   return section;
 }
 

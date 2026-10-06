@@ -432,6 +432,39 @@ function integerGcd(left, right) {
   return a;
 }
 
+/** CDF at a budget, including grade-specific prices and pity guarantees.
+ * Without a known price use attempts as the budget unit instead. */
+export function calculatePotentialRankUpChanceWithinBudget(plan, budget, { attempts = false } = {}) {
+  const stages = plan?.stages ?? [];
+  if (!stages.length || !Number.isFinite(budget)) return null;
+  if (budget < 0) return 0;
+  const costs = stages.map((stage) => attempts ? 1 : stage.resetCost);
+  if (!costs.every((cost) => Number.isSafeInteger(cost) && cost >= 0)) return null;
+  const positiveCosts = costs.filter((cost) => cost > 0);
+  if (!positiveCosts.length) return 1;
+  const unit = positiveCosts.reduce(integerGcd);
+  const maximum = Math.floor(budget / unit + 1e-12);
+  let distribution = new Float64Array(maximum + 1);
+  distribution[0] = 1;
+  stages.forEach((stage, index) => {
+    if (costs[index] === 0) return;
+    if (!(stage.probability > 0 && stage.probability <= 1)) {
+      throw new RangeError("등급 상승 확률은 0보다 크고 1 이하여야 합니다.");
+    }
+    distribution = convolveRankUpStage(distribution, {
+      probability: stage.probability, remaining: stage.remaining, step: costs[index] / unit,
+    }, maximum);
+  });
+  return Math.min(1, Math.max(0, distribution.reduce((sum, mass) => sum + mass, 0)));
+}
+
+/** A fractional expected count is not an executable number of attempts. */
+export function calculateGeometricMeanChance(probability) {
+  if (!(probability > 0 && probability <= 1)) return null;
+  if (probability === 1) return 1;
+  return -Math.expm1(Math.floor(1 / probability + 1e-12) * Math.log1p(-probability));
+}
+
 /**
  * 여러 등급 상승 단계를 순서대로 진행할 때 목표 누적 확률을 만족하는
  * 최소 총 재설정 횟수와 최소 메소 예산을 계산한다. 천장이 있는 단계는

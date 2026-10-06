@@ -46,6 +46,10 @@ function checkAgainstOracle(plan, calculate, cost) {
   const mean = attempts.reduce((sum, [value, p]) => sum + value * p, 0);
   const meanCdf = attempts.reduce((sum, [value, p]) => sum + (value <= mean + 1e-12 ? p : 0), 0);
   assert.ok(Math.abs(calculate(plan, 0.8).averageAttemptChance - meanCdf) < 1e-12);
+  const meanCost = costs.reduce((sum, [value, p]) => sum + value * p, 0);
+  const costCdf = costs.reduce((sum, [value, p]) => sum + (value <= meanCost + 1e-5 ? p : 0), 0);
+  assert.ok(Math.abs(calculate(plan, 0.8).averageCostChance - costCdf) < 1e-10);
+
 }
 
 test("four-stage amplification quantiles include rising chances and all guarantees", () => {

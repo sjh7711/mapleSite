@@ -1,4 +1,4 @@
-import { calculatePotentialRankUpReachForChance } from "./potential.js";
+import { calculatePotentialRankUpReachForChance, calculatePotentialRankUpChanceWithinBudget } from "./potential.js";
 
 const planCache = new WeakMap();
 
@@ -100,6 +100,19 @@ function costQuantile(left, right, chance) {
   return low;
 }
 
+function costChanceWithin(left, right, budget) {
+  const cdf = [];
+  let mass = 0;
+  for (const outcome of right) cdf.push(mass += outcome.probability);
+  let probability = 0;
+  let index = right.length - 1;
+  for (const outcome of left) {
+    while (index >= 0 && outcome.cost + right[index].cost > budget + 1e-5) index -= 1;
+    if (index >= 0) probability += outcome.probability * cdf[index];
+  }
+  return Math.min(1, Math.max(0, probability));
+}
+
 /** Minimum total attempts and budget, each independently meeting the chance. */
 export function calculateSoulAmplificationReachForChance(plan, chance) {
   const targetChance = validateChance(chance);
@@ -110,19 +123,29 @@ export function calculateSoulAmplificationReachForChance(plan, chance) {
       costOutcomes(plan.stages.slice(0, split)),
       costOutcomes(plan.stages.slice(split)),
     ];
+    const meanCost = plan.stages.reduce((sum, stage) => sum + stage.attempts.reduce(
+      (total, outcome) => total + outcome.costMeso * outcome.successProbability, 0,
+    ), 0);
+    distribution.averageCostChance = costChanceWithin(...distribution.costPairs, meanCost);
   }
   return {
     chance: targetChance,
     attempts: attemptQuantile(distribution.attempts, targetChance),
     cost: costQuantile(...distribution.costPairs, targetChance),
     averageAttemptChance: distribution.averageAttemptChance,
+    averageCostChance: distribution.averageCostChance,
   };
 }
 
 export function calculateSoulPotentialRankUpReachForChance(plan, chance) {
   const targetChance = validateChance(chance);
-  const result = calculatePotentialRankUpReachForChance({
+  const costPlan = {
     stages: plan.stages.map((stage) => ({ ...stage, resetCost: stage.resetCostMeso })),
-  }, targetChance);
-  return { ...result, averageAttemptChance: distributionsFor(plan).averageAttemptChance };
+  };
+  const result = calculatePotentialRankUpReachForChance(costPlan, targetChance);
+  const distribution = distributionsFor(plan);
+  distribution.averageCostChance ??= calculatePotentialRankUpChanceWithinBudget(costPlan,
+    plan.stages.reduce((sum, stage) => sum + stage.expectedCostMeso, 0));
+  return { ...result, averageAttemptChance: distribution.averageAttemptChance,
+    averageCostChance: distribution.averageCostChance };
 }

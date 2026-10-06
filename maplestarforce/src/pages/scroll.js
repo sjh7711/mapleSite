@@ -284,7 +284,7 @@ function usesReturnFirstWork() {
 
 function invalidWorkCountResult(label) {
   return createResultCard(
-    "계산 결과",
+    "기댓값",
     element(
       "div",
       "result-empty",
@@ -295,7 +295,7 @@ function invalidWorkCountResult(label) {
 
 function invalidMagicalCompletedCountResult() {
   return createResultCard(
-    "계산 결과",
+    "기댓값",
     element(
       "div",
       "result-empty",
@@ -424,7 +424,7 @@ function returnCalculationCard(status, message = "") {
       ),
     );
   }
-  return createResultCard("계산 결과", box);
+  return createResultCard("기댓값", box);
 }
 
 function save() {
@@ -1276,7 +1276,7 @@ function chaosFirstTargetText() {
 function firstChaosResult() {
   if (state.chaosFirstStat > 0 && statCount() === 0) {
     return createResultCard(
-      "계산 결과",
+      "기댓값",
       element("div", "result-empty", "목표 스탯 합에 포함할 스탯을 하나 이상 선택해 주세요."),
     );
   }
@@ -1286,17 +1286,17 @@ function firstChaosResult() {
   try {
     first = chaosFirstCost(reset);
   } catch (error) {
-    return createResultCard("계산 결과", line("계산할 수 없음", error.message));
+    return createResultCard("기댓값", line("계산할 수 없음", error.message));
   }
   if (!first.feasible) {
     return createResultCard(
-      "계산 결과",
+      "기댓값",
       element("div", "result-empty", "선택한 놀긍첫작 목표는 나올 수 없습니다."),
     );
   }
   if (!Number.isFinite(first.cost)) {
     return createResultCard(
-      "계산 결과",
+      "기댓값",
       element(
         "div",
         "result-empty",
@@ -1321,7 +1321,7 @@ function firstChaosResult() {
     : null;
 
   return createResultCard(
-    "계산 결과",
+    "기댓값",
     resultHero("평균 비용", eok(first.cost)),
     line("목표", chaosFirstTargetText(), true),
     firstChaosTargetChanceLine(first),
@@ -1358,7 +1358,7 @@ function slotResult() {
   );
   if (usesChaosFirst && state.chaosFirstStat > 0 && statCount() === 0) {
     return createResultCard(
-      "계산 결과",
+      "기댓값",
       element("div", "result-empty", "목표 스탯 합에 포함할 스탯을 하나 이상 선택해 주세요."),
     );
   }
@@ -1366,7 +1366,7 @@ function slotResult() {
     const [minimum, maximum] = TRACE_LEVEL_RANGE[state.slot];
     if (state.itemLevel < minimum || state.itemLevel > maximum) {
       return createResultCard(
-        "계산 결과",
+        "기댓값",
         element("div", "result-empty", `이 부위는 공식표에서 Lv.${minimum}~${maximum} 구간만 확인됩니다.`),
       );
     }
@@ -1374,7 +1374,7 @@ function slotResult() {
   const restore = restoreChoices()[0] ?? null;
   if (!restore) {
     return createResultCard(
-      "계산 결과",
+      "기댓값",
       element(
         "div",
         "result-empty",
@@ -1390,7 +1390,7 @@ function slotResult() {
   const maximumSlots = 20;
   if (current.slots < 1 || current.slots > maximumSlots) {
     return createResultCard(
-      "계산 결과",
+      "기댓값",
       element(
         "div",
         "result-empty",
@@ -1400,7 +1400,7 @@ function slotResult() {
   }
   if (usesChaosFirst && current.recoverable > 0) {
     return createResultCard(
-      "계산 결과",
+      "기댓값",
       element("div", "result-empty", "첫작놀긍은 복구 가능한 횟수가 없는 장비에만 적용할 수 있습니다."),
     );
   }
@@ -1408,7 +1408,7 @@ function slotResult() {
   const first = usesChaosFirst ? chaosFirstCost(reset) : null;
   if (first && !first.feasible) {
     return createResultCard(
-      "계산 결과",
+      "기댓값",
       element("div", "result-empty", "선택한 첫작놀긍 목표는 나올 수 없습니다."),
     );
   }
@@ -1503,7 +1503,7 @@ function slotResult() {
   policyDetailsForRender = policyDetails;
 
   return createResultCard(
-    "계산 결과",
+    "기댓값",
     resultHero("평균 비용", Number.isFinite(total) ? eok(total) : "계산 불가"),
     metricGrid(
       state.method === "trace"
@@ -1586,7 +1586,7 @@ function magicalResult() {
     : null;
   if (needsFirstWork && !reset) {
     return createResultCard(
-      "계산 결과",
+      "기댓값",
       element("div", "result-empty", "비용 설정에서 첫작 초기화에 사용할 이노센트 시세를 입력해 주세요."),
     );
   }
@@ -1610,7 +1610,7 @@ function magicalResult() {
       resetStock: selectedResetStock,
     });
   } catch (error) {
-    return createResultCard("계산 결과", line("계산할 수 없음", error.message));
+    return createResultCard("기댓값", line("계산할 수 없음", error.message));
   }
   const cashAsMeso = remainingSlots === 0
     ? 0
@@ -1620,7 +1620,7 @@ function magicalResult() {
     ? "아크 이노센트"
     : "이노센트";
   return createResultCard(
-    "계산 결과",
+    "기댓값",
     returnCostHero(
       "예상 필요 메소",
       eokMeso(totalMeso),
@@ -1676,7 +1676,7 @@ function returnResult() {
   if (!Number.isInteger(appliedWorks) || appliedWorks < 0 || appliedWorks > slots) {
     stopReturnEconomyWorker();
     return createResultCard(
-      "계산 결과",
+      "기댓값",
       element("div", "result-empty", `이미 적용한 작 수는 0~${slots}회로 입력해 주세요.`),
     );
   }
@@ -1690,14 +1690,14 @@ function returnResult() {
   ) {
     stopReturnEconomyWorker();
     return createResultCard(
-      "계산 결과",
+      "기댓값",
       element("div", "result-empty", "목표 스탯 합에 포함할 스탯을 하나 이상 선택해 주세요."),
     );
   }
   if (!(state.chaos60Price > 0) || (hasFirst && !(state.chaos100Price > 0))) {
     stopReturnEconomyWorker();
     return createResultCard(
-      "계산 결과",
+      "기댓값",
       element(
         "div",
         "result-empty",
@@ -1711,7 +1711,7 @@ function returnResult() {
   if (hasFirst && !reset) {
     stopReturnEconomyWorker();
     return createResultCard(
-      "계산 결과",
+      "기댓값",
       element(
         "div",
         "result-empty",
@@ -1813,7 +1813,7 @@ function returnResult() {
     remainingStatText,
   ].filter(Boolean).join(" · ");
   return createResultCard(
-    "계산 결과",
+    "기댓값",
     returnCostHero(
       "예상 필요 메소",
       eokMeso(totalMeso),

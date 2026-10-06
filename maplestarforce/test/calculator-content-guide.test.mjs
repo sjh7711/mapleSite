@@ -2,45 +2,55 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
+const root = new URL("../", import.meta.url);
+const read = (path) => readFile(new URL(path, root), "utf8");
+const calculators = ["starforce", "potential", "ability", "add-option", "scroll", "pet", "soul"];
 
-const PAGES = [
-  { path: "../index.html", stylesheet: "./src/calculator-guide.css", id: "starforce", terms: ["스페어 가격", "파괴방지", "준비할 메소"] },
-  { path: "../potential/index.html", stylesheet: "../src/calculator-guide.css", id: "potential", terms: ["윗잠·아랫잠", "목표 세트", "1회 성공 확률"] },
-  { path: "../ability/index.html", stylesheet: "../src/calculator-guide.css", id: "ability", terms: ["잠금 상태", "서큘레이터", "추천 진행 순서"] },
-  { path: "../add-option/index.html", stylesheet: "../src/calculator-guide.css", id: "add-option", terms: ["목표 급", "환생의 불꽃", "평균 개수"] },
-  { path: "../scroll/index.html", stylesheet: "../src/calculator-guide.css", id: "scroll", terms: ["잔여·복구 가능 횟수", "리턴", "다음 행동"] },
-  { path: "../pet/index.html", stylesheet: "../src/calculator-guide.css", id: "pet", terms: ["목표 마릿수", "당첨선", "회수 반영 비용"] },
-  { path: "../soul/index.html", stylesheet: "../src/calculator-guide.css", id: "soul", terms: ["현재 단계의 실패 횟수", "등급 상승", "성공 보장"] },
-];
+test("이용 안내에서 공개 계산기별 정적 사용법과 계산기로 이동할 수 있다", async () => {
+  const hub = await read("guide/index.html");
+  for (const id of calculators) {
+    assert.ok(hub.includes(`href="/guide/${id}/"`), `${id}: 허브 링크`);
+    const html = await read(`guide/${id}/index.html`);
+    assert.ok(html.includes(`href="https://starforce.pages.dev/guide/${id}/"`), `${id}: canonical`);
+    const calculator = id === "starforce" ? "/" : `/${id}/`;
+    assert.ok(html.includes(`href="${calculator}"`), `${id}: 계산기 열기`);
+    assert.match(html, /<article class="usage-article"[^>]*>/u);
+    assert.doesNotMatch(html, /<article[^>]*\bhidden\b/u);
+    const ids = new Set([...html.matchAll(/\bid="([^"]+)"/gu)].map((match) => match[1]));
+    for (const [, anchor] of html.matchAll(/href="#([^"]+)"/gu)) {
+      assert.ok(ids.has(anchor), `${id}: 사용 순서 #${anchor}`);
+    }
+  }
+  assert.doesNotMatch(hub, /href="\/guide\/item-market/u);
+});
 
-test("광고가 있는 계산기 페이지의 정적 이용 안내는 숨김 상태를 유지한다", async () => {
-  for (const page of PAGES) {
-    const html = await read(page.path);
-    const guideStart = html.indexOf('<article class="calculator-guide"');
-    const footerMarker = html.indexOf("<!-- site-footer -->");
-    const script = html.indexOf('<script type="module"');
-    const tool = page.id === "starforce"
-      ? html.indexOf('id="starforce-total"')
-      : html.indexOf('id="tool"');
-
-    assert.match(html, new RegExp(`<link rel="stylesheet" href="${page.stylesheet.replaceAll(".", "\\.")}"`), page.path);
-    assert.ok(tool >= 0 && guideStart > tool, `${page.path}: 안내는 계산기 뒤에 있어야 합니다.`);
-    assert.ok(guideStart < footerMarker && footerMarker < script, `${page.path}: 안내는 푸터 앞의 정적 HTML이어야 합니다.`);
-    assert.match(html, new RegExp(`<article class="calculator-guide" aria-labelledby="${page.id}-guide-title" hidden>`), page.path);
-    assert.match(html, /<h3>[^<]+<\/h3>[\s\S]*?<h3>[^<]+<\/h3>[\s\S]*?<h3>[^<]+<\/h3>/u, page.path);
-    assert.match(html, /href="\/sources\/"/u, page.path);
-    assert.match(html, /href="\/about\/#usage"/u, page.path);
-    assert.match(html.slice(guideStart, footerMarker), /<article class="calculator-guide"[^>]*\shidden>/u, page.path);
-    for (const term of page.terms) assert.ok(html.includes(term), `${page.path}: ${term}`);
+test("모든 사용법 이미지의 파일·크기·대체 설명이 실제 자료와 일치한다", async () => {
+  for (const id of calculators) {
+    const html = await read(`guide/${id}/index.html`);
+    const figures = [...html.matchAll(/<figure\b[^>]*>([\s\S]*?)<\/figure>/gu)];
+    assert.ok(figures.length >= 2, `${id}: 단계별 이미지`);
+    for (const [, figure] of figures) {
+      const image = figure.match(/<img src="(\/guide-images\/[^"<>]+\.png)" alt="([^"]+)" width="(\d+)" height="(\d+)"/u);
+      assert.ok(image, `${id}: 이미지와 대체 설명·크기`);
+      const [, path, alt, width, height] = image;
+      assert.ok(alt.trim().length > 10);
+      const data = await readFile(new URL(`public${path}`, root));
+      assert.equal(data.readUInt32BE(16), Number(width), path);
+      assert.equal(data.readUInt32BE(20), Number(height), path);
+      assert.ok(figure.includes(`href="${path}"`), `${path}: 원본 크게 보기`);
+      assert.match(figure, /<figcaption>[^<]+/u);
+    }
   }
 });
 
-test("정적 안내 스타일은 본문 흐름과 반응형 한 열 레이아웃을 유지한다", async () => {
-  const css = await read("../src/calculator-guide.css");
-  assert.match(css, /\.calculator-guide\s*\{[^}]*position:\s*relative;[^}]*width:\s*100%;/su);
-  assert.match(css, /\.calculator-guide\[hidden\]\s*\{[^}]*display:\s*none\s*!important;/su);
-  assert.doesNotMatch(css, /position:\s*(?:fixed|absolute|sticky)/u);
-  assert.match(css, /grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/u);
-  assert.match(css, /@media \(max-width:\s*980px\)[\s\S]*?grid-template-columns:\s*1fr/u);
+test("공통 이용 안내는 별도 페이지에서 제공하고 소개·문의와 계산기에 중복하지 않는다", async () => {
+  const about = await read("about/index.html");
+  assert.doesNotMatch(about, /<h2>제공하는 계산기<\/h2>|<section id="usage">/u);
+  assert.match(about, /<h1>소개·문의<\/h1>/u);
+  assert.match(await read("partials/site-footer.html"), /href="\/guide\/"/u);
+  for (const id of calculators) {
+    const html = await read(id === "starforce" ? "index.html" : `${id}/index.html`);
+    assert.doesNotMatch(html, /calculator-guide|href="\/about\/#usage"/u);
+    assert.match(html, /<!-- site-footer -->/u);
+  }
 });

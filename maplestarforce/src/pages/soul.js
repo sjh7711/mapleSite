@@ -5,7 +5,7 @@ import {
   getSoulPotentialRankUpInfo,
   calculateSoulAmplificationReachForChance, calculateSoulPotentialRankUpReachForChance,
 } from "maple-core/soul";
-import { POTENTIAL_PAGE_TARGETS, calculateResetsForChance } from "maple-core/potential";
+import { POTENTIAL_PAGE_TARGETS, calculateResetsForChance, calculateGeometricMeanChance } from "maple-core/potential";
 import { renderToolNav } from "../shared/shell.js";
 import { chip, field, numberInput } from "../shared/ui.js";
 import {
@@ -97,11 +97,6 @@ function select(key, options, onChange = () => {}) {
 
 function stageOptions(start = 0) {
   return Array.from({ length: 5 - start }, (_, i) => ({ value: start + i, label: `${start + i}단계` }));
-}
-function sourceLink(label, href) {
-  const link = element("a", "", label);
-  link.href = href; link.target = "_blank"; link.rel = "noreferrer";
-  return link;
 }
 function settingsCard() {
   const modePicker = chipRow(
@@ -230,8 +225,7 @@ function potentialControls() {
 function soulReachControl(result) {
   const attemptsMetric = metric("목표 도달 재설정", "-");
   const costMetric = metric("목표 도달 비용", "-");
-  const averageChance = Number((result.probability > 0 && result.probability < 1
-    ? (1 - (1 - result.probability) ** result.expectedResets) * 100 : 63.21).toFixed(2));
+  const averageChance = calculateGeometricMeanChance(result.probability) * 100;
   return createReachChanceControl({
     id: "soul-target-chance", value: state.chanceAverage ? averageChance : state.chance,
     min: 0.01, max: 99.99, average: state.chanceAverage, averageValue: averageChance,
@@ -251,8 +245,8 @@ function soulReachControl(result) {
 
 function soulProgressReachControl(result, amplification, onSelectionChange = () => {}) {
   const calculate = amplification ? calculateSoulAmplificationReachForChance : calculateSoulPotentialRankUpReachForChance;
-  const initial = calculate(result, state.chance / 100);
-  const averageChance = Number(clamp(initial.averageAttemptChance * 100, 0.01, 99.99).toFixed(2));
+  const initial = calculate(result, 0.5);
+  const averageChance = Number((initial.averageCostChance * 100).toFixed(2));
   const attemptLabel = amplification ? "증폭 시도" : "재설정";
   const attemptsMetric = metric(`목표 도달 ${attemptLabel}`, "-");
   const costMetric = metric("목표 도달 비용", "-");
@@ -361,8 +355,6 @@ function results() {
       if (result.probability === 0) section.append(note("현재 등급과 증폭 단계의 공식 옵션으로는 해당 목표에 도달할 수 없습니다."));
     }
   } catch (error) { section.append(element("div", "result-empty", error.message)); }
-  section.append(sourceLink("공식 소울 잠재능력 확률", "https://maplestory.nexon.com/Guide/OtherProbability/cube/Soulpotential"),
-    document.createTextNode(" · "), sourceLink("9월 17일 업데이트", "https://maplestory.nexon.com/news/update/813"));
   return section;
 }
 function render() {

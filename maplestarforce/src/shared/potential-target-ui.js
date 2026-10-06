@@ -4,7 +4,7 @@ import {
 
 export const MIN_TARGET_CHANCE_PERCENT = 0.01;
 export const MAX_TARGET_CHANCE_PERCENT = 99.99;
-// 희박한 독립 시행에서 평균 시도 횟수의 누적 성공 확률인 1 - e^-1.
+// Legacy default / manual-input fallback. Mean mode computes its own cost CDF.
 export const DEFAULT_TARGET_CHANCE_PERCENT = 63.21;
 export const TARGET_CHANCE_DEFAULT_REVISION = 1;
 
@@ -73,6 +73,7 @@ export function normalizePotentialTargetChance(
 /** 과거 기본값 50%만 한 번 옮기고 사용자가 정한 값은 그대로 둔다. */
 export function migratePotentialTargetChanceDefault({
   targetChancePercent,
+  targetChanceAverage,
   targetChanceDefaultRevision,
 }) {
   const shouldMigrateLegacyDefault =
@@ -80,6 +81,9 @@ export function migratePotentialTargetChanceDefault({
     Number(targetChancePercent) === 50;
 
   return {
+    targetChanceAverage: typeof targetChanceAverage === "boolean" ? targetChanceAverage
+      : targetChancePercent == null || shouldMigrateLegacyDefault ||
+        Number(targetChancePercent) === DEFAULT_TARGET_CHANCE_PERCENT,
     targetChancePercent: normalizePotentialTargetChance(
       shouldMigrateLegacyDefault
         ? DEFAULT_TARGET_CHANCE_PERCENT
@@ -177,8 +181,15 @@ export function getPotentialTargetTypesForRow({
   targets,
   index,
   hasProfile,
+  system,
+  part,
 }) {
-  if (index > 0 && targets[0]?.type === "stat-equivalent") return [];
+  if (index > 0 && targets[0]?.type === "stat-equivalent") {
+    // 모자 에디셔널은 주스탯 환산과 별도로 쿨타임 감소 목표를 함께 둔다.
+    return system === "additional" && Number(part) === 6
+      ? availableTargetTypes.filter((type) => type === "cooldown")
+      : [];
+  }
   return availableTargetTypes.filter((type) =>
     (type !== "stat-equivalent" || (hasProfile && index === 0))
   );

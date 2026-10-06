@@ -5,6 +5,8 @@ import test from "node:test";
 import {
   POTENTIAL_PAGE_TARGETS,
   calculatePotentialExpected,
+  calculatePrimePotentialExpected,
+  getPotentialSuccessCombinations,
   encodeExactPotentialTargetType,
   getAvailablePotentialTargetTypes,
 } from "maple-core/potential";
@@ -56,7 +58,7 @@ async function additionalHatTables() {
   );
 }
 
-test("평균 비용 기준 63.21%를 기본으로 쓰고 과거 50%만 한 번 옮긴다", () => {
+test("평균 모드를 명시적으로 저장하고 사용자가 고른 확률을 보존한다", () => {
   assert.equal(
     DEFAULT_TARGET_CHANCE_PERCENT,
     Math.round((1 - Math.exp(-1)) * 10_000) / 100,
@@ -65,6 +67,7 @@ test("평균 비용 기준 63.21%를 기본으로 쓰고 과거 50%만 한 번 �
     targetChancePercent: 50,
   });
   assert.deepEqual(migratedLegacyDefault, {
+    targetChanceAverage: true,
     targetChancePercent: 63.21,
     targetChanceDefaultRevision: TARGET_CHANCE_DEFAULT_REVISION,
   });
@@ -73,12 +76,14 @@ test("평균 비용 기준 63.21%를 기본으로 쓰고 과거 50%만 한 번 �
     migratedLegacyDefault,
   );
   assert.deepEqual(migratePotentialTargetChanceDefault({}), {
+    targetChanceAverage: true,
     targetChancePercent: 63.21,
     targetChanceDefaultRevision: TARGET_CHANCE_DEFAULT_REVISION,
   });
   assert.deepEqual(
     migratePotentialTargetChanceDefault({ targetChancePercent: 73.45 }),
     {
+      targetChanceAverage: false,
       targetChancePercent: 73.45,
       targetChanceDefaultRevision: TARGET_CHANCE_DEFAULT_REVISION,
     },
@@ -89,10 +94,13 @@ test("평균 비용 기준 63.21%를 기본으로 쓰고 과거 50%만 한 번 �
       targetChanceDefaultRevision: TARGET_CHANCE_DEFAULT_REVISION,
     }),
     {
+      targetChanceAverage: false,
       targetChancePercent: 50,
       targetChanceDefaultRevision: TARGET_CHANCE_DEFAULT_REVISION,
     },
   );
+  assert.equal(migratePotentialTargetChanceDefault({ targetChancePercent: 63.21, targetChanceAverage: false }).targetChanceAverage, false);
+  assert.equal(migratePotentialTargetChanceDefault({ targetChancePercent: 53.44, targetChanceAverage: true }).targetChanceAverage, true);
   assert.equal(normalizePotentialTargetChance(undefined), 63.21);
   assert.equal(normalizePotentialTargetChance(120), 99.99);
 });
@@ -293,8 +301,9 @@ test("잠재와 에디셔널 목표 도달 확률은 평균으로 보기로 되�
   );
 
   assert.match(control, /createReachChanceControl\(\{/u);
-  assert.match(control, /DEFAULT_TARGET_CHANCE_PERCENT/u);
-  assert.match(control, /averageValue: DEFAULT_TARGET_CHANCE_PERCENT/u);
+  assert.match(control, /averageValue: averageChance/u);
+  assert.match(control, /average: state.targetChanceAverage/u);
+  assert.match(control, /average \? \{ attempts: plan.expectedAttempts, cost: plan.expectedCost \}/u);
   assert.match(component, /"평균으로 보기"/u);
   assert.doesNotMatch(component, /"초기화"/u);
   assert.match(component, /modeStatus\.hidden = !averageMode/u);
@@ -406,6 +415,59 @@ test("주스탯%급은 캐릭터 정보가 있을 때 첫 줄에만 허용한다
     }),
     [],
   );
+});
+
+test("모자 에디셔널은 주스탯%급과 쿨타임 감소를 함께 선택할 수 있다", () => {
+  const availableTargetTypes = ["stat-equivalent", "cooldown", "str-flat", "damage"];
+  const targets = [
+    { type: "stat-equivalent", value: "12" },
+    { type: "cooldown", value: "1" },
+    { type: "", value: "" },
+  ];
+  for (const index of [1, 2]) {
+    const options = { availableTargetTypes, targets, index, hasProfile: true };
+    assert.deepEqual(getPotentialTargetTypesForRow({ ...options, system: "additional", part: 6 }), ["cooldown"]);
+    assert.deepEqual(getPotentialTargetTypesForRow({ ...options, system: "regular", part: 6 }), []);
+    assert.deepEqual(getPotentialTargetTypesForRow({ ...options, system: "additional", part: 11 }), []);
+    assert.deepEqual(getPotentialTargetTypesForRow({
+      ...options, system: "additional", part: 6,
+      availableTargetTypes: ["stat-equivalent", "str-flat"],
+    }), []);
+  }
+});
+
+test("모자 에디셔널의 환산·쿨타임 목표는 두 조건을 모두 만족해야 성공한다", () => {
+  const tables = [
+    [{ name: "스킬 재사용 대기시간 -1초", probability: 50 }, { name: "STR +12%", probability: 50 }],
+    [{ name: "STR +6%", probability: 50 }, { name: "기타", probability: 50 }],
+    [{ name: "STR +6%", probability: 50 }, { name: "기타", probability: 50 }],
+  ];
+  const targets = mergePotentialTargets([
+    { type: "stat-equivalent", value: 12 }, { type: "cooldown", value: 1 },
+  ]).map(({ type, value }) => ({ targetType: type, target: value }));
+  const context = { tables, itemLevel: 200, grade: "legendary", system: "additional", mainStat: "STR", characterLevel: 285 };
+  const combined = calculatePotentialExpected({ ...context, targetSets: [targets] });
+  const statOnly = calculatePotentialExpected({ ...context, targets: targets.slice(0, 1) });
+  const cooldownOnly = calculatePotentialExpected({ ...context, targets: targets.slice(1) });
+  assert.equal(combined.rawProbability, 0.125);
+  assert.equal(statOnly.rawProbability, 0.625);
+  assert.equal(cooldownOnly.rawProbability, 0.5);
+  const success = getPotentialSuccessCombinations({ ...context, targets });
+  assert.equal(success.totalCount, 1);
+  assert.deepEqual(success.combinations[0].scores, [12, 1]);
+});
+
+test("프에큐의 환산·쿨타임 조건은 재설정하는 두 줄에서 동시에 충족한다", () => {
+  const tables = [
+    [{ name: "STR +12%", probability: 100 }],
+    [{ name: "스킬 재사용 대기시간 -1초", probability: 50 }, { name: "기타", probability: 50 }],
+    [{ name: "STR +12%", probability: 50 }, { name: "기타", probability: 50 }],
+  ];
+  const result = calculatePrimePotentialExpected({
+    tables, itemLevel: 200, grade: "legendary", system: "additional", mainStat: "STR", characterLevel: 285,
+    targetSets: [[{ targetType: "stat-equivalent", target: 12 }, { targetType: "cooldown", target: 1 }]],
+  });
+  assert.equal(result.rawProbability, 0.25);
 });
 
 test("앞 칸의 공격력 목표를 다른 칸에서도 선택할 수 있다", () => {

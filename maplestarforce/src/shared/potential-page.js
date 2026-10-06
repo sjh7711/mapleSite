@@ -3,6 +3,8 @@ import {
   POTENTIAL_GRADES,
   POTENTIAL_PARTS,
   calculatePotentialRankUpExpected,
+  calculatePotentialRankUpChanceWithinBudget,
+  calculateGeometricMeanChance,
   calculatePotentialRankUpReachForChance,
   calculatePotentialExpected,
   calculatePrimePotentialExpected,
@@ -442,6 +444,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
       return getPotentialTargetTypesForRow({
         availableTargetTypes: orderPotentialTargetTypes(types, { system }),
         targets: targets.slice(1), index: index - 1, hasProfile,
+        system, part: state.part,
       });
     }
     return getPotentialTargetTypesForRow({
@@ -449,6 +452,8 @@ function mountPotentialSystem({ system, onSystemChange }) {
       targets,
       index,
       hasProfile,
+      system,
+      part: state.part,
     });
   }
 
@@ -1573,103 +1578,72 @@ function mountPotentialSystem({ system, onSystemChange }) {
       costValue.dataset.targetChanceCost = "";
       metricItems.push(costMetric);
     }
-    const updateReadout = (chancePercent) => {
-      const attempts = calculateResetsForChance(
-        result.probability ?? result.probabilityRange?.[0] ?? 0,
-        chancePercent / 100,
-      );
-      const chanceLabel = `${formatTargetChance(chancePercent)}% 도달`;
+    const averageChance = result.dependsOnFirstLine ? null
+      : calculateGeometricMeanChance(result.probability) * 100;
+    const updateReadout = (chancePercent, average) => {
+      const counts = result.dependsOnFirstLine
+        ? average ? result.expectedResetsRange
+          : result.probabilityRange.map((p) => calculateResetsForChance(p, chancePercent / 100))
+        : [average ? result.expectedResets : calculateResetsForChance(result.probability, chancePercent / 100)];
+      const chanceLabel = average ? "평균" : `${formatTargetChance(chancePercent)}% 도달`;
       attemptsLabel.textContent = `${chanceLabel} ${methodInfo.usesMeso ? "재설정" : "큐브"}`;
-      attemptsValue.textContent = result.dependsOnFirstLine
-        ? formatRange(result.probabilityRange.map((probability) => calculateResetsForChance(probability, chancePercent / 100)), formatAttempts)
-        : formatAttempts(attempts);
+      attemptsValue.textContent = formatRange(counts, formatAttempts);
       if (costLabel && costValue) {
         costLabel.textContent = `${chanceLabel} ${methodInfo.usesMeso ? "비용" : "큐브 사용 메소"}`;
-        const costForAttempts = (count) => Number.isFinite(count)
-          ? formatPotentialResetMeso(count * result.resetCost, methodInfo)
-          : "도달 불가";
-        costValue.textContent = result.dependsOnFirstLine
-          ? formatRange(result.probabilityRange.map((probability) => calculateResetsForChance(probability, chancePercent / 100)), costForAttempts)
-          : costForAttempts(attempts);
+        costValue.textContent = formatRange(counts, (count) => Number.isFinite(count)
+          ? formatPotentialResetMeso(count * result.resetCost, methodInfo) : "도달 불가");
       }
     };
-
-    return createReachChanceControl({
+    const control = createReachChanceControl({
       id: `${toolId}-target-chance-range`,
-      label: "목표 도달 확률",
       value: state.targetChancePercent,
-      min: MIN_TARGET_CHANCE,
-      max: MAX_TARGET_CHANCE,
-      average: Math.abs(
-        Number(state.targetChancePercent) - DEFAULT_TARGET_CHANCE_PERCENT,
-      ) < 0.005,
-      averageValue: DEFAULT_TARGET_CHANCE_PERCENT,
-      resetTitle: `평균 재설정 횟수에 해당하는 ${DEFAULT_TARGET_CHANCE_PERCENT}%로 봅니다.`,
-      rangeKey: "target-chance-range",
-      numberKey: "target-chance-number",
+      min: MIN_TARGET_CHANCE, max: MAX_TARGET_CHANCE,
+      average: state.targetChanceAverage,
+      averageValue: averageChance,
+      averagePlaceholder: "범위",
+      resetTitle: "실제 평균 횟수·비용으로 봅니다. 확률은 평균 비용 이내의 성공 확률입니다.",
+      rangeKey: "target-chance-range", numberKey: "target-chance-number",
       metrics: metricItems,
-      normalize: (value, fallback) => normalizePotentialTargetChance(value, fallback),
-      deriveAverage: ({ value }) => Math.abs(
-        Number(value) - DEFAULT_TARGET_CHANCE_PERCENT,
-      ) < 0.005,
-      onChange: (value) => {
-        state.targetChancePercent = value;
-        updateReadout(value);
+      normalize: normalizePotentialTargetChance,
+      onChange: (value, { average }) => {
+        if (value !== null) state.targetChancePercent = value;
+        state.targetChanceAverage = average;
+        updateReadout(value, average);
       },
       onCommit: persist,
     });
+    if (result.dependsOnFirstLine) control.append(note("첫 줄에 따라 평균이 달라 하나의 평균 도달 확률로 표시할 수 없습니다. 확률을 직접 입력하면 해당 확률의 횟수·비용 범위를 확인할 수 있습니다."));
+    return control;
   }
 
-  function rankUpReachChanceSection(plan, methodInfo) {
-    const attemptsMetric = metric("목표 도달 재설정", "-");
-    const attemptsLabel = attemptsMetric.querySelector("span");
-    const attemptsValue = attemptsMetric.querySelector("strong");
-    const metricItems = [attemptsMetric];
-    let costLabel = null;
-    let costValue = null;
-    if (plan.expectedCost !== null) {
-      const costMetric = metric("목표 도달 비용", "-");
-      costLabel = costMetric.querySelector("span");
-      costValue = costMetric.querySelector("strong");
-      metricItems.push(costMetric);
-    }
-    const updateReadout = (chancePercent) => {
-      const reach = calculatePotentialRankUpReachForChance(
-        plan,
-        chancePercent / 100,
-      );
-      const chanceLabel = `${formatTargetChance(chancePercent)}% 도달`;
-      attemptsLabel.textContent = `${chanceLabel} ${methodInfo.usesMeso ? "재설정" : "큐브"}`;
-      attemptsValue.textContent = formatAttempts(reach.attempts);
-      if (costLabel && costValue) {
-        costLabel.textContent = `${chanceLabel} ${methodInfo.usesMeso ? "비용" : "큐브 사용 메소"}`;
-        costValue.textContent = reach.cost === null
-          ? "계산 불가"
-          : formatPotentialResetMeso(reach.cost, methodInfo);
-      }
-    };
-
+  function rankUpReachChanceSection(plan, methodInfo, onSelectionChange = () => {}) {
+    const attemptsMetric = metric("평균 재설정", "-");
+    const costMetric = plan.expectedCost === null ? null : metric("평균 비용", "-");
+    const averageChance = calculatePotentialRankUpChanceWithinBudget(plan,
+      plan.expectedCost ?? plan.expectedAttempts, { attempts: plan.expectedCost === null }) * 100;
     return createReachChanceControl({
       id: `${toolId}-rank-up-target-chance-range`,
-      label: "목표 도달 확률",
       value: state.targetChancePercent,
-      min: MIN_TARGET_CHANCE,
-      max: MAX_TARGET_CHANCE,
-      average: Math.abs(
-        Number(state.targetChancePercent) - DEFAULT_TARGET_CHANCE_PERCENT,
-      ) < 0.005,
-      averageValue: DEFAULT_TARGET_CHANCE_PERCENT,
-      resetTitle: `평균 기댓값에 가까운 ${DEFAULT_TARGET_CHANCE_PERCENT}%로 봅니다.`,
-      rangeKey: "rank-up-target-chance-range",
-      numberKey: "rank-up-target-chance-number",
-      metrics: metricItems,
-      normalize: (value, fallback) => normalizePotentialTargetChance(value, fallback),
-      deriveAverage: ({ value }) => Math.abs(
-        Number(value) - DEFAULT_TARGET_CHANCE_PERCENT,
-      ) < 0.005,
-      onChange: (value) => {
+      min: MIN_TARGET_CHANCE, max: MAX_TARGET_CHANCE,
+      average: state.targetChanceAverage,
+      averageValue: averageChance,
+      resetTitle: "실제 평균 횟수·비용으로 봅니다. 확률은 평균 비용 이내의 성공 확률입니다.",
+      rangeKey: "rank-up-target-chance-range", numberKey: "rank-up-target-chance-number",
+      metrics: [attemptsMetric, costMetric],
+      normalize: normalizePotentialTargetChance,
+      onChange: (value, { average }) => {
         state.targetChancePercent = value;
-        updateReadout(value);
+        state.targetChanceAverage = average;
+        const reach = average ? { attempts: plan.expectedAttempts, cost: plan.expectedCost }
+          : calculatePotentialRankUpReachForChance(plan, value / 100);
+        const label = average ? "평균" : `${formatTargetChance(value)}% 도달`;
+        attemptsMetric.querySelector("span").textContent = `${label} ${methodInfo.usesMeso ? "재설정" : "큐브"}`;
+        attemptsMetric.querySelector("strong").textContent = formatAttempts(reach.attempts);
+        if (costMetric) {
+          costMetric.querySelector("span").textContent = `${label} ${methodInfo.usesMeso ? "비용" : "큐브 사용 메소"}`;
+          costMetric.querySelector("strong").textContent = formatPotentialResetMeso(reach.cost, methodInfo);
+        }
+        onSelectionChange({ chance: value / 100, average, label });
       },
       onCommit: persist,
     });
@@ -1706,25 +1680,28 @@ function mountPotentialSystem({ system, onSystemChange }) {
           ),
         );
       }
-      const stageDetails = details(
-        "단계별 기댓값",
-        ...plan.stages.map((stage) =>
-          resultLine(
-            `${GRADE_NAMES[stage.fromGrade]} → ${GRADE_NAMES[stage.toGrade]}`,
-            [
-              formatAttempts(stage.expectedAttempts),
-              formatProbability(stage.probability, 6),
-              stage.expectedCost === null
-                ? null
-                : formatPotentialResetMeso(stage.expectedCost, methodInfo),
-            ].filter(Boolean).join(" · "),
-          ),
-        ),
-      );
+      const stageDetails = details("단계별 기댓값");
       stageDetails.dataset.detailsKey = "rank-up";
+      const stageRows = plan.stages.map((stage) => {
+        const line = resultLine(`${GRADE_NAMES[stage.fromGrade]} → ${GRADE_NAMES[stage.toGrade]}`, "-");
+        stageDetails.append(line);
+        return { stage, line };
+      });
+      const stageNote = note("각 단계에 선택한 확률을 각각 적용합니다. 단계별 비용의 합은 전체 목표 도달 비용과 다를 수 있습니다.");
+      stageDetails.append(stageNote);
+      const updateStages = ({ chance, average, label }) => {
+        for (const { stage, line } of stageRows) {
+          const reach = average ? { attempts: stage.expectedAttempts, cost: stage.expectedCost }
+            : calculatePotentialRankUpReachForChance({ stages: [stage] }, chance);
+          line.lastElementChild.textContent = [label, formatAttempts(reach.attempts),
+            reach.cost === null ? null : formatPotentialResetMeso(reach.cost, methodInfo),
+          ].filter(Boolean).join(" · ");
+        }
+        stageNote.hidden = average;
+      };
       section.append(
         metricGrid(...averageMetrics),
-        rankUpReachChanceSection(plan, methodInfo),
+        rankUpReachChanceSection(plan, methodInfo, updateStages),
         resultLine(
           "목표 등급",
           `${GRADE_NAMES[state.grade]} → ${GRADE_NAMES[targetGrade]}`,

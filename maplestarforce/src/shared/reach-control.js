@@ -31,6 +31,7 @@ export function createReachChanceControl({
   step = 0.01,
   average = false,
   averageValue = value,
+  averagePlaceholder = "—",
   resetTitle = "평균 기댓값으로 돌아갑니다.",
   rangeKey = "",
   numberKey = "",
@@ -91,9 +92,11 @@ export function createReachChanceControl({
   let currentValue = Number(value);
   let averageMode = Boolean(average);
 
-  const normalizeCandidate = (raw, { live = false } = {}) => {
+  const normalizeCandidate = (raw, { live = false, mean = false } = {}) => {
+    if (raw === null || raw === undefined) return null;
     const numeric = finiteNumber(raw);
     if (numeric === null) return null;
+    if (mean) return Math.round(Math.min(100, Math.max(0, numeric)) * 100) / 100;
     if (live && (numeric < min || numeric > max)) return null;
     const normalized = Number(normalize(numeric, currentValue));
     if (!Number.isFinite(normalized)) return null;
@@ -106,6 +109,13 @@ export function createReachChanceControl({
     reset.hidden = averageMode;
     reset.disabled = averageMode;
     inputs.dataset.active = String(!averageMode);
+    // Manual quantiles exclude 0/100; a mean budget can have exactly 0/100% CDF.
+    for (const input of [range, number]) {
+      input.min = String(averageMode ? 0 : min);
+      input.max = String(averageMode ? 100 : max);
+    }
+    number.placeholder = averagePlaceholder;
+    range.disabled = averageMode && currentValue === null;
   };
 
   const apply = (next, {
@@ -121,9 +131,9 @@ export function createReachChanceControl({
       source,
       phase,
     }));
-    range.value = String(next);
-    if (syncNumber) number.value = String(next);
     paintMode();
+    range.value = String(next ?? 50);
+    if (syncNumber) number.value = next === null ? "" : String(next);
     onChange(next, {
       average: averageMode,
       phase,
@@ -150,7 +160,7 @@ export function createReachChanceControl({
   };
 
   range.addEventListener("input", () => {
-    const next = normalizeCandidate(range.value, { live: true });
+    const next = normalizeCandidate(range.value);
     if (next === null) return;
     apply(next, { syncNumber: true, phase: "input", source: "range" });
   });
@@ -169,7 +179,7 @@ export function createReachChanceControl({
 
   reset.addEventListener("click", () => {
     const raw = typeof averageValue === "function" ? averageValue() : averageValue;
-    const next = normalizeCandidate(raw) ?? currentValue;
+    const next = normalizeCandidate(raw, { mean: true });
     apply(next, {
       requestedAverage: true,
       syncNumber: true,
@@ -180,7 +190,9 @@ export function createReachChanceControl({
   });
 
   control.append(head, inputs, metricsNode);
-  const initial = normalizeCandidate(currentValue) ?? min;
+  const meanValue = typeof averageValue === "function" ? averageValue() : averageValue;
+  const initial = average ? normalizeCandidate(meanValue, { mean: true })
+    : normalizeCandidate(currentValue) ?? min;
   number.value = String(initial);
   apply(initial, {
     requestedAverage: average,

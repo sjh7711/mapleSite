@@ -254,10 +254,7 @@ test("자석펫 결과는 평균으로 시작하고 확률 입력 시 목표 확
     source,
     /loaded\.resultMode = loaded\.resultMode === "chance"[\s\S]*\? "chance"[\s\S]*: "average"/,
   );
-  assert.match(
-    source,
-    /loaded\.resultMode === "average"[\s\S]*loaded\.targetChancePercent = DEFAULT_PET_TARGET_CHANCE_PERCENT/u,
-  );
+  assert.doesNotMatch(source, /loaded\.targetChancePercent = DEFAULT_PET_TARGET_CHANCE_PERCENT/u);
   assert.match(source, /targetChancePercent: DEFAULT_PET_TARGET_CHANCE_PERCENT/);
   assert.match(source, /function petReachChanceControl\(/);
   assert.match(source, /createReachChanceControl\(\{/u);
@@ -275,7 +272,7 @@ test("자석펫 결과는 평균으로 시작하고 확률 입력 시 목표 확
   );
   assert.match(
     source,
-    /averageValue: DEFAULT_PET_TARGET_CHANCE_PERCENT/,
+    /averageValue: meanEstimate\?\.chance == null \? null : meanEstimate\.chance \* 100/,
   );
   assert.match(component, /modeStatus\.hidden = !averageMode/u);
   assert.match(component, /reset\.hidden = averageMode/u);

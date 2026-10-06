@@ -213,3 +213,16 @@ test("even an invalid share link isolates both stores before calculator initiali
     globalThis.sessionStorage = previousSession;
   }
 });
+
+
+test("potential share links preserve explicit mean vs percentile mode at the same displayed probability", async () => {
+  for (const targetChanceAverage of [true, false]) {
+    const value = snapshot("potential", "additional:v6", {
+      targetChancePercent: 53.44, targetChanceAverage, calculationMode: "rank-up",
+    });
+    const encoded = await encodeResultSnapshot(value);
+    const decoded = await decodeResultSnapshot(encoded, "potential");
+    assert.equal(decoded.local[key("additional:v6")].targetChanceAverage, targetChanceAverage);
+    assert.equal(decoded.local[key("additional:v6")].targetChancePercent, 53.44);
+  }
+});
