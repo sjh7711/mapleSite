@@ -16,7 +16,7 @@ npm test
 
 ## 2. 환경 설정
 
-저장소에 포함된 `.env.preview`와 `.env.production`에는 공개 가능한 기능 플래그만 있습니다. NEXON API 키 등 비밀값은 저장소에 없으며 Cloudflare Pages의 Secret으로 별도 등록해야 합니다.
+저장소에는 공개 가능한 기능 플래그의 `.env.preview.example`과 `.env.production.example`이 있습니다. NEXON API 키 등 런타임 비밀값은 Cloudflare Pages의 Secret으로 별도 등록해야 합니다.
 
 ## 3. 빌드
 
@@ -36,4 +36,8 @@ npm run build:production
 
 ## 5. Cloudflare Pages
 
-프로젝트명은 `starforce`, 배포 디렉터리는 `maplestarforce/dist`입니다. 배포 전 반드시 해당 환경의 빌드와 전체 테스트를 실행합니다.
+프로젝트명은 `starforce`, 빌드 디렉터리는 `maplestarforce/dist`입니다.
+
+운영 배포는 GitHub의 `Starforce CI`에서 실행합니다. `main`의 테스트와 빌드가 통과하면 같은 실행에서 만든 결과물과 같은 커밋의 Pages Functions를 사용합니다. 다시 배포하려면 GitHub Actions에서 `main`을 선택해 `Starforce CI`를 실행합니다.
+
+GitHub `production` 환경에는 `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`이 필요합니다. 브라우저에서 사용하는 대장장이 API 주소는 저장소 변수 `VITE_INBOX_API_BASE`에 설정합니다. 저장소 변수 `STARFORCE_PRODUCTION_ENABLED`를 `true`로 설정하면 운영 배포를 실행합니다.

@@ -5,6 +5,7 @@ on:
     branches: [main]
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -35,4 +36,85 @@ jobs:
       - run: npm --prefix maplestarforce ci
       - run: npm --prefix maple-core test
       - run: npm --prefix maplestarforce test
-      - run: npm --prefix maplestarforce run build:production
+      - name: Build Starforce for production
+        working-directory: maplestarforce
+        env:
+          VITE_STARFORCE_INBOX_ENABLED: "true"
+          VITE_INBOX_API_BASE: ${{ vars.VITE_INBOX_API_BASE }}
+        run: |
+          : "${VITE_INBOX_API_BASE:?Set the public production inbox API URL in repository variables}"
+          npm run build:production
+      - name: Verify Pages Functions build
+        working-directory: maplestarforce
+        run: ./node_modules/.bin/wrangler pages functions build --outdir "$RUNNER_TEMP/starforce-functions"
+      - name: Package the tested Pages build
+        if: github.repository == 'sjh7711/mapleSite' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        working-directory: maplestarforce
+        run: tar -czf "$RUNNER_TEMP/starforce-pages.tgz" dist functions/_generated
+      - name: Upload the tested Pages build
+        if: github.repository == 'sjh7711/mapleSite' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: starforce-pages-${{ github.sha }}
+          path: ${{ runner.temp }}/starforce-pages.tgz
+          if-no-files-found: error
+          retention-days: 7
+
+  deploy:
+    name: Deploy Starforce production
+    needs: check
+    if: >-
+      github.repository == 'sjh7711/mapleSite' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      vars.STARFORCE_PRODUCTION_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://starforce.pages.dev/
+    concurrency:
+      group: starforce-production
+      cancel-in-progress: false
+    env:
+      CI: "true"
+      npm_config_audit: "false"
+      npm_config_fund: "false"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: maplestarforce/.nvmrc
+          package-manager-cache: false
+      - run: npm --prefix maplestarforce ci
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: starforce-pages-${{ github.sha }}
+          path: ${{ runner.temp }}
+      - name: Restore the tested Pages build
+        working-directory: maplestarforce
+        run: tar -xzf "$RUNNER_TEMP/starforce-pages.tgz"
+      - name: Confirm this commit is still at the tip of main
+        id: main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          main_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')
+          if [[ "$main_sha" == "$GITHUB_SHA" ]]; then
+            echo 'deploy=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'Skipping this run because main has advanced.'
+          fi
+      - name: Upload to Cloudflare Pages production
+        if: steps.main.outputs.deploy == 'true'
+        working-directory: maplestarforce
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          : "${CLOUDFLARE_API_TOKEN:?Set the Cloudflare token in the GitHub production environment}"
+          : "${CLOUDFLARE_ACCOUNT_ID:?Set the Cloudflare account ID in the GitHub production environment}"
+          ./node_modules/.bin/wrangler pages deploy dist --project-name starforce --branch main --commit-hash "$GITHUB_SHA" --commit-dirty=false
