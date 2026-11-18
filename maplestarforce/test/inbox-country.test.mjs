@@ -4,7 +4,7 @@ import {mkdtemp,rm,writeFile,stat} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {gzipSync} from 'node:zlib';
-import {compileKoreanRanges,createCountryPolicy,countryFeed} from '../tools/inbox-api/country.mjs';
+import {compileKoreanRanges,createCountryPolicy,countryFeed} from '../../services/blacksmith-inbox/country.mjs';
 
 const csv='1.201.0.0,1.201.0.127,KR\n1.201.0.128,1.201.0.255,KR\n8.8.8.0,8.8.8.255,US\n2001:db8::,2001:db8::ffff,KR\n';
 test('country policy handles Korean IPv4, IPv6, mapped IPv4 and boundary/foreign IPs',()=>{

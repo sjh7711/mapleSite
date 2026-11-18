@@ -26,13 +26,14 @@ export const PRIVATE_STATE_SCHEMA = "maplestarforce.item-market.state.v1";
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const VALIDATOR_PATH = fileURLToPath(new URL("./lib/schema-validator.mjs", import.meta.url));
 const PROJECT_ROOT = path.resolve(path.dirname(SCRIPT_PATH), "..");
-const DEFAULT_EXTENSION_ROOT = path.resolve(PROJECT_ROOT, "../chrome extension/maple-auction-diagnostic");
-const DEFAULT_RAW_ROOT = path.join(PROJECT_ROOT, "item_price_raw");
-const DEFAULT_PRIVATE_ROOT = path.join(
+const DEFAULT_EXTENSION_ROOT = path.resolve(PROJECT_ROOT, "../extensions/auction-diagnostic");
+const DATA_ROOT = process.env.MAPLE_MARKET_DATA_ROOT;
+const DEFAULT_RAW_ROOT = DATA_ROOT ? path.join(DATA_ROOT, "item_price_raw") : path.join(PROJECT_ROOT, "item_price_raw");
+const DEFAULT_PRIVATE_ROOT = DATA_ROOT ? path.join(DATA_ROOT, "market-data/auction") : path.join(
   PROJECT_ROOT,
   "tools/item-market-dataset/market-data/auction"
 );
-const DEFAULT_PUBLIC_ROOT = path.join(PROJECT_ROOT, "public/item-market");
+const DEFAULT_PUBLIC_ROOT = DATA_ROOT ? path.join(DATA_ROOT, "public-item-market") : path.join(PROJECT_ROOT, "public/item-market");
 const HASH_PATTERN = /^sha256:[0-9a-f]{64}$/u;
 const DECIMAL_PATTERN = /^(?:0|[1-9][0-9]*)$/u;
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}(?:T.*)?$/u;

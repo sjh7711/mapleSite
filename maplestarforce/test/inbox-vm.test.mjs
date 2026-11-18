@@ -7,9 +7,9 @@ import {fileURLToPath} from 'node:url';
 import {createHash,randomUUID} from 'node:crypto';
 import {build} from 'esbuild';
 import http from 'node:http';
-import {openInboxDatabase} from '../tools/inbox-api/sqlite.mjs';
-import {createInboxServer} from '../tools/inbox-api/server.mjs';
-import {createTrafficLimiter} from '../tools/inbox-api/traffic.mjs';
+import {openInboxDatabase} from '../../services/blacksmith-inbox/sqlite.mjs';
+import {createInboxServer} from '../../services/blacksmith-inbox/server.mjs';
+import {createTrafficLimiter} from '../../services/blacksmith-inbox/traffic.mjs';
 
 let directory,db,server,verifier,url,handlers;
 const config={frontendOrigin:'https://preview.starforce.pages.dev',proxyKey:'1'.repeat(64),bridgeToken:'2'.repeat(64),sitekey:'fixture-only'};

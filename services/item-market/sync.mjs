@@ -5,7 +5,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 
-const ROOT = path.resolve(import.meta.dirname, "../..");
+const ROOT = path.resolve(import.meta.dirname, "../../maplestarforce");
 const CONFIG_PATH = process.env.MAPLE_MARKET_SYNC_CONFIG || "/home/ubuntu/.config/maple-market-sync/config.json";
 const HASH = /^[a-f0-9]{64}$/u;
 const VERSION = /^[a-f0-9]{20}$/u;
@@ -62,7 +62,7 @@ async function command(config, name, executable, args, cwd, timeoutMs = 45 * 60_
   await mkdir(path.dirname(logFile), { recursive: true });
   const { open } = await import("node:fs/promises");
   const output = await open(logFile, "a", 0o600);
-  const child = spawn(executable, args, { cwd, env: { ...process.env, CI: "true" },
+  const child = spawn(executable, args, { cwd, env: { ...process.env, CI: "true", MAPLE_MARKET_PUBLIC_ROOT: config.publicRoot },
     stdio: ["ignore", output.fd, output.fd], detached: true });
   let timedOut = false;
   const terminate = () => { try { process.kill(-child.pid, "SIGKILL"); } catch {} };

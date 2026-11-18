@@ -2,7 +2,7 @@
 
 ## 현재 구성
 
-실행 작업본은 `/home/ubuntu/maple-platform/mapleSite/maplestarforce`이며 시세 원본도 이 작업본의 `item_price_raw`에 저장합니다. `/home/ubuntu/maplestarforce`는 같은 작업본으로 연결되는 호환 링크입니다.
+실행 작업본은 `/home/ubuntu/mapleSite/maplestarforce`이며 시세 원본도 이 작업본의 `item_price_raw`에 저장합니다. `/home/ubuntu/maplestarforce`는 같은 작업본으로 연결되는 호환 링크입니다.
 
 확장 프로그램 → Cloudflare Tunnel → VM `127.0.0.1:8793` → `item_price_raw/incoming/<해시 앞 2글자>/<SHA-256>.jsonl`
 
@@ -46,4 +46,4 @@ sudo systemctl restart maple-market-upload.service
 
 개별 업로드는 최대 32 MiB이며 capture.v2 구조, 전체 파일 SHA-256, 문서별 payload SHA-256을 확인합니다. 수집 요청 횟수·계정·경매장 호출 방식은 바꾸지 않습니다.
 
-Worker 수정 시 `npx wrangler types --config tools/item-market-upload/wrangler.jsonc`로 타입을 재생성하고 타입 검사 후 배포합니다. 비밀값을 명령줄 인자나 Git에 넣지 않습니다.
+Worker 수정 시 `npx wrangler types --config ../services/item-market/wrangler.jsonc`로 타입을 재생성하고 타입 검사 후 배포합니다. 비밀값을 명령줄 인자나 Git에 넣지 않습니다.

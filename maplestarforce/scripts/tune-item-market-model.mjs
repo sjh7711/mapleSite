@@ -134,9 +134,16 @@ export async function tuneItemMarketModel({ publicRoot, cacheRoot, reportPath, o
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   const root = path.resolve(import.meta.dirname, "..");
-  const result = await tuneItemMarketModel({ publicRoot: path.join(root, "public/item-market"),
-    cacheRoot: path.join(root, "tools/item-market-dataset/market-data/model-cache"),
-    reportPath: process.argv[2] || path.join(root, "tools/item-market-dataset/market-data/latest-model-report.json"),
+  const dataRoot = process.env.MAPLE_MARKET_DATA_ROOT;
+  const modelRoot = dataRoot
+    ? path.join(dataRoot, "market-data")
+    : path.join(root, "tools/item-market-dataset/market-data");
+  const publicRoot = process.env.MAPLE_MARKET_PUBLIC_ROOT || (dataRoot
+    ? path.join(dataRoot, "public-item-market")
+    : path.join(root, "public/item-market"));
+  const result = await tuneItemMarketModel({ publicRoot,
+    cacheRoot: path.join(modelRoot, "model-cache"),
+    reportPath: process.argv[2] || path.join(modelRoot, "latest-model-report.json"),
     onProgress: (event) => console.log(JSON.stringify(event)) });
   console.log(JSON.stringify(result.report.summary));
 }

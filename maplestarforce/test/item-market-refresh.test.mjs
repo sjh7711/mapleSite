@@ -21,7 +21,7 @@ const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT_ROOT = path.resolve(TEST_DIR, "..");
 const EXTENSION_ROOT = path.resolve(
   PROJECT_ROOT,
-  "../chrome extension/maple-auction-diagnostic",
+  "../extensions/auction-diagnostic",
 );
 const catalog = await import(
   pathToFileURL(path.join(EXTENSION_ROOT, "tools/catalog.mjs")).href

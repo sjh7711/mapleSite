@@ -4,8 +4,8 @@ import { createHash } from "node:crypto";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createUploadServer } from "../tools/item-market-upload/receiver.mjs";
-import worker from "../tools/item-market-upload/worker.js";
+import { createUploadServer } from "../../services/item-market/receiver.mjs";
+import worker from "../../services/item-market/worker.js";
 
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 test("VM receiver acknowledges only validated durable files and deduplicates retries", async () => {

@@ -7,10 +7,11 @@ StartLimitIntervalSec=0
 [Service]
 Type=simple
 User=ubuntu
-WorkingDirectory=/home/ubuntu/maple-platform/mapleSite/maplestarforce
+WorkingDirectory=/home/ubuntu/mapleSite/maplestarforce
+Environment=MAPLE_MARKET_DATA_ROOT=/home/ubuntu/maple-data/starforce
 Environment=MAPLE_MARKET_SYNC_CONFIG=/home/ubuntu/.config/maple-market-sync/config.json
 Environment=PATH=/home/ubuntu/.nvm/versions/node/v22.23.4/bin:/usr/local/bin:/usr/bin:/bin
-ExecStart=/usr/bin/flock --nonblock /home/ubuntu/.local/state/maple-market-sync/service.lock /home/ubuntu/.nvm/versions/node/v22.23.4/bin/node /home/ubuntu/maple-platform/mapleSite/maplestarforce/tools/item-market-sync/service.mjs daemon
+ExecStart=/usr/bin/flock --nonblock /home/ubuntu/.local/state/maple-market-sync/service.lock /home/ubuntu/.nvm/versions/node/v22.23.4/bin/node /home/ubuntu/mapleSite/services/item-market/sync.mjs daemon
 Restart=always
 RestartSec=15
 TimeoutStopSec=30

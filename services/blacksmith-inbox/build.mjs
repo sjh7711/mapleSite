@@ -1,7 +1,9 @@
-import { build } from 'esbuild';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { mkdir } from 'node:fs/promises';
-const root=fileURLToPath(new URL('../../',import.meta.url));
+const sitePackage = new URL('../../maplestarforce/package.json', import.meta.url);
+const { build } = createRequire(sitePackage)('esbuild');
+const root=fileURLToPath(new URL('.',sitePackage));
 await mkdir(new URL('./.build',import.meta.url),{recursive:true});
 await build({stdin:{resolveDir:root,contents:`
   export {onRequest as publicApi} from './functions/api/blacksmith-inboxes/[[path]].ts';

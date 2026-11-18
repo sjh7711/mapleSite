@@ -38,8 +38,8 @@
     "market:status": "node scripts/refresh-item-market-data.mjs --status",
     "market:check": "node scripts/refresh-item-market-data.mjs --check",
     "market:refresh": "node --max-old-space-size=4096 scripts/refresh-item-market-data.mjs",
-    "market:sync": "node tools/item-market-sync/service.mjs refresh --wait",
-    "market:sync-status": "node tools/item-market-sync/service.mjs status",
+    "market:sync": "node ../services/item-market/sync.mjs refresh --wait",
+    "market:sync-status": "node ../services/item-market/sync.mjs status",
     "market:model-check": "node scripts/check-item-market-model.mjs",
     "market:prior-check": "node scripts/check-item-market-pooled-prior.mjs"
   },

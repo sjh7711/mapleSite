@@ -2,7 +2,7 @@
 
 ## 운영
 
-- 실행 작업본: `/home/ubuntu/maple-platform/mapleSite/maplestarforce`. 웹 프리뷰와 같은 소스를 사용합니다.
+- 실행 작업본: `/home/ubuntu/mapleSite/maplestarforce`. 웹 프리뷰와 같은 소스를 사용합니다.
 - 원본은 `item_price_raw`, 비공개 가공 자료·모델 캐시는 `tools/item-market-dataset/market-data`, 공개 자료는 `public/item-market`에 보존합니다. 서비스의 비공개 설정도 이 실제 경로를 가리킵니다.
 - 서비스: `maple-market-sync.service` (ubuntu 계정, 부팅 시 시작, 비정상 종료 시 15초 후 재시작)
 - 60초마다 `item_price_raw/incoming`의 해시 파일명을 확인합니다.

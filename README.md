@@ -5,12 +5,16 @@
 ## 구성
 
 - `maplestarforce/`: Cloudflare Pages에 배포되는 웹사이트, Pages Functions, 테스트, 연구·수집 파이프라인
-- `maple-core/`: 스타포스 데브 웹사이트 전용 기댓값·스탯 환산 계산 엔진
-- `chrome extension/maple-auction-diagnostic/`: 웹 경매장 자료 수집·진단용 Chrome 확장. 사이트 테스트가 사용하는 기존 상대 경로를 보존
+- `services/blacksmith-inbox/`: VM 대장장이 API 및 운영·프리뷰 백업 도구
+- `services/item-market/`: VM 시세 수신·갱신 및 수집 경로 안내
+- `maple-core/`: 사이트가 사용하는 공용 기대값·스탯 환산 계산 엔진
+- `extensions/auction-diagnostic/`: 웹 경매장 자료 수집·진단용 Chrome 확장. 사이트 테스트가 사용하는 기존 상대 경로를 보존
 - `research/ui-reference/`: UI 검토에 사용한 선별 캡처
 - `backup-manifests/`: GitHub Release로 분리한 대용량 자료의 체크섬과 원래 경로
 
-스타포스 데브 운영 소스와 웹 계산 엔진을 이 저장소에서 관리합니다. 기존에 공개한 시세 릴리스 `22762152e065ef31aa1f`는 보관용입니다. 현재 시세 수신·갱신 서비스의 데이터는 운영 호스트에서 관리합니다.
+프리뷰 빌드 재현에 필요한 현재 장비 시세 릴리스 `1463d27e9e475640d240`와 기존 재현용 `22762152e065ef31aa1f`는 저장소에 포함하며, 나머지 과거 릴리스와 수집 원본은 일반 Git 이력에서 제외합니다. 시세 수신·갱신 서비스도 이 저장소의 `maplestarforce`에서 실행하며, 원본·가공 자료·모델 캐시를 같은 작업본 아래에 보존합니다.
+
+VM의 사설 시세 원본, 가공 자료, 모델 캐시, 배포 데이터는 `/home/ubuntu/maple-data/starforce`에 보관합니다.
 
 ## 설치와 검증
 

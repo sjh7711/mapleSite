@@ -7,8 +7,11 @@ import {
 } from "../src/shared/item-market-estimator.js";
 
 const ROOT = resolve(import.meta.dirname, "..");
-const manifest = JSON.parse(await readFile(resolve(ROOT, "public/item-market/manifest.json"), "utf8"));
-const releaseRoot = resolve(ROOT, "public/item-market/releases", manifest.dataset_version);
+const PUBLIC_ROOT = process.env.MAPLE_MARKET_DATA_ROOT
+  ? resolve(process.env.MAPLE_MARKET_DATA_ROOT, "public-item-market")
+  : resolve(ROOT, "public/item-market");
+const manifest = JSON.parse(await readFile(resolve(PUBLIC_ROOT, "manifest.json"), "utf8"));
+const releaseRoot = resolve(PUBLIC_ROOT, "releases", manifest.dataset_version);
 const catalog = JSON.parse(await readFile(resolve(releaseRoot, "catalog.json"), "utf8"));
 const SIGNED_FEATURES = new Set(["scroll_applied", "scroll_recoverable", "trade_one_left"]);
 

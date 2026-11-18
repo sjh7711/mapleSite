@@ -10,8 +10,6 @@
 # Secrets and machine-local state
 **/.env
 **/.env.*
-!maplestarforce/.env.preview
-!maplestarforce/.env.production
 **/*credentials*
 **/*secret*
 **/youtube-cookies.txt
@@ -36,3 +34,22 @@ maplestarforce/tools/battle-practice-dataset/generated/
 .DS_Store
 Thumbs.db
 *.swp
+
+# Only blank/sanitized configuration examples may be committed.
+!**/.env.example
+!**/.env.*.example
+
+/services/blacksmith-inbox/.build/
+
+# Databases, host-only config, and runtime state
+**/.dev.vars
+**/.dev.vars.*
+!**/.dev.vars.example
+**/*.sqlite
+**/*.sqlite-*
+**/*.db
+**/*.db-*
+**/*.key
+**/*.pem
+**/*.log
+**/vm-upload-config.json

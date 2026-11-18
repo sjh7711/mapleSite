@@ -4,7 +4,7 @@ import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { atomicJson, captureInventory, shouldRefresh, serviceTick, readJson, prepareDataBundle }
-  from "../tools/item-market-sync/service.mjs";
+  from "../../services/item-market/sync.mjs";
 import { splitMarketValidation, selectRecencyCandidate } from "../scripts/tune-item-market-model.mjs";
 
 const hash = (n) => n.toString(16).padStart(64, "0");

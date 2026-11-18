@@ -7,10 +7,10 @@ Wants=network-online.target
 Type=simple
 User=ubuntu
 Group=ubuntu
-WorkingDirectory=/home/ubuntu/maple-platform/mapleSite/maplestarforce
+WorkingDirectory=/home/ubuntu/mapleSite/maplestarforce
 Environment=NODE_ENV=production
 Environment=INBOX_API_CONFIG=/home/ubuntu/.config/starforce-inbox-preview/config.json
-ExecStart=/home/ubuntu/.nvm/versions/node/v22.23.4/bin/node tools/inbox-api/service.mjs
+ExecStart=/home/ubuntu/.nvm/versions/node/v22.23.4/bin/node /home/ubuntu/mapleSite/services/blacksmith-inbox/service.mjs
 Restart=on-failure
 RestartSec=5
 TimeoutStopSec=25

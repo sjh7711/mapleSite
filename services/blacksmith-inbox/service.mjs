@@ -8,7 +8,7 @@ import { dirname,join } from 'node:path';
 import * as handlers from './.build/handlers.mjs';
 const config=JSON.parse(await readFile(process.env.INBOX_API_CONFIG,'utf8'));
 if(!['https://preview.starforce.pages.dev','https://starforce.pages.dev'].includes(config.frontendOrigin)||config.verifyUrl!==`${config.frontendOrigin}/api/internal/blacksmith-verify`||![config.bridgeToken,config.proxyKey].every(v=>/^[a-f0-9]{64}$/.test(v)))throw new Error('Invalid inbox API configuration');
-const database=await openInboxDatabase(config.database,fileURLToPath(new URL('../../migrations/blacksmith-inbox',import.meta.url)));
+const database=await openInboxDatabase(config.database,fileURLToPath(new URL('../../maplestarforce/migrations/blacksmith-inbox',import.meta.url)));
 const relay=await createRelayBlocker(join(dirname(config.database),'private-relay.csv'));
 const country=await createCountryPolicy(join(dirname(config.database),'country-lite.csv.gz'));
 const server=createInboxServer({database,handlers,config,relay,country});

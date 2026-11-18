@@ -8,7 +8,10 @@ import {
 } from "../src/shared/item-market-estimator.js";
 
 const ROOT = resolve(import.meta.dirname, "..");
-const MANIFEST_PATH = resolve(ROOT, "public/item-market/manifest.json");
+const PUBLIC_ROOT = process.env.MAPLE_MARKET_DATA_ROOT
+  ? resolve(process.env.MAPLE_MARKET_DATA_ROOT, "public-item-market")
+  : resolve(ROOT, "public/item-market");
+const MANIFEST_PATH = resolve(PUBLIC_ROOT, "manifest.json");
 const EPSILON = 1e-9;
 
 function number(value) {
@@ -148,7 +151,7 @@ function extremeTarget(record) {
 }
 
 const manifest = await readJson(MANIFEST_PATH);
-const releaseRoot = resolve(ROOT, "public/item-market", `releases/${manifest.dataset_version}`);
+const releaseRoot = resolve(PUBLIC_ROOT, `releases/${manifest.dataset_version}`);
 const catalog = await readJson(resolve(releaseRoot, "catalog.json"));
 const itemReports = [];
 

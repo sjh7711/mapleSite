@@ -1,6 +1,6 @@
 # 대장장이 신청함
 
-운영·프리뷰 모두 `VITE_STARFORCE_INBOX_ENABLED=true`로 신청함을 제공한다. 신청 API는 각 환경 전용 VM SQLite에 연결한다. Pages의 기존 D1 바인딩은 롤백용으로 보존하며, 관리자 로그인과 가격 설정은 기존 구조를 유지한다. 운영 구성과 복구 절차는 `tools/inbox-api/README.md`를 따른다. 운영과 프리뷰의 신청함·차단 정보·접수 주소는 서로 분리한다. 기존 프리뷰 신청함은 프리뷰에서 계속 관리한다.
+운영·프리뷰 모두 `VITE_STARFORCE_INBOX_ENABLED=true`로 신청함을 제공한다. 신청 API는 각 환경 전용 VM SQLite에 연결한다. Pages의 기존 D1 바인딩은 롤백용으로 보존하며, 관리자 로그인과 가격 설정은 기존 구조를 유지한다. 운영 구성과 복구 절차는 `services/blacksmith-inbox/README.md`를 따른다. 운영과 프리뷰의 신청함·차단 정보·접수 주소는 서로 분리한다. 기존 프리뷰 신청함은 프리뷰에서 계속 관리한다.
 
 ## 사용 흐름
 

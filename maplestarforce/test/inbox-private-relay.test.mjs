@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {compileRelayRanges} from '../tools/inbox-api/private-relay.mjs';
+import {compileRelayRanges} from '../../services/blacksmith-inbox/private-relay.mjs';
 test('Private Relay CIDR matching covers IPv4/IPv6 boundaries, adjacent ranges and mapped IPv4',()=>{
   const list=compileRelayRanges('172.224.226.0/27,US,Test\n172.224.226.32/31,US,Test\n2001:db8::/64,KR,Test\n2001:db8:1::/128,KR,Test\n');
   assert.equal(list.rows,4);assert.equal(list.intervals,3);

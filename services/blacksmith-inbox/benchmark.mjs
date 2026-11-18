@@ -10,7 +10,7 @@ import {createInboxServer} from './server.mjs';
 import * as handlers from './.build/handlers.mjs';
 
 const directory=await mkdtemp(join(tmpdir(),'inbox-load-'));
-const db=await openInboxDatabase(join(directory,'benchmark.sqlite'),fileURLToPath(new URL('../../migrations/blacksmith-inbox',import.meta.url)));
+const db=await openInboxDatabase(join(directory,'benchmark.sqlite'),fileURLToPath(new URL('../../maplestarforce/migrations/blacksmith-inbox',import.meta.url)));
 const hash=s=>createHash('sha256').update(s).digest('hex'),owner='b'.repeat(64);
 const rooms=Array.from({length:100},(_,i)=>({id:i.toString(16).padStart(24,'0'),client:hash('client:'+i),ip:`192.0.2.${i+1}`}));
 const equipment=JSON.stringify(Array.from({length:5},()=>({presetId:'giant-fear',itemLevel:200,startStar:12,targetStar:21,quantity:1})));
