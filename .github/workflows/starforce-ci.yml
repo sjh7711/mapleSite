@@ -26,6 +26,11 @@ jobs:
         with:
           node-version-file: maplestarforce/.nvmrc
           package-manager-cache: false
+      - name: Prepare tracked environment defaults
+        working-directory: maplestarforce
+        run: |
+          cp .env.preview.example .env.preview
+          cp .env.production.example .env.production
       - run: npm --prefix maple-core ci
       - run: npm --prefix maplestarforce ci
       - run: npm --prefix maple-core test
