@@ -4,6 +4,7 @@ import {
 } from "./result-share-state.js";
 import { installResultShare } from "./result-share-ui.js";
 import "./result-share.css";
+import { startCalculator } from "./calculator-startup.js";
 
 const entries = {
   starforce: () => import("../main.js"),
@@ -32,7 +33,7 @@ function installCalculatorStorageActivation() {
       'input, select, textarea, button, [role="button"], [contenteditable="true"]',
     );
     if (!control || !page.contains(control)) return;
-    if (control.closest(".site-footer, .calculator-guide, .toolnav, .page__head")) return;
+    if (control.closest(".site-footer, .calculator-guide, .toolnav, .page__head, .calculator-startup-error")) return;
     enableCalculatorStoragePersistence();
     cleanup();
   };
@@ -46,21 +47,42 @@ installCalculatorStorageActivation();
 async function start() {
   const tool = document.querySelector("[data-calculator]")?.dataset.calculator;
   if (!Object.hasOwn(entries, tool)) return;
-  const status = await initializeResultShare(tool);
-  try {
-    // Character profiles read storage at module initialization, so restore the
-    // isolated snapshot before importing any calculator or its dependencies.
-    await entries[tool]();
-  } catch (error) {
-    if (!status.shared) throw error;
-    status.error = "공유된 설정으로 계산할 수 없습니다. 새 공유 링크를 만들어 주세요.";
-    console.error(error);
-  }
-  installResultShare(tool, status);
-  const hash = location.hash;
-  window.addEventListener("hashchange", () => {
-    if (location.hash !== hash && (status.shared || location.hash.startsWith("#share="))) location.reload();
+  const textTransfer = tool === "starforce" && import.meta.env.VITE_STARFORCE_TEXT_TRANSFER_ENABLED === "true";
+  const inbox = tool === "starforce" && import.meta.env.VITE_STARFORCE_INBOX_ENABLED === "true";
+  const features = [];
+  if (textTransfer) features.push({
+    name: "장비목록 복사·붙여넣기",
+    load: () => import("./starforce-equipment-text-ui.js"),
+    install: (module, calculator, status) => {
+      const transfer = module.installEquipmentTextTransfer(calculator.equipmentTextTransfer);
+      installResultShare(tool, status, transfer);
+    },
+  });
+  if (inbox) features.push({
+    name: "대장장이 예약",
+    load: () => import("./blacksmith-inbox-ui.js"),
+    install: (module, calculator) => module.installBlacksmithInbox(calculator.blacksmithInbox),
+  });
+  await startCalculator({
+    initialize: () => initializeResultShare(tool),
+    loadCalculator: entries[tool],
+    features,
+    onReady: (calculator, status) => {
+      window.calculatorStartup?.finish();
+      if (!textTransfer) installResultShare(tool, status);
+      const hash = location.hash;
+      window.addEventListener("hashchange", () => {
+        if (location.hash !== hash && (status.shared || location.hash.startsWith("#share="))) location.reload();
+      });
+    },
+    onError: (error, feature) => {
+      console.error(`${feature} 초기화 실패`, error);
+      window.calculatorStartup?.fail(`${feature} 기능을 불러오지 못했습니다. 다시 시도해 주세요.`, feature);
+    },
   });
 }
 
-void start();
+void start().catch((error) => {
+  console.error("계산기 초기화 실패", error);
+  window.calculatorStartup?.fail("계산기를 불러오지 못했습니다. 연결 상태를 확인한 후 다시 시도해 주세요.");
+});

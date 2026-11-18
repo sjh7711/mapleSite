@@ -5,7 +5,7 @@ export function installStorageReset({ root = document, scope = globalThis } = {}
 
   button.addEventListener("click", () => {
     const shared = /^#share(?:=|$)/u.test(scope.location.hash);
-    const message = "이 사이트의 저장된 계산 설정·캐릭터 정보·테마와 현재 탭의 장비 목록을 모두 삭제합니다."
+    const message = "이 사이트의 저장된 계산 설정·캐릭터 정보·테마와 장비 목록을 모두 삭제합니다."
       + (shared ? "\n공유 링크의 설정도 해제됩니다." : "")
       + "\n삭제한 설정은 되돌릴 수 없습니다. 전체 초기화할까요?";
     if (!scope.confirm(message)) return;

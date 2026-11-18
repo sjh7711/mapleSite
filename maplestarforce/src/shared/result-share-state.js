@@ -1,5 +1,7 @@
 import { encode, decode } from "@msgpack/msgpack";
 import { packShareSnapshot, unpackShareSnapshot } from "./result-share-schema.js";
+import { packStarforceV4, unpackStarforceV4 } from "./result-share-starforce-v4.js";
+import { readStarforceItems } from "./starforce-item-storage.js";
 
 // Shared links use a tab-local overlay. Never write a shared calculation into
 // the visitor's saved calculator settings, including when a link is invalid.
@@ -128,12 +130,18 @@ export function buildResultSnapshot(tool, current = {}, storage = calculatorStor
       && current.local && !Object.hasOwn(current.local, key)) continue;
     let value = Object.hasOwn(current.local ?? {}, key) ? current.local[key] : readJSON(storage, key);
     if (key === PROFILE_KEY) value = calculationProfile(value);
+    if (tool === "starforce" && isRecord(value)) {
+      // Shared results carry their item prices; this cache is only used by personal views.
+      value = { ...value };
+      delete value.publishedPriceDefaults;
+    }
     if (isRecord(value)) local[key] = value;
   }
   const sessionValues = {};
   if (tool === "starforce") {
-    const items = current.session?.[ITEMS_KEY] ?? readJSON(session, ITEMS_KEY);
-    const selected = items?.slots?.[items.slot ?? 0];
+    // 공유 링크의 기존 session 필드 형식은 유지한다.
+    const items = current.session?.[ITEMS_KEY] ?? readStarforceItems(storage, session);
+    const selected = Array.isArray(items) ? items : items?.slots?.[items.slot ?? 0];
     // Only the currently selected equipment list is part of this result.
     sessionValues[ITEMS_KEY] = { slots: [Array.isArray(selected) ? selected : [], [], []], slot: 0 };
   }
@@ -220,14 +228,29 @@ export async function encodeResultSnapshot(snapshot) {
   validateTree(clean);
   validateSnapshot(clean, clean.tool);
   const bytes = encode(packShareSnapshot(clean));
+  const candidates = [{ bytes, version: "v2" }];
+  if (clean.tool === "starforce") {
+    const compact = encode(packShareSnapshot(clean, { compactIcons: true }));
+    if (compact.length < bytes.length) candidates.push({ bytes: compact, version: "v3" });
+    const v4 = packStarforceV4(clean);
+    if (v4) candidates.push({ bytes: encode(v4), version: "v4" });
+  }
   let packed = bytes;
   let version = "v2";
-  // Large character profiles benefit from extra compression, small settings
-  // often grow. Always retain the shorter MessagePack representation.
-  if (typeof CompressionStream === "function" && typeof DecompressionStream === "function") {
-    const compressed = await limitedBytes(new Blob([bytes]).stream().pipeThrough(new CompressionStream("gzip")));
-    if (Math.ceil(compressed.length * 4 / 3) + 4 < Math.ceil(bytes.length * 4 / 3) + 3) {
-      packed = compressed; version = "v2g";
+  const tokenLength = (data, tag) => tag.length + 1 + Math.ceil(data.length * 4 / 3);
+  const useIfShorter = (data, tag) => {
+    if (tokenLength(data, tag) < tokenLength(packed, version)) {
+      packed = data;
+      version = tag;
+    }
+  };
+  // Compare final lengths, including gzip overhead, and retain older formats
+  // when they are shorter. Browsers without compression can use raw MessagePack.
+  for (const candidate of candidates) {
+    useIfShorter(candidate.bytes, candidate.version);
+    if (typeof CompressionStream === "function" && typeof DecompressionStream === "function") {
+      const compressed = await limitedBytes(new Blob([candidate.bytes]).stream().pipeThrough(new CompressionStream("gzip")));
+      useIfShorter(compressed, `${candidate.version}g`);
     }
   }
   let binary = "";
@@ -238,11 +261,11 @@ export async function encodeResultSnapshot(snapshot) {
 }
 
 export async function decodeResultSnapshot(token, tool) {
-  if (token.length > MAX_TOKEN_LENGTH || !/^v2g?\.[A-Za-z0-9_-]+$/.test(token)) throw new Error("공유 링크가 올바르지 않습니다.");
+  if (token.length > MAX_TOKEN_LENGTH || !/^v[234]g?\.[A-Za-z0-9_-]+$/.test(token)) throw new Error("공유 링크가 올바르지 않습니다.");
   const [version, encoded] = token.split(".");
   const binary = atob(encoded.replaceAll("-", "+").replaceAll("_", "/"));
   const packed = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-  const bytes = version === "v2g"
+  const bytes = version.endsWith("g")
     ? await limitedBytes(new Blob([packed]).stream().pipeThrough(new DecompressionStream("gzip"))) : packed;
   const decoded = decode(bytes, {
     maxStrLength: MAX_BYTES, maxBinLength: MAX_BYTES,
@@ -253,7 +276,8 @@ export async function decodeResultSnapshot(token, tool) {
     },
   });
   validateTree(decoded, true);
-  const snapshot = unpackShareSnapshot(decoded);
+  const snapshot = version.startsWith("v4") ? unpackStarforceV4(decoded)
+    : unpackShareSnapshot(decoded, { compactIcons: version.startsWith("v3") });
   validateTree(snapshot);
   if (new TextEncoder().encode(JSON.stringify(snapshot)).length > MAX_BYTES) throw new Error("공유 설정이 너무 큽니다.");
   return validateSnapshot(snapshot, tool);

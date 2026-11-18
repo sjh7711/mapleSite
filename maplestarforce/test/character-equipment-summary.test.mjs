@@ -833,7 +833,8 @@ test("웹 경매장형 장비 툴팁은 API 상세값을 보존하고 없는 값
     },
   });
 
-  assert.equal(model.name, "몽환의 벨트 (+4)");
+  assert.equal(model.name, "몽환의 벨트");
+  assert.equal(model.tradeNotice, "가위 사용 잔여 횟수 : 2회");
   assert.equal(model.stars, 22);
   assert.deepEqual(model.metadata, [
     { label: "착용 부위", value: "벨트" },
@@ -1183,11 +1184,11 @@ test("구버전 장비도 네이티브 title 대신 접근 가능한 맞춤 툴�
   );
   assert.match(
     styles,
-    /\.profile-equipment-tooltip\[data-placement="inline"\] \{[\s\S]*position: relative;[\s\S]*width: min\(354px, 100%\);/u,
+    /\.profile-equipment-tooltip\[data-placement="inline"\] \{[\s\S]*position: relative;[\s\S]*width: min\(325px, 100%\);/u,
   );
   assert.match(
     styles,
-    /\.profile-equipment-tooltip__grade-badge \{[\s\S]*width: 14px;[\s\S]*height: 14px;/u,
+    /\.profile-equipment-tooltip__grade-badge \{[\s\S]*width: 10px;[\s\S]*height: 10px;/u,
   );
   assert.match(
     styles,
@@ -1197,11 +1198,11 @@ test("구버전 장비도 네이티브 title 대신 접근 가능한 맞춤 툴�
     styles,
     /\.profile-equipment-tooltip__description \{[\s\S]*color: #c1c7d1;/u,
   );
-  assert.match(component, /starSlotCount = Math\.max\(25, Math\.ceil\(visibleStars \/ 5\) \* 5\)/u);
+  assert.match(component, /starSlotCount = Math\.max\(30, Math\.ceil\(visibleStars \/ 5\) \* 5\)/u);
   assert.match(component, /groupIndex < starSlotCount \/ 5/u);
   assert.match(component, /star\.dataset\.filled/u);
   assert.match(component, /visibleStars >= 23/u);
-  assert.match(styles, /__header\[data-sparkle="true"\]::before/u);
+  assert.match(styles, /\.profile-equipment-tooltip__starlight/u);
   assert.match(styles, /profile-equipment-tooltip__exceptional-badge/u);
 });
 
@@ -1217,7 +1218,7 @@ test("26성 이상 장비도 실제 수치까지 별을 채우고 다음 5개 �
   assert.doesNotMatch(source, /Math\.min\(model\.stars, 25\)/u);
 });
 
-test("장비 툴팁은 계산과 무관한 게임 안내와 가위 문구를 숨긴다", () => {
+test("장비 툴팁은 게임 조작·전투력·장착·플래티넘 안내를 숨기고 실제 설명과 가위 횟수는 보존한다", () => {
   const model = getCharacterEquipmentTooltipModel({
     name: "안내 문구 장비",
     part: "장갑",
@@ -1227,13 +1228,29 @@ test("장비 툴팁은 계산과 무관한 게임 안내와 가위 문구를 숨
       description: [
         "일부 상황에서는 보이지 않는 아이템입니다.",
         "NPC/채집 키를 통해 장비 정보를 확인할 수 있습니다.",
+        "전투력 증가량",
+        "현재 장착 중인 장비",
+        "플래티넘 카르마의 가위 사용 시 1회 교환 가능",
+        "고유 아이템",
       ].join("\n"),
       cuttableCount: 5,
     },
   });
 
-  assert.equal(model.description, null);
+  assert.equal(model.description, "고유 아이템");
+  assert.equal(model.tradeNotice, "가위 사용 잔여 횟수 : 5회");
   assert.equal(model.metadata.some(({ value }) => /가위/u.test(value)), false);
+});
+
+test("가위 횟수가 없거나 특수 값인 장비의 교환 상태를 추측하지 않는다", () => {
+  for (const cuttableCount of [null, undefined, 255]) {
+    assert.equal(getCharacterEquipmentTooltipModel({
+      name: "장비", tooltip: { cuttableCount },
+    }).tradeNotice, null);
+  }
+  assert.equal(getCharacterEquipmentTooltipModel({
+    name: "장비", tooltip: { cuttableCount: 0 },
+  }).tradeNotice, "가위 사용 잔여 횟수 : 0회");
 });
 
 test("착용 레벨 감소는 API의 양수 감소량을 화면에서 음수로 표시한다", async () => {
@@ -1366,6 +1383,10 @@ test("캐릭터 환산 장비판은 개편된 인게임 장비창의 열 배치�
     ]),
   );
 
+  assert.deepEqual(positions.반지4, [1, 1]);
+  assert.deepEqual(positions.반지3, [2, 1]);
+  assert.deepEqual(positions.반지2, [3, 1]);
+  assert.deepEqual(positions.반지1, [4, 1]);
   assert.deepEqual(positions.벨트, [5, 1]);
   assert.deepEqual(positions.펜던트2, [5, 2]);
   assert.deepEqual(positions.포켓아이템, [6, 1]);

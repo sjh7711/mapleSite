@@ -975,17 +975,7 @@ function supportScrollPurchaseGuide() {
     tbody.append(row);
   }
   table.append(thead, tbody);
-  panel.append(
-    table,
-    note(
-      state.useCleanScrolls
-        ? `현재 주문의 흔적 시세${state.halfPrice ? "와 주흔 반값 썬데이 적용 여부" : ""}로 계산했습니다. ` +
-          "표시된 가격 이하라면 경매장에서 주문서를 사는 편이 주흔 100%를 쓰는 것보다 저렴하거나 같습니다. " +
-          "순백 5%·10% 중에서는 복구 1회당 평균 비용이 더 낮은 주문서를 자동으로 사용합니다."
-        : "보유 순백 100%를 먼저 사용하고, 모두 소진되면 주흔 순백 100%로 복구합니다. 순백 5%·10%는 현재 전략에서 사용하지 않습니다.",
-      "scroll-purchase-threshold__note",
-    ),
-  );
+  panel.append(table);
   if (!state.useInnocent) {
     panel.append(
       note(
@@ -1557,7 +1547,7 @@ function slotResult() {
     first ? firstChaosTargetChanceLine(first) : null,
     first ? firstChaosUsageLine(first) : null,
     first ? line("첫 작 비용", Number.isFinite(first.cost) ? eok(first.cost) : "-") : null,
-    state.method === "trace" ? supportScrollPurchaseGuide() : null,
+    supportScrollPurchaseGuide(),
     first
       ? note("첫작놀긍 성공 후 이노센트를 사용하면 첫작도 초기화되므로, 남은 작의 실패는 순백으로만 복구합니다.")
       : null,

@@ -1,26 +1,68 @@
 <!doctype html>
 <html lang="ko"><head><meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>스타포스 사용법 | Maple Starforce</title>
-<meta name="description" content="여러 장비의 강화 계획을 한 목록에 담고, 캐릭터가 착용한 장비를 바로 추가해 총비용을 확인합니다." />
+<title>스타포스 데브</title>
+    <meta name="application-name" content="스타포스 데브" />
+    <meta property="og:site_name" content="스타포스 데브" />
+<meta name="description" content="스타포스 강화 계획과 비용 편차를 확인하고, 장비목록 복사·붙여넣기와 대장장이 예약·신청을 이용하는 방법을 안내합니다." />
 <link rel="canonical" href="https://starforce.pages.dev/guide/starforce/" />
-<link rel="icon" href="/tool-icons/starforce-star.svg" />
 <link rel="stylesheet" href="/src/style.css" />
 <link rel="stylesheet" href="/src/site-info.css" />
 <link rel="stylesheet" href="/src/usage-guide.css" />
+<link rel="icon" type="image/x-icon" sizes="16x16 32x32 48x48 96x96 256x256" href="/favicon.ico" />
+<link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
+<link rel="icon" type="image/svg+xml" sizes="any" href="/tool-icons/starforce-star.svg" />
 </head><body class="page--info page--usage"><main class="page">
-<header class="info-header usage-header"><a class="info-home" href="/guide/">← 사용가이드 전체</a><h1>스타포스 사용법</h1><div class="usage-header__actions"><a class="usage-button" href="/">스타포스 계산기 열기 →</a><span>화면 확인 · <time datetime="2026-09-30">2026. 9. 30.</time></span></div></header>
+<header class="info-header usage-header"><a class="info-home" href="/guide/">← 사용가이드 전체</a><h1>스타포스 사용법</h1><div class="usage-header__actions"><a class="usage-button" href="/">스타포스 계산기 열기 →</a><span>화면 확인 · <time datetime="2026-11-04">2026. 11. 4.</time></span></div></header>
 <article class="usage-article" aria-label="스타포스 사용 안내"><div class="usage-intro"><p>강화하려는 장비들의 기댓값을 한 번에 확인할 수 있습니다. 또한 캐릭터 닉네임 검색을 통해 장착한 장비를 불러와서 강화 목록에 추가할 수 있습니다.</p></div>
 <nav class="usage-toc" aria-label="이 페이지의 사용 순서"><a href="#multiple">01 여러 장비를 강화 목록에 추가하기</a>
 <a href="#character">02 캐릭터를 불러와 착용 장비 확인하기</a>
-<a href="#plan">03 착용 장비를 바로 올려보고 총비용 읽기</a>
+<a href="#plan">03 착용 장비를 바로 올려보고 총비용 확인</a>
+<a href="#variance">04 비용 편차와 예산 확인하기</a>
+<a href="#equipment-text">05 장비목록 복사·붙여넣기</a>
+<a href="#blacksmith">06 대장장이 예약·신청 이용하기</a>
 </nav>
 <section class="usage-step" id="multiple"><span class="usage-step__number">STEP 01</span><h2>여러 장비를 강화 목록에 추가하기</h2><div class="usage-copy"><ol><li>이벤트와 MVP·PC방 적용 여부를 실제 강화 조건에 맞춥니다.</li><li>왼쪽 장비 목록의 <strong>기본값 시작·목표</strong>를 정하고 스페어 가격을 확인합니다.</li><li>계산할 장비 버튼을 누르면 오른쪽 강화 목록에 추가됩니다. 같은 장비도 여러 개 담을 수 있습니다.</li><li>모상하견·장신망의 작은 메뉴 버튼에서는 세부 부위를 골라 추가할 수 있습니다.</li></ol></div><figure class="usage-figure" style="--image-width:1213px"><a href="/guide-images/starforce-multiple.png" target="_blank" rel="noopener" aria-label="커포·컴플·몽벨을 같은 강화 목록에 담은 예시. 왼쪽은 가격과 기본 조건, 오른쪽은 장비별 계획과 합계입니다. — 이미지 크게 보기"><img src="/guide-images/starforce-multiple.png" alt="커포·컴플·몽벨을 같은 강화 목록에 담은 예시. 왼쪽은 가격과 기본 조건, 오른쪽은 장비별 계획과 합계입니다." width="1213" height="937" loading="lazy" decoding="async"></a><figcaption>커포·컴플·몽벨을 같은 강화 목록에 담은 예시. 왼쪽은 가격과 기본 조건, 오른쪽은 장비별 계획과 합계입니다. <span>이미지를 누르면 크게 볼 수 있습니다.</span></figcaption></figure></section>
-<section class="usage-step" id="character"><span class="usage-step__number">STEP 02</span><h2>캐릭터를 불러와 착용 장비 확인하기</h2><div class="usage-copy"><ol><li>오른쪽 목록 위의 <strong>캐릭터 닉네임</strong>에 이름을 입력합니다.</li><li>돋보기 버튼을 눌러 NEXON Open API의 공개 장비 정보를 불러옵니다.</li><li>캐릭터 장비판의 장비와 현재 스타포스, 표시된 장비 프리셋을 확인합니다.</li></ol><p>장비판에 표시된 장비를 누르면 해당 장비를 강화 목록에 추가할 수 있습니다. 현재 장비 정보는 API가 제공하는 시점의 정보이므로 게임에서 막 바꾼 장비와 다르면 다시 확인해 주세요.</p></div><figure class="usage-figure" style="--image-width:657px"><a href="/guide-images/starforce-character-redacted.png" target="_blank" rel="noopener" aria-label="닉네임으로 불러온 착용 장비판. 각 장비 아이콘에 현재 스타포스가 표시됩니다. — 이미지 크게 보기"><img src="/guide-images/starforce-character-redacted.png" alt="닉네임으로 불러온 착용 장비판. 각 장비 아이콘에 현재 스타포스가 표시됩니다." width="657" height="650" loading="lazy" decoding="async"></a><figcaption>닉네임으로 불러온 착용 장비판. 각 장비 아이콘에 현재 스타포스가 표시됩니다. <span>이미지를 누르면 크게 볼 수 있습니다.</span></figcaption></figure></section>
-<section class="usage-step" id="plan"><span class="usage-step__number">STEP 03</span><h2>착용 장비를 바로 올려보고 총비용 읽기</h2><div class="usage-copy"><ol><li>장비판에서 강화할 장비를 누릅니다. 지원되는 장비는 <strong>현재 스타포스를 시작값</strong>으로 목록에 들어갑니다.</li><li>추가된 장비의 목표 성수와 스페어 가격을 조정합니다.</li><li><strong>강화 최적화</strong> 또는 직접 선택한 파괴방지·확정복구 조건을 확인합니다.</li><li>장비별 기댓값·평균 스페어와 위쪽 <strong>준비할 메소</strong>를 함께 봅니다.</li></ol><p>대장장이 배율을 선택하면 화면에 기본 합계와 배율 적용 합계를 나누어 보여줍니다. <strong>단계별 기댓값</strong>을 펼치면 강화 구간별 결과도 확인할 수 있습니다.</p></div><figure class="usage-figure" style="--image-width:615px"><a href="/guide-images/starforce-selected.png" target="_blank" rel="noopener" aria-label="착용 장비를 선택해 강화 목록에 추가한 화면. 각 장비의 시작·목표와 세부 전략을 따로 설정할 수 있습니다. — 이미지 크게 보기"><img src="/guide-images/starforce-selected.png" alt="착용 장비를 선택해 강화 목록에 추가한 화면. 각 장비의 시작·목표와 세부 전략을 따로 설정할 수 있습니다." width="615" height="417" loading="lazy" decoding="async"></a><figcaption>착용 장비를 선택해 강화 목록에 추가한 화면. 각 장비의 시작·목표와 세부 전략을 따로 설정할 수 있습니다. <span>이미지를 누르면 크게 볼 수 있습니다.</span></figcaption></figure></section>
+<section class="usage-step" id="character"><span class="usage-step__number">STEP 02</span><h2>캐릭터를 불러와 착용 장비 확인하기</h2><div class="usage-copy"><ol><li>오른쪽 목록 위의 <strong>캐릭터 닉네임</strong>에 이름을 입력합니다.</li><li>돋보기 버튼을 눌러 NEXON Open API의 공개 장비 정보를 불러옵니다.</li><li>캐릭터 장비판의 장비와 현재 스타포스, 표시된 장비 프리셋을 확인합니다.</li></ol><p>장비판에 표시된 장비를 누르면 해당 장비를 강화 목록에 추가할 수 있습니다. 현재 장비 정보는 API가 제공하는 시점의 정보이므로 게임에서 막 바꾼 장비와 다르면 다시 확인해 주세요.</p></div><figure class="usage-figure" style="--image-width:657px"><a href="/guide-images/starforce-character-redacted.png" target="_blank" rel="noopener" aria-label="닉네임 조회로 불러온 캐릭터 장비판 — 이미지 크게 보기"><img src="/guide-images/starforce-character-redacted.png" alt="닉네임 조회로 불러온 캐릭터 장비판" width="657" height="650" loading="lazy" decoding="async"></a><figcaption>이미지를 누르면 크게 볼 수 있습니다.</figcaption></figure></section>
+<section class="usage-step" id="plan"><span class="usage-step__number">STEP 03</span><h2>착용 장비를 바로 올려보고 총비용 확인</h2><div class="usage-copy"><ol><li>장비판에서 강화할 장비를 누릅니다. 지원되는 장비는 <strong>현재 스타포스를 시작값</strong>으로 목록에 들어갑니다.</li><li>추가된 장비의 목표와 스페어 가격을 조정합니다.</li><li><strong>강화 최적화</strong> 또는 직접 선택한 파괴방지·확정복구 조건을 확인합니다.</li><li>장비별 기댓값·평균 스페어와 위쪽 <strong>준비할 메소</strong>를 함께 봅니다.</li></ol><p>대장장이 배율을 선택하면 화면에 기본 합계와 배율 적용 합계를 나누어 보여줍니다. <strong>단계별 기댓값&amp;스탯 상승량</strong>을 펼치면 강화 구간별 비용과 누적 스탯 상승량도 확인할 수 있습니다.</p></div><figure class="usage-figure" style="--image-width:615px"><a href="/guide-images/starforce-selected.png" target="_blank" rel="noopener" aria-label="강화 목록의 시작·목표 및 최적화 설정 — 이미지 크게 보기"><img src="/guide-images/starforce-selected.png" alt="강화 목록의 시작·목표 및 최적화 설정" width="615" height="417" loading="lazy" decoding="async"></a><figcaption>이미지를 누르면 크게 볼 수 있습니다.</figcaption></figure></section>
+
+<section class="usage-step" id="variance">
+<span class="usage-step__number">STEP 04</span><h2>비용 편차와 예산 확인하기</h2>
+<div class="usage-copy"><ol>
+<li><strong>준비할 메소</strong>의 <strong>편차 확인</strong>에서 전체 비용 편차를 확인합니다. <strong>각 장비 별 편차 확인</strong>에서 전체 또는 개별 장비를 선택합니다.</li>
+<li>개별 장비의 <strong>편차</strong>를 누르면 강화 최적화 대비 기댓값·표준편차와 현재 전략의 비용 범위를 확인할 수 있습니다. 파괴방지·확정복구를 바꾸면 표시도 함께 갱신됩니다.</li>
+<li><strong>편차 감소 추천</strong>은 최저 기댓값 대비 비용 차이 0.5% 이내에서 표준편차를 줄이는 전략을 적용합니다. 적용되면 장비 버튼에 <strong>편차 감소 O</strong>가 표시됩니다.</li>
+<li><strong>그래프 확인</strong>에서 현재 전략의 그래프를 엽니다. <strong>순위 곡선</strong>은 비용이 적게 든 순서, <strong>비용 분포</strong>는 금액 구간별 완료 비중을 보여줍니다. 그래프에 마우스를 올리거나 터치하면 비용과 평균 파괴·스페어를 확인할 수 있습니다.</li>
+<li><strong>예산</strong>에 억 메소 단위로 금액을 입력하면 그 안에 목표까지 완료할 확률을 확인할 수 있습니다.</li>
+</ol>
+<p>편차 계산에는 대장장이 배율을 적용하지 않습니다. <strong>대장장이 금액</strong>은 평균 비용에 선택한 배율을 곱한 금액입니다.</p></div>
+<figure class="usage-figure" style="--image-width:900px"><a href="/guide-images/starforce-variance.png" target="_blank" rel="noopener" aria-label="비용 편차 화면에서 예산 내 성공 확률과 순위 곡선을 확인한 예시. — 이미지 크게 보기"><img src="/guide-images/starforce-variance.png" alt="비용 편차 화면에서 예산 내 성공 확률과 순위 곡선을 확인한 예시." width="900" height="791" loading="lazy" decoding="async"></a><figcaption>이미지를 누르면 크게 볼 수 있습니다.</figcaption></figure>
+</section>
+<section class="usage-step" id="equipment-text">
+<span class="usage-step__number">STEP 05</span><h2>장비목록 복사·붙여넣기</h2>
+<div class="usage-copy"><ol>
+<li>상단의 <strong>장비목록 복사</strong>를 누르면 현재 슬롯에 추가한 장비목록이 복사됩니다.</li>
+<li>전달받은 쪽에서 <strong>장비목록 붙여넣기</strong>를 눌러 목록을 넣습니다. <strong>몽벨 12-21</strong>처럼 장비명과 시작·목표를 한 줄에 하나씩 직접 입력해도 됩니다.</li>
+<li><strong>현재 슬롯 교체</strong>는 기존 목록을 바꾸고, <strong>추가하기</strong>는 기존 목록 아래에 장비를 더합니다.</li>
+</ol><p>장비명과 시작·목표만 옮깁니다. 가격·이벤트·MVP·PC방·대장장이 배율은 받는 쪽 설정을 사용하며, 강화 최적화를 새로 적용합니다.</p></div>
+<figure class="usage-figure" style="--image-width:520px"><a href="/guide-images/starforce-equipment-text.png" target="_blank" rel="noopener" aria-label="장비목록을 한 줄씩 붙여넣고 현재 슬롯 교체 또는 추가하기를 선택하는 화면. — 이미지 크게 보기"><img src="/guide-images/starforce-equipment-text.png" alt="장비목록을 한 줄씩 붙여넣고 현재 슬롯 교체 또는 추가하기를 선택하는 화면." width="520" height="420" loading="lazy" decoding="async"></a><figcaption>이미지를 누르면 크게 볼 수 있습니다.</figcaption></figure>
+</section>
+<section class="usage-step" id="blacksmith">
+<span class="usage-step__number">STEP 06</span><h2>대장장이 예약·신청 이용하기</h2>
+<div class="usage-copy"><p><strong>신청자</strong></p><ol>
+<li>상단의 <strong>대장장이 예약 → 대장장이 찾기</strong>에서 진행자 이름을 정확히 입력하고 봇 확인을 마치면 신청서를 열 수 있습니다. 진행자가 공유한 접수 주소로 들어가도 됩니다.</li>
+<li>장비와 시작·목표를 정한 뒤 <strong>신청</strong>을 누릅니다. 신청자 닉네임을 입력하고 봇 확인 후 <strong>신청 보내기</strong>를 누릅니다.</li>
+<li>접수한 장비는 <strong>신청 장비 보기</strong>에서 확인합니다. 대기중에는 <strong>신청 수정</strong>을 최대 5회 하거나 <strong>신청 철회</strong>를 할 수 있습니다. 진행중에는 수정·철회할 수 없습니다.</li>
+</ol><p><strong>진행자</strong></p><ol>
+<li><strong>대장장이 예약 → 대장장이 예약 열기</strong>에서 이름을 정하고 봇 확인 후 예약을 엽니다. <strong>접수 주소 복사</strong>로 신청자에게 주소를 공유합니다.</li>
+<li><strong>대장장이 대기열</strong>에서 <strong>장비 보기</strong>로 목록을 확인하고 <strong>장비 불러오기</strong>를 누르면 진행중으로 바뀝니다. 진행자의 가격과 강화 조건으로 계산합니다.</li>
+<li>계산기 위 작업 바의 <strong>완료</strong>를 누르면 완료 처리하고 내 슬롯으로 돌아갑니다. <strong>접수 일시 중지</strong> 후에는 <strong>접수 재개</strong>로 다시 받을 수 있습니다. <strong>대장장이 종료</strong>는 예약과 접수 내역을 삭제합니다.</li>
+</ol><p>예약은 만든 브라우저에서 관리합니다. 새 신청이 12시간 동안 없으면 자동 종료됩니다.</p></div>
+<figure class="usage-figure" style="--image-width:714px"><a href="/guide-images/starforce-blacksmith-queue.png" target="_blank" rel="noopener" aria-label="대장장이 대기열에서 신청 장비와 처리 상태를 확인하는 예시 화면. — 이미지 크게 보기"><img src="/guide-images/starforce-blacksmith-queue.png" alt="대장장이 대기열에서 신청 장비와 처리 상태를 확인하는 예시 화면." width="714" height="450" loading="lazy" decoding="async"></a><figcaption>예시 대기열입니다. 상태별로 보거나 닉네임·초성으로 검색하고, 장비를 불러와 작업할 수 있습니다. <span>이미지를 누르면 크게 볼 수 있습니다.</span></figcaption></figure>
+</section>
 
 <section class="usage-notices"><h2>안내사항</h2><ul class="usage-notice-list"><li>스페어 가격은 임의로 설정된 가격이므로 현재 경매장 가격으로 직접 입력해주셔야 합니다.</li><li>장비목록·강화목록 중 한쪽에서 스페어 값을 수정하면 같은 장비의 두 값이 모두 변경됩니다.</li><li><strong>평균 스페어 ≠ 평균 파괴 횟수</strong>입니다. 복구에 사용하는 장비 수를 반영하므로 파괴 횟수와 다를 수 있습니다.</li><li>에테르넬 장비의 가격이 부위별로 크게 차이날 경우 장비 버튼의 세부항목에서 부위를 선택해 추가해주세요.</li></ul></section>
-<section class="usage-next"><h2>내 조건으로 계산해 보세요</h2><p>실제 장비와 가격을 입력하고, 계산 조건과 결과를 함께 확인하세요. 계산 근거는 <a href="/sources/">데이터·확률 출처</a>에서 볼 수 있습니다.</p><a class="usage-button" href="/">스타포스 계산기 열기 →</a></section></article>
+<section class="usage-next"><a class="usage-button" href="/">스타포스 계산기 열기 →</a></section></article>
 <nav class="usage-related" aria-label="다른 계산기 사용법"><strong>다른 사용법</strong><a href="/guide/potential/">잠재능력·에디셔널</a><a href="/guide/ability/">어빌리티</a><a href="/guide/add-option/">추가옵션</a><a href="/guide/scroll/">주문서</a><a href="/guide/pet/">자석펫</a><a href="/guide/soul/">소울</a></nav>
 <!-- site-footer -->
 </main></body></html>

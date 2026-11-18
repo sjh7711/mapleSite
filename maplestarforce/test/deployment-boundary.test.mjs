@@ -162,17 +162,19 @@ test("배포용 연무장 프로필은 레테를 포함한 47직업만 계산식
   }
 });
 
-test("운영 빌드는 비공개 장비 시세 대용량 데이터를 제거한다", async () => {
-  const productionEnv = await readFile(
-    resolve(PROJECT_ROOT, ".env.production"),
-    "utf8",
-  );
+test("보존한 시세 데이터와 제거한 도구는 웹 배포에 포함되지 않는다", async () => {
   const viteConfig = await readFile(resolve(PROJECT_ROOT, "vite.config.js"), "utf8");
+  assert.doesNotMatch(viteConfig, /"(?:item-market|spec-up)":\s*resolve/u);
+  assert.match(viteConfig, /copyPublicDir:\s*false/u);
+  assert.match(viteConfig, /entry\.name === "item-market"\) continue/u);
+  const { getTools } = await import("../src/shared/tool-nav.js");
+  assert.deepEqual(getTools().map((tool) => tool.id),
+    ["starforce", "potential", "add-option", "scroll", "ability", "pet", "soul"]);
+});
 
-  assert.match(productionEnv, /^VITE_ITEM_MARKET_ENABLED=false$/mu);
-  assert.match(viteConfig, /if \(!enabled\)/u);
-  assert.match(
-    viteConfig,
-    /await rm\(releasesRoot, \{ recursive: true, force: true \}\)/u,
-  );
+test("장비 텍스트 복사·붙여넣기는 운영과 프리뷰에서 활성화한다", async () => {
+  const preview = await readFile(resolve(PROJECT_ROOT, ".env.preview"), "utf8");
+  const production = await readFile(resolve(PROJECT_ROOT, ".env.production"), "utf8");
+  assert.match(preview, /^VITE_STARFORCE_TEXT_TRANSFER_ENABLED=true$/mu);
+  assert.match(production, /^VITE_STARFORCE_TEXT_TRANSFER_ENABLED=true$/mu);
 });

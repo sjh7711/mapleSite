@@ -3,8 +3,60 @@
   "name": "starforce",
   "pages_build_output_dir": "./dist",
   "compatibility_date": "2026-08-29",
-  // NEXON_API_KEY는 Preview 환경의 암호화된 Pages secret으로만 설정한다.
+  "d1_databases": [
+    {
+      "binding": "STARFORCE_CONFIG",
+      "database_name": "starforce-settings",
+      "database_id": "9723160c-441d-4cfb-9a3c-028aa3a0a8af",
+      "migrations_dir": "migrations/starforce-prices"
+    },
+    {
+      "binding": "STARFORCE_INBOX_DB",
+      "database_name": "starforce-inbox-production",
+      "database_id": "bb3c4b9e-86be-4941-a0a0-e53aa1e2bc28",
+      "migrations_dir": "migrations/blacksmith-inbox"
+    }
+  ],
   "env": {
-    "preview": {}
-  }
+    "preview": {
+      "vars": {
+        "STARFORCE_INBOX_ENABLED": "true",
+        "TURNSTILE_SITEKEY": "0x4AAAAAAFwxLuAxryrkPIb9",
+        "INBOX_VM_MAINTENANCE": "false",
+        "INBOX_VM_ORIGIN": "https://maple.hoegifarm.duckdns.org/starforce-preview-api"
+      },
+      "services": [
+        {
+          "binding": "INBOX_TRAFFIC",
+          "service": "starforce-inbox-preview-cleanup"
+        }
+      ],
+      "d1_databases": [
+        {
+          "binding": "STARFORCE_CONFIG",
+          "database_name": "starforce-settings",
+          "database_id": "9723160c-441d-4cfb-9a3c-028aa3a0a8af",
+          "migrations_dir": "migrations/starforce-prices"
+        },
+        {
+          "binding": "STARFORCE_INBOX_DB",
+          "database_name": "starforce-inbox-preview",
+          "database_id": "60641ab2-08b9-41a0-a268-5faffd744edf",
+          "migrations_dir": "migrations/blacksmith-inbox"
+        }
+      ]
+    }
+  },
+  "vars": {
+    "STARFORCE_INBOX_ENABLED": "true",
+    "TURNSTILE_SITEKEY": "0x4AAAAAAFwxLuAxryrkPIb9",
+    "INBOX_VM_MAINTENANCE": "false",
+    "INBOX_VM_ORIGIN": "https://maple.hoegifarm.duckdns.org/starforce-api"
+  },
+  "services": [
+    {
+      "binding": "INBOX_TRAFFIC",
+      "service": "starforce-inbox-production-cleanup"
+    }
+  ]
 }

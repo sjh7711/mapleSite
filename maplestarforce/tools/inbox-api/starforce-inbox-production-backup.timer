@@ -1,0 +1,10 @@
+[Unit]
+Description=Hourly Starforce production SQLite backup
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+RandomizedDelaySec=120
+
+[Install]
+WantedBy=timers.target

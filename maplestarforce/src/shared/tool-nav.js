@@ -7,11 +7,10 @@ const TOOLS = [
   { id: "ability", name: "어빌리티", href: "ability/" },
   { id: "pet", name: "자석펫", href: "pet/" },
   { id: "soul", name: "소울", href: "soul/" },
-  { id: "item-market", name: "장비 시세", href: "item-market/" },
 ];
 
-export function getTools({ itemMarketEnabled = false } = {}) {
-  return TOOLS.filter((tool) => itemMarketEnabled || tool.id !== "item-market");
+export function getTools() {
+  return [...TOOLS];
 }
 
 export const TOOL_ITEM_ICONS = {
@@ -26,7 +25,6 @@ export const TOOL_ITEM_ICONS = {
 
 export const TOOL_VECTOR_ICONS = {
   starforce: '<path d="m12 2.8 2.78 5.63 6.22.9-4.5 4.39 1.06 6.2L12 17l-5.56 2.92 1.06-6.2L3 9.33l6.22-.9L12 2.8Z"/>',
-  "item-market": '<path d="M4 7h16l-1 13H5zM8 7a4 4 0 0 1 8 0"/>',
 };
 
 /** 하위 폴더 페이지에서는 한 단계 위가 사이트 뿌리다. */
@@ -34,9 +32,9 @@ export function rootPrefix(current) {
   return current === "starforce" ? "./" : "../";
 }
 
-export function renderStaticToolNav(current, options) {
+export function renderStaticToolNav(current) {
   const root = rootPrefix(current);
-  return getTools(options).map((tool) => {
+  return getTools().map((tool) => {
     const itemIconPath = TOOL_ITEM_ICONS[tool.id];
     const icon = itemIconPath
       ? `<img class="toolnav__icon toolnav__icon--item" src="${root}${itemIconPath}" alt="" draggable="false" aria-hidden="true">`

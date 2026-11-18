@@ -88,7 +88,27 @@ function createContext(request, waitUntilPromises = []) {
   };
 }
 
-test("현재 item_equipment의 135제 이상 스타포스 가능 장비만 공개한다", () => {
+test("스탯 계산용 기본·작·SF 숫자만 공개하고 슈페리얼·놀장 장비는 제외한다", () => {
+  const result = sanitizeStarforceEquipment({ item_equipment: [
+    equipment({ name: "에테르넬 시프글러브", part: "장갑", slot: "장갑", level: 250,
+      item_base_option: { base_equipment_level: 250, str: "0", dex: "55", int: "0", luk: "55", attack_power: "9", magic_power: "9", private_marker: RAW_MARKER },
+      item_etc_option: { str: "1", dex: "1", luk: "2" },
+      item_add_option: { str: "72" },
+      item_starforce_option: { str: "34", dex: "74", int: "0", luk: "74" },
+    }),
+    equipment({ name: "슈페리얼 망토", superior_eqp_flag: "Y" }),
+    equipment({ name: "놀장 망토", starforce_scroll_flag: "Y" }),
+    equipment({ name: "일반 이름의 놀장 장비", starforce_scroll_flag: "사용" }),
+  ] });
+  assert.equal(result.length, 1);
+  assert.equal(result[0].growthOptions.base.str, 0);
+  assert.equal(result[0].growthOptions.scroll.str, 1);
+  assert.equal(result[0].growthOptions.starforce.str, 34);
+  assert.equal(result[0].growthOptions.flame, undefined);
+  assert.equal(JSON.stringify(result).includes(RAW_MARKER), false);
+});
+
+test("현재 item_equipment의 130제·135제 이상 스타포스 가능 장비만 공개한다", () => {
   const result = sanitizeStarforceEquipment({
     item_equipment: [
       equipment({
@@ -179,6 +199,15 @@ test("현재 item_equipment의 135제 이상 스타포스 가능 장비만 공�
   ]);
   assert.equal(JSON.stringify(result).includes(RAW_MARKER), false);
   assert.equal(JSON.stringify(result).includes("다른 프리셋 장비"), false);
+});
+
+test("130제 플라즈마 하트는 프리셋 2 응답에서도 제외되지 않는다", () => {
+  const heart = equipment({ name: "플라즈마 하트", part: "기계 심장", slot: "기계 심장", level: 130, starforce: "17" });
+  const presets = sanitizeStarforceEquipmentPresets({ preset_no: "2", item_equipment: [heart], item_equipment_preset_2: [heart] });
+  const second = presets.presets.find(({ presetNo }) => presetNo === 2);
+  assert.equal(second.equipment[0].name, "플라즈마 하트");
+  assert.equal(second.equipment[0].level, 130);
+  assert.equal(second.equipment[0].starforce, 17);
 });
 
 test("세 장비 프리셋을 번호와 함께 정제하고 현재 프리셋 누락 배열을 보완한다", () => {
@@ -376,7 +405,7 @@ test("닉네임으로 기본 정보와 세 장비 프리셋을 조회해 보스 
   assert.equal(response.headers.get("Access-Control-Allow-Origin"), ORIGIN);
   assert.equal(
     new URL(observedCacheKey.url).searchParams.get("version"),
-    "starforce-equipment-v5",
+    "starforce-equipment-v8",
   );
   assert.equal(calls.length, 3);
   assert.equal(calls[0].url.pathname, "/maplestory/v1/id");

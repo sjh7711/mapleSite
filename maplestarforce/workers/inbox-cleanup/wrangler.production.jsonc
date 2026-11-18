@@ -1,0 +1,56 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "starforce-inbox-production-cleanup",
+  "main": "index.ts",
+  "compatibility_date": "2026-11-02",
+  "workers_dev": false,
+  "preview_urls": false,
+  "triggers": {
+    "crons": []
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.1
+  },
+  "ratelimits": [
+    {
+      "name": "READ_CLIENT",
+      "namespace_id": "760041",
+      "simple": {
+        "limit": 60,
+        "period": 60
+      }
+    },
+    {
+      "name": "WRITE_CLIENT",
+      "namespace_id": "760042",
+      "simple": {
+        "limit": 20,
+        "period": 60
+      }
+    },
+    {
+      "name": "READ_IP",
+      "namespace_id": "760043",
+      "simple": {
+        "limit": 300,
+        "period": 60
+      }
+    },
+    {
+      "name": "WRITE_IP",
+      "namespace_id": "760044",
+      "simple": {
+        "limit": 120,
+        "period": 60
+      }
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "STARFORCE_INBOX_DB",
+      "database_name": "starforce-inbox-production",
+      "database_id": "bb3c4b9e-86be-4941-a0a0-e53aa1e2bc28"
+    }
+  ]
+}

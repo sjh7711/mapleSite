@@ -1,11 +1,10 @@
 /* 도구가 늘어나면 서로 오갈 길이 있어야 한다. 페이지마다 머리말과 탐색 줄을
    따로 적지 않도록 여기서 한 번에 만든다. */
 
-import { ITEM_MARKET_ENABLED } from "./features.js";
 import { installMobileResultBar, installStarforceMobileResultBar } from "./mobile-result-bar.js";
 import { getTools, rootPrefix, TOOL_ITEM_ICONS, TOOL_VECTOR_ICONS } from "./tool-nav.js";
 
-const TOOLS = getTools({ itemMarketEnabled: ITEM_MARKET_ENABLED });
+const TOOLS = getTools();
 
 const TOOLNAV_DESKTOP_QUERY = "(min-width: 1280px)";
 const TOOL_PREFETCH_DELAY_MS = 120;
@@ -29,7 +28,7 @@ function toolIcon(tool, root) {
   icon.classList.add(`toolnav__icon--${tool.id}`);
   icon.setAttribute("viewBox", "0 0 24 24");
   icon.setAttribute("aria-hidden", "true");
-  icon.innerHTML = TOOL_VECTOR_ICONS[tool.id] ?? TOOL_VECTOR_ICONS["item-market"];
+  icon.innerHTML = TOOL_VECTOR_ICONS[tool.id] ?? TOOL_VECTOR_ICONS.starforce;
   return icon;
 }
 
@@ -131,13 +130,13 @@ export function renderToolNav(container, current) {
 
 /**
  * 계산기 목록은 넓은 화면에서는 본문 바깥의 왼쪽 사이드바로 보이고,
- * 그 자리가 부족한 화면에서는 제목 전체 버튼으로 여는 서랍이 된다.
+ * 그 자리가 부족한 화면에서는 제목 왼쪽의 메뉴 버튼으로 여는 서랍이 된다.
  * 스타포스의 장비 목록 서랍과 상태 및 선택자를 완전히 분리한다.
  */
 function enhanceToolNav(container) {
   const page = container.closest(".page");
   const header = page?.querySelector(":scope > .page__head");
-  const heading = header?.querySelector(":scope > h1");
+  const heading = header?.querySelector(":scope > h1, :scope > .page__title-row > h1, :scope > .page__title-row > .page__brand > h1");
   if (!page || !header || !heading) return;
 
   if (!container.id) container.id = "toolnav";
@@ -150,11 +149,15 @@ function enhanceToolNav(container) {
     titleRow.append(heading);
   }
 
-  const pageTitle = heading.textContent.trim();
-  const titleLabel = document.createElement("span");
-  titleLabel.className = "toolnav-toggle__label";
-  titleLabel.textContent = pageTitle;
-  let toggle = heading.querySelector(":scope > .toolnav-toggle");
+  const pageTitle = (heading.querySelector(".toolnav-toggle__label")?.textContent ?? heading.textContent).trim();
+  let brand = titleRow.querySelector(":scope > .page__brand");
+  if (!brand) {
+    brand = document.createElement("div");
+    brand.className = "page__brand";
+    heading.before(brand);
+    brand.append(heading);
+  }
+  let toggle = brand.querySelector(":scope > .toolnav-toggle");
   if (!toggle) {
     toggle = document.createElement("button");
     toggle.type = "button";
@@ -171,9 +174,15 @@ function enhanceToolNav(container) {
       document.createElement("span"),
       document.createElement("span"),
     );
-    toggle.append(titleLabel, icon);
-    heading.replaceChildren(toggle);
+    toggle.append(icon);
+    brand.prepend(toggle);
   }
+
+  const titleLabel = document.createElement("span");
+  titleLabel.className = "toolnav-toggle__label";
+  titleLabel.textContent = pageTitle;
+  heading.replaceChildren(titleLabel);
+  toggle.disabled = false;
 
   const close = document.createElement("button");
   close.type = "button";
@@ -209,7 +218,7 @@ function enhanceToolNav(container) {
     container.dataset.open = String(open);
     container.inert = !desktop.matches && !open;
     toggle.setAttribute("aria-expanded", String(open));
-    toggle.setAttribute("aria-label", `${pageTitle} · ${open ? "메뉴 닫기" : "메뉴 열기"}`);
+    toggle.setAttribute("aria-label", open ? "메뉴 닫기" : "메뉴 열기");
     if (open) {
       close.focus({ preventScroll: true });
     } else if (restoreFocus && !desktop.matches) {
@@ -233,9 +242,6 @@ function enhanceToolNav(container) {
   });
 
   const handleLayoutChange = () => {
-    // 데스크톱에서는 일반 제목으로, 모바일에서는 제목 전체가 버튼으로 동작한다.
-    if (desktop.matches) heading.prepend(titleLabel);
-    else toggle.prepend(titleLabel);
     setOpen(false);
   };
   if (typeof desktop.addEventListener === "function") {

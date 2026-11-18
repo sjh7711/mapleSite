@@ -2002,7 +2002,9 @@ function resultCard() {
 function render() {
   const grid = element("div", "calculator-grid");
   const left = element("div", "calculator-column");
-  left.append(targetCard(), costCard(), probabilityCard());
+  const probabilities = probabilityCard();
+  probabilities.classList.add("pet-probabilities");
+  left.append(targetCard(), costCard(), probabilities);
   const result = element("aside", "calculator-result");
   result.append(resultCard());
   grid.append(left, result);

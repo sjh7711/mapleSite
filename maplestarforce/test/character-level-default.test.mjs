@@ -2,8 +2,6 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-import { resolveItemMarketProfile } from "../src/shared/item-market-estimator.js";
-
 const PROFILE_V2 = "maplestarforce:character-profile:v2";
 
 function memoryStorage(initial = {}) {
@@ -22,10 +20,7 @@ function memoryStorage(initial = {}) {
 }
 
 test("수동 캐릭터 레벨은 290으로 시작하고 저장 상태를 우선한다", async () => {
-  const [potentialPage, itemMarketPage] = await Promise.all([
-    readFile(new URL("../src/shared/potential-page.js", import.meta.url), "utf8"),
-    readFile(new URL("../src/pages/item-market.js", import.meta.url), "utf8"),
-  ]);
+  const potentialPage = await readFile(new URL("../src/shared/potential-page.js", import.meta.url), "utf8");
 
   assert.match(
     potentialPage,
@@ -34,18 +29,6 @@ test("수동 캐릭터 레벨은 290으로 시작하고 저장 상태를 우선�
   assert.match(
     potentialPage,
     /return \{ \.\.\.fallback, \.\.\.JSON\.parse\(calculatorStorage\.getItem\(key\)\) \};/u,
-  );
-  assert.match(
-    itemMarketPage,
-    /const defaults = \{[\s\S]*?characterLevel: 290,/u,
-  );
-  assert.match(
-    itemMarketPage,
-    /\.\.\.structuredClone\(defaults\),\s*\.\.\.migrated,/u,
-  );
-  assert.match(
-    itemMarketPage,
-    /characterLevel: Number\(state\.characterLevel\) \|\| 290,/u,
   );
 });
 
@@ -102,13 +85,4 @@ test("계산 fallback은 290이고 명시값과 불러온 캐릭터 레벨은 �
     else globalThis.localStorage = originalStorage;
   }
 
-  assert.equal(resolveItemMarketProfile().characterLevel, 290);
-  assert.equal(
-    resolveItemMarketProfile({ characterLevel: 275 }).characterLevel,
-    275,
-  );
-  assert.equal(
-    resolveItemMarketProfile({ character: { level: 284 } }).characterLevel,
-    284,
-  );
 });

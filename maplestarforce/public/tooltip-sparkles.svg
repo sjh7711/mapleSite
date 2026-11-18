@@ -1,22 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="64" height="60" viewBox="0 0 64 60">
-  <g fill="#fffbd0">
-    <circle cx="4" cy="7" r="1"/>
-    <circle cx="35" cy="7" r="1"/>
-    <circle cx="4" cy="36" r="1"/>
-    <circle cx="35" cy="36" r="1"/>
-  </g>
-  <g fill="#ffda55" fill-opacity=".95">
-    <circle cx="19" cy="18" r="1.2"/>
-    <circle cx="62" cy="18" r="1.2"/>
-    <circle cx="19" cy="55" r="1.2"/>
-    <circle cx="62" cy="55" r="1.2"/>
-  </g>
-  <g fill="#fff0a9" fill-opacity=".72">
-    <circle cx="11" cy="28" r=".8"/>
-    <circle cx="34" cy="28" r=".8"/>
-    <circle cx="57" cy="28" r=".8"/>
-    <circle cx="11" cy="59" r=".8"/>
-    <circle cx="34" cy="59" r=".8"/>
-    <circle cx="57" cy="59" r=".8"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <defs>
+    <filter id="halo" x="-60%" y="-60%" width="220%" height="220%" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="1.8"/>
+    </filter>
+  </defs>
+  <circle cx="8" cy="8" r="4" fill="#f5db63" opacity=".8" filter="url(#halo)"/>
+  <path d="M8 1 9.3 6.7 14.5 8 9.3 9.3 8 15 6.7 9.3 1.5 8 6.7 6.7Z" fill="#ffe68b" opacity=".7"/>
+  <path d="M8 3 8.7 7.3 12.5 8 8.7 8.7 8 13 7.3 8.7 3.5 8 7.3 7.3Z" fill="#ffffe0"/>
+  <circle cx="8" cy="8" r="1.5" fill="#ffffd9"/>
+  <rect x="6.9" y="6.9" width="2.2" height="2.2" fill="#fff"/>
 </svg>

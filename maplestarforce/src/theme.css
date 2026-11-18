@@ -97,10 +97,21 @@
   font-weight: 500;
 }
 
-:is(.page__head, .info-header, .sitemap-submit__head):has(> .theme-toggle) {
+:is(.info-header, .sitemap-submit__head):has(> .theme-toggle) {
   position: relative;
   min-height: 36px;
   padding-right: 52px;
+}
+
+.page__head:has(> .theme-toggle) {
+  position: relative;
+  min-height: 40px;
+}
+
+.page__head > .theme-toggle {
+  position: static;
+  flex: none;
+  order: 1;
 }
 
 .theme-toggle {
@@ -173,8 +184,6 @@
 :root[data-theme="light"] .sitemap-submit__primary { background: #ffc107; color: #29200d; }
 
 @media (max-width: 760px) {
-  .page__head:has(> .menu-button):has(> .theme-toggle) { padding-right: 112px; }
-  .page__head:has(> .menu-button) > .theme-toggle { right: 64px; height: 40px; }
   .theme-toggle { width: 44px; height: 40px; }
   .sitemap-submit__head:has(> .theme-toggle) { flex-wrap: wrap; }
 }

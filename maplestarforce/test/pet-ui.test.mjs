@@ -701,7 +701,7 @@ test("자석펫 결과는 데스크톱 고정 2열과 모바일 1열을 지원�
   assert.match(css, /\.page--pet \.pet-purchase-threshold/);
   assert.match(
     source,
-    /left\.append\(targetCard\(\), costCard\(\), probabilityCard\(\)\)/,
+    /left\.append\(targetCard\(\), costCard\(\), probabilities\)/,
   );
   assert.doesNotMatch(source, /pet-setup-grid/);
   assert.match(

@@ -6,6 +6,8 @@ import { parseArgs } from "node:util";
 const PUBLIC_PATHS = [
   "/", "/potential/", "/ability/", "/add-option/", "/scroll/", "/pet/",
   "/about/", "/privacy/", "/sources/", "/soul/",
+  "/guide/", "/guide/starforce/", "/guide/potential/", "/guide/ability/",
+  "/guide/add-option/", "/guide/scroll/", "/guide/pet/", "/guide/soul/",
 ];
 const AD_PATHS = new Set(["/", "/potential/", "/ability/", "/add-option/", "/scroll/", "/pet/", "/soul/"]);
 
@@ -32,7 +34,8 @@ export function documentSignals(html) {
     } catch { return false; }
   });
   return {
-    hasHeading: /<h1\b[^>]*>[^<\s]/iu.test(html),
+    hasHeading: [...html.matchAll(/<h1\b[^>]*>([\s\S]*?)<\/h1>/giu)]
+      .some(([, body]) => body.replace(/<[^>]*>/gu, "").trim().length > 0),
     canonical: links.find((tag) => tag.rel?.toLowerCase() === "canonical")?.href,
     noindex: meta.some((tag) => /^(?:robots|googlebot)$/iu.test(tag.name ?? "") &&
       /(?:noindex|none)/iu.test(tag.content ?? "")),
@@ -117,7 +120,7 @@ async function main() {
   const checks = [];
   const add = (name, status, detail) => checks.push({ name, status, detail });
   const documents = new Map();
-  const paths = [...PUBLIC_PATHS, "/robots.txt", "/sitemap.xml", "/ads.txt", "/item-market/", "/adsense-check-missing-page/"];
+  const paths = [...PUBLIC_PATHS, "/robots.txt", "/sitemap.xml", "/ads.txt", "/adsense-check-missing-page/"];
   // 동시에 네 개까지만 요청한다.
   for (let start = 0; start < paths.length; start += 4) {
     await Promise.all(paths.slice(start, start + 4).map(async (path) => {
@@ -163,15 +166,6 @@ async function main() {
   }
   const missing = documents.get("/adsense-check-missing-page/");
   if (missing) add("없는 주소", missing.status === 404 ? "pass" : "fail", `HTTP ${missing.status}`);
-  const market = documents.get("/item-market/");
-  if (market) {
-    const expectedPath = values.environment === "preview" ? "/item-market/" : "/";
-    const valid = market.status === 200 && new URL(market.finalUrl).pathname === expectedPath &&
-      (values.environment === "preview" || market.redirected);
-    add("장비 시세 공개 범위", valid ? "pass" : "fail", values.environment === "preview"
-      ? "Preview에서 시세 페이지 제공 여부 확인"
-      : "비활성 시세 주소가 JavaScript 없이 홈으로 이동하는지 확인");
-  }
   const adsTxt = documents.get("/ads.txt");
   const adsAssessment = adsTxt ? assessAdsTxt(adsTxt, publisherId) : null;
   if (adsAssessment) add("ads.txt", adsAssessment.status, adsAssessment.detail);

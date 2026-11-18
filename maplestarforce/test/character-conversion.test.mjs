@@ -438,7 +438,7 @@ test("환산 계약 버전으로 이전 단일 부스탯 캐시와 키를 분리
     versionedUrl.searchParams.get("conversionVersion"),
     characterConversionCacheVersion,
   );
-  assert.equal(characterConversionCacheVersion, "combat-profile-v67");
+  assert.equal(characterConversionCacheVersion, "combat-profile-v69");
   const freshSnapshotKey = createSnapshotCacheKey(request, "테스트", "fresh");
   const staleSnapshotKey = createSnapshotCacheKey(request, "테스트", "stale");
   assert.equal(characterSnapshotCacheVersion, "character-snapshot-v2");
@@ -967,7 +967,7 @@ test("길드 노블 조회를 다른 공개 스냅샷과 겹쳐 처리한다", a
   assert.ok(maximumConcurrency <= 4);
 });
 
-test("길드 조회와 429 재시도를 포함한 모든 요청 시작을 275ms 이상 간격으로 예약한다", async () => {
+test("서비스 키 조회는 길드·429 재시도를 포함해 간격을 유지하고 불필요한 초 단위 대기를 없앤다", async () => {
   const originalDateNow = Date.now;
   let currentTime = 1_000_000;
   const requestStartedAt = [];
@@ -1016,12 +1016,16 @@ test("길드 조회와 429 재시도를 포함한 모든 요청 시작을 275ms 
   assert.equal(requestStartedAt.length, EXPECTED_PUBLIC_SNAPSHOT_CALLS + 3);
   for (let index = 1; index < requestStartedAt.length; index += 1) {
     assert.ok(
-      requestStartedAt[index] - requestStartedAt[index - 1] >= 275,
-      `요청 ${index + 1}의 시작 간격이 275ms보다 짧습니다: ${
+      requestStartedAt[index] - requestStartedAt[index - 1] >= 20,
+      `요청 ${index + 1}의 시작 간격이 20ms보다 짧습니다: ${
         JSON.stringify(requestStartedAt)
       }`,
     );
   }
+  assert.ok(
+    requestStartedAt.at(-1) - requestStartedAt[0] < 1_000,
+    "즉시 응답하는 API에서도 개발 키의 8초 대기 시간이 남아 있습니다.",
+  );
 });
 
 test("프리셋이 달라도 공개 원본 스냅샷을 재사용한다", async () => {
@@ -1455,6 +1459,8 @@ test("429는 세 번까지 재시도하고 키와 upstream body를 노출하지 
   const delays = [];
   const response = await handleCharacterConversion(createContext(apiRequest()), {
     cache: null,
+    // 요청 시작 간격은 별도 테스트에서 검증하고 여기서는 429 대기만 확인한다.
+    beforeRequest: async () => {},
     fetchImpl: async (input, init) => {
       attempts += 1;
       assert.equal(new URL(input).pathname, "/maplestory/v1/id");
@@ -1475,7 +1481,7 @@ test("429는 세 번까지 재시도하고 키와 upstream body를 노출하지 
   const body = JSON.parse(responseText);
 
   assert.equal(attempts, 3);
-  assert.deepEqual(delays.filter((delay) => delay <= 200), [100, 100]);
+  assert.deepEqual(delays, [100, 100]);
   assert.equal(response.status, 503);
   assert.equal(response.headers.get("Retry-After"), "2");
   assert.equal(body.ok, false);

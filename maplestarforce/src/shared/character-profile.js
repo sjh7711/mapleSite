@@ -1054,6 +1054,22 @@ function presetOptions(selection, field, current) {
     .map((value) => ({ value, label: String(value) }));
 }
 
+function profileLoadingIndicator() {
+  const loadingMode = ["auto", "active"].find((mode) =>
+    isPresetModeLoading(mode, pending, pendingPresetRequest)
+  );
+  const loadingLabel = loadingMode === "active" ? "현재 활성" : "자동 보스";
+  const indicator = element("span", "profile-head-loading");
+  indicator.dataset.visible = String(Boolean(loadingMode));
+  indicator.setAttribute("aria-hidden", String(!loadingMode));
+  if (loadingMode) {
+    indicator.setAttribute("role", "status");
+    indicator.setAttribute("aria-label", `${loadingLabel} 기준 불러오는 중`);
+    indicator.title = `${loadingLabel} 기준 불러오는 중`;
+  }
+  return indicator;
+}
+
 function presetSelectionControls(activeName, selection, conventionalAddOption) {
   if (!selection) return null;
   const request = pendingPresetRequest ?? presetRequest;
@@ -1123,21 +1139,6 @@ function presetSelectionControls(activeName, selection, conventionalAddOption) {
     "profile-preset-controls__basis",
     conventionalAddOption ? "관행 추옵 점수" : "풀 보스 도핑",
   );
-  const loadingMode = ["auto", "active"].find((mode) =>
-    isPresetModeLoading(mode, pending, pendingPresetRequest)
-  );
-  const loadingLabel = loadingMode === "active" ? "현재 활성" : "자동 보스";
-  const loadingIndicator = element("span", "profile-preset-controls__loading");
-  loadingIndicator.dataset.visible = String(Boolean(loadingMode));
-  loadingIndicator.setAttribute("aria-hidden", String(!loadingMode));
-  if (loadingMode) {
-    loadingIndicator.setAttribute("role", "status");
-    loadingIndicator.setAttribute(
-      "aria-label",
-      `${loadingLabel} 기준 불러오는 중`,
-    );
-    loadingIndicator.title = `${loadingLabel} 기준 불러오는 중`;
-  }
   top.append(title, modes, summary);
   if (currentMode === "auto" && selection.approximate) {
     const approximate = element("span", "profile-preset-controls__approximate", "자동 추정");
@@ -1145,7 +1146,7 @@ function presetSelectionControls(activeName, selection, conventionalAddOption) {
     top.append(approximate);
   }
   top.append(basis);
-  controls.append(top, loadingIndicator);
+  controls.append(top);
 
   if (currentMode === "manual") {
     const manualControls = element("div", "profile-preset-manual");
@@ -1591,5 +1592,9 @@ export function characterProfileCard({
     ...children,
   );
   profileCard.classList.add("profile-card");
+  const heading = profileCard.querySelector(".card__head h2");
+  const headingText = element("span", "profile-head-title", heading.textContent);
+  headingText.title = heading.textContent;
+  heading.replaceChildren(headingText, profileLoadingIndicator());
   return profileCard;
 }

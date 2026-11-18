@@ -5,7 +5,7 @@ import test from "node:test";
 const read = (path) => readFile(new URL(path, import.meta.url), "utf8");
 
 test("독립 토글과 선택·실행 버튼을 서로 다른 모양과 의미로 구분한다", async () => {
-  const [ui, calculatorUi, css, potential, ability, scroll, addOption, itemMarket] = await Promise.all([
+  const [ui, calculatorUi, css, potential, ability, scroll, addOption] = await Promise.all([
     read("../src/shared/ui.js"),
     read("../src/shared/calculator-ui.js"),
     read("../src/style.css"),
@@ -13,7 +13,6 @@ test("독립 토글과 선택·실행 버튼을 서로 다른 모양과 의미�
     read("../src/pages/ability.js"),
     read("../src/pages/scroll.js"),
     read("../src/pages/add-option.js"),
-    read("../src/pages/item-market.js"),
   ]);
 
   assert.match(ui, /export function toggleChip[\s\S]*kind: "toggle"/u);
@@ -24,7 +23,6 @@ test("독립 토글과 선택·실행 버튼을 서로 다른 모양과 의미�
   }
   assert.match(calculatorUi, /export function resetAction\(/u);
   assert.match(potential, /resetAction\("목표 초기화"/u);
-  assert.match(itemMarket, /resetAction\("옵션 초기화"/u);
   assert.match(css, /\.button\.button--reset[\s\S]*color:\s*var\(--muted\)/u);
   assert.match(css, /\.button\.button--reset:hover:not\(:disabled\)[\s\S]*color:\s*#ffaaaa/u);
   assert.match(css, /\.button\.button--remove:hover\s*\{[^}]*border-color:\s*#e26d6d/su);

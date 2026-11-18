@@ -5,18 +5,21 @@
 ## 구성
 
 - `maplestarforce/`: Cloudflare Pages에 배포되는 웹사이트, Pages Functions, 테스트, 연구·수집 파이프라인
-- `maple-core/`: 사이트가 사용하는 공용 기대값·스탯 환산 계산 엔진
+- `maple-core/`: 스타포스 데브 웹사이트 전용 기댓값·스탯 환산 계산 엔진
 - `chrome extension/maple-auction-diagnostic/`: 웹 경매장 자료 수집·진단용 Chrome 확장. 사이트 테스트가 사용하는 기존 상대 경로를 보존
 - `research/ui-reference/`: UI 검토에 사용한 선별 캡처
 - `backup-manifests/`: GitHub Release로 분리한 대용량 자료의 체크섬과 원래 경로
 
-프리뷰 빌드 재현에 필요한 현재 장비 시세 릴리스 `22762152e065ef31aa1f`는 저장소에 포함하며, 과거 릴리스와 수집 원본은 일반 Git 이력에서 제외합니다.
+스타포스 데브 운영 소스와 웹 계산 엔진을 이 저장소에서 관리합니다. 기존에 공개한 시세 릴리스 `22762152e065ef31aa1f`는 보관용입니다. 현재 시세 수신·갱신 서비스의 데이터는 운영 호스트에서 관리합니다.
 
 ## 설치와 검증
 
-Node.js 22.12.0 이상을 사용합니다.
+Node.js 22.23.4 이상의 22.x 버전을 사용합니다. `.nvmrc`는 보안 수정 버전인 22.23.4를 지정합니다.
 
 ```bash
+nvm install 22.23.4
+nvm use 22.23.4
+
 cd maple-core
 npm ci
 npm test

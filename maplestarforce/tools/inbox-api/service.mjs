@@ -1,0 +1,22 @@
+import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { openInboxDatabase } from './sqlite.mjs';
+import { createInboxServer } from './server.mjs';
+import { createRelayBlocker } from './private-relay.mjs';
+import { createCountryPolicy } from './country.mjs';
+import { dirname,join } from 'node:path';
+import * as handlers from './.build/handlers.mjs';
+const config=JSON.parse(await readFile(process.env.INBOX_API_CONFIG,'utf8'));
+if(!['https://preview.starforce.pages.dev','https://starforce.pages.dev'].includes(config.frontendOrigin)||config.verifyUrl!==`${config.frontendOrigin}/api/internal/blacksmith-verify`||![config.bridgeToken,config.proxyKey].every(v=>/^[a-f0-9]{64}$/.test(v)))throw new Error('Invalid inbox API configuration');
+const database=await openInboxDatabase(config.database,fileURLToPath(new URL('../../migrations/blacksmith-inbox',import.meta.url)));
+const relay=await createRelayBlocker(join(dirname(config.database),'private-relay.csv'));
+const country=await createCountryPolicy(join(dirname(config.database),'country-lite.csv.gz'));
+const server=createInboxServer({database,handlers,config,relay,country});
+server.requestTimeout=20000;server.headersTimeout=10000;server.keepAliveTimeout=5000;server.maxRequestsPerSocket=1000;
+let cleaning=false;
+async function cleanup(){if(cleaning)return;cleaning=true;try{const now=Date.now();await handlers.purgeExpiredInboxes(database,now);await handlers.purgeInboxHistory(database,now);await database.prepare('DELETE FROM blacksmith_submissions WHERE request_id IN (SELECT request_id FROM blacksmith_submissions WHERE submitted_at<=? LIMIT 200)').bind(now-1800000).run();}catch{console.error('Inbox scheduled cleanup failed');}finally{cleaning=false;}}
+const timer=setInterval(()=>void cleanup(),300000);timer.unref();await cleanup();
+await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(config.port,'127.0.0.1',resolve);});
+console.log('Inbox API ready (SQLite WAL)');
+let stopping=false;
+for(const signal of ['SIGINT','SIGTERM'])process.once(signal,()=>{if(stopping)return;stopping=true;clearInterval(timer);relay.close();country.close();server.close(async()=>{await database.close();process.exit(0);});setTimeout(()=>process.exit(1),20000).unref();});

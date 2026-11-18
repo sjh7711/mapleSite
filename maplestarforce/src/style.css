@@ -71,7 +71,7 @@ input[type="number"],
   margin: 0;
   font-size: var(--page-title-size);
   font-weight: 750;
-  letter-spacing: -0.035em;
+  letter-spacing: normal;
 }
 
 
@@ -786,14 +786,77 @@ details[open] > summary {
   margin-bottom: 8px;
 }
 
+.item__growth-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 8px;
+}
+
+.item__growth-modes .chip {
+  padding: 3px 10px;
+  font-size: 0.8125rem;
+}
+
 .item__stages {
   font-size: 0.9375rem;
+  /* 넓을 때는 장비 카드 폭을 채우고, 좁을 때는 내용 폭을 확보해 스크롤한다. */
+  width: 100%;
+  min-width: 0;
 }
 
 .item__stages th,
 .item__stages td {
   padding: 5px 8px;
 }
+
+.item__stages :is(th, td):nth-child(2) {
+  width: 1%;
+  padding-right: 4px;
+  text-align: right;
+}
+
+.item__stages :is(th, td):nth-child(3) {
+  width: 1%;
+  padding-left: 4px;
+  padding-right: 52px;
+  text-align: right;
+}
+
+.item__stages thead th[colspan="2"] {
+  text-align: center;
+}
+
+/* 이름은 한 칸에 모아 단계 수치·누적 수치와 나란히 정렬한다. */
+.item__stages tbody td:nth-child(4) {
+  width: 1%;
+}
+
+.item__stages tbody td:nth-child(5),
+.item__stages tbody td:nth-child(6),
+.item__stages thead th:nth-child(5) {
+  text-align: right;
+}
+
+.item__stages tbody td:nth-child(5) {
+  width: 1%;
+  padding-right: 4px;
+}
+
+.item__stages tbody td:nth-child(6),
+.item__stages thead th:nth-child(5) {
+  width: 1%;
+  padding-left: 4px;
+}
+
+.item__stage-gain {
+  display: grid;
+  gap: 2px;
+  line-height: 1.4;
+  color: var(--text);
+}
+
+
 
 .card--total .table-scroll {
   margin-top: 18px;
@@ -1456,16 +1519,13 @@ td:not(.empty):nth-last-child(-n + 2) {
     gap: 12px;
   }
 
-  /* 장비 목록을 여는 버튼. 머리줄에 두면 스크롤을 내렸을 때 손이 닿지 않아
-     화면 오른쪽 위에 띄워 둔다. */
+  /* 장비 목록 버튼도 제목과 같은 헤더 줄에 정렬한다. */
   .menu-button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    position: fixed;
-    right: 12px;
-    top: 12px;
-    z-index: 45;
+    flex: none;
+    order: 2;
     width: 52px;
     height: 40px;
     padding: 0 10px;
@@ -1720,10 +1780,6 @@ td:not(.empty):nth-last-child(-n + 2) {
     background: var(--accent);
   }
 
-  .item__strategy .chip {
-    padding: 8px 13px;
-    font-size: 0.9375rem;
-  }
 
   .chip:active {
     border-color: var(--accent);
@@ -1958,24 +2014,41 @@ input,
   content: none;
 }
 
-/* 한글은 기본값이면 음절 아무 데서나 끊겨 "단계별 기댓 / 값" 이 된다.
-   띄어쓰기에서만 넘어가게 해 "단계별 / 기댓값" 으로 떨어뜨린다. */
+/* 제목은 두 묶음 사이에서만 줄이 바뀌며 '스탯 상승량'은 붙여 둔다. */
 .item__toggle {
+  position: relative;
+  padding-left: 20px;
   word-break: keep-all;
 }
 
-/* 앞을 줄바꿈 없는 공백으로 둬 표시가 혼자 다음 줄로 내려가지 않게 한다. */
-.item__toggle::after {
-  content: "\00a0▾";
-  color: var(--muted);
+.item__toggle-part {
+  display: inline-block;
+  white-space: nowrap;
 }
 
-.item__details[open] .item__toggle::after {
-  content: "\00a0▴";
+/* 글꼴 기준선에 영향을 받지 않도록 제목 첫 줄의 중앙에 화살표를 둔다. */
+.item__toggle::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.5lh;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-top: 8px solid var(--muted);
+}
+
+.item__details[open] .item__toggle::before {
+  border-top: 0;
+  border-bottom: 8px solid var(--muted);
 }
 
 .item__stats {
   margin-left: auto;
+  min-width: min-content;
+  flex-shrink: 1;
   color: var(--muted);
   font-size: 0.9375rem;
   text-align: right;
@@ -1988,7 +2061,7 @@ input,
 
 .page__head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 16px;
 }
 
@@ -2002,6 +2075,97 @@ input,
   flex-direction: column;
   align-items: flex-start;
   gap: 10px;
+}
+
+.total__heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  max-width: 100%;
+  font-size: 1.125rem;
+}
+
+.total__equipment-count {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.total__heading h2 {
+  flex: 0 0 auto;
+  font-size: inherit;
+}
+
+.total__benefits {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+
+.total__benefits[hidden] {
+  display: none;
+}
+
+.total-benefit {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--benefit-color);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.total-benefit svg {
+  display: block;
+  flex: 0 0 auto;
+  width: 1.1em;
+  height: 1.1em;
+}
+
+.total-benefit--event,
+.total-benefit--mvp[data-value="gold"] {
+  --benefit-color: #e9ba52;
+}
+
+.total-benefit--mvp[data-value="silver"] {
+  --benefit-color: #b6c5db;
+}
+
+.total-benefit--mvp[data-value="diamond"] {
+  --benefit-color: #b5a4fa;
+}
+
+.total-benefit--pc {
+  --benefit-color: #80cec7;
+}
+
+.total-benefit--event[data-value="none"],
+.total-benefit--mvp[data-value="none"] {
+  color: var(--muted);
+}
+
+:root[data-theme="light"] .total-benefit--event,
+:root[data-theme="light"] .total-benefit--mvp[data-value="gold"] {
+  --benefit-color: #8c6411;
+}
+
+:root[data-theme="light"] .total-benefit--mvp[data-value="silver"] {
+  --benefit-color: #4f6380;
+}
+
+:root[data-theme="light"] .total-benefit--mvp[data-value="diamond"] {
+  --benefit-color: #7253ba;
+}
+
+:root[data-theme="light"] .total-benefit--pc {
+  --benefit-color: #237c76;
 }
 
 /* 그 외 레벨도 위 목록처럼 두 칸씩 늘어놓는다.
@@ -2033,6 +2197,47 @@ input,
 .layout > .layout__main {
   grid-column: 2;
   grid-row: 1 / span 2;
+}
+
+/* 첫 장비를 추가하기 전에도 오른쪽 카드의 고정 기준을 확보한다.
+   페이지 맨 아래에서 준비할 메소가 부모 높이 변화로 튀는 것을 막는다. */
+@media (min-width: 761px) {
+  [data-calculator="starforce"] .layout > .layout__main {
+    align-self: stretch;
+  }
+
+  [data-calculator="starforce"] .layout__main > .card--enhance {
+    flex-grow: 1;
+  }
+
+  /* 캐릭터 장비판이 있거나 카드가 줄바꿈되어도 첫 장비가 들어갈 공간을
+     확보한다. 합계 문단은 장비 바로 아래에 두고 남는 여백은 그 아래 둔다. */
+  [data-calculator="starforce"] .enhance-results {
+    min-height: 20rem;
+  }
+
+  /* 1080px 이하에서는 장비 카드의 조작부도 여러 줄로 배치된다. */
+  @media (max-width: 1080px) {
+    [data-calculator="starforce"] .enhance-results {
+      min-height: 28rem;
+    }
+  }
+
+  @container starforce-enhance (max-width: 420px) {
+    [data-calculator="starforce"] .enhance-results {
+      min-height: 28rem;
+    }
+  }
+
+  @container starforce-enhance (max-width: 300px) {
+    [data-calculator="starforce"] .enhance-results {
+      min-height: 38rem;
+    }
+  }
+}
+
+.enhance-results {
+  display: flow-root;
 }
 
 .layout > .card--settings .settings--row {
@@ -2184,15 +2389,14 @@ input,
 }
 
 .picker__part-control > .picker__pick {
-  grid-template-columns: 14px 20px minmax(0, 1fr);
-  gap: 4px;
-  padding-left: 6px;
   padding-right: 32px;
 }
 
-.picker__part-control > .picker__pick img {
-  width: 20px;
-  height: 20px;
+/* 작은 화면에서도 같은 아이콘 정렬을 유지하며 이름과 부위 메뉴를 함께 표시한다. */
+@media (max-width: 360px) {
+  .picker__row {
+    grid-template-columns: minmax(0, 1fr) 78px;
+  }
 }
 
 .picker__group-menu,
@@ -2294,7 +2498,13 @@ input,
   .item__stats {
     margin-left: 0;
     flex-basis: 100%;
+    min-width: 0;
+    flex-shrink: 1;
     text-align: left;
+  }
+
+  .item__stat strong {
+    white-space: normal;
   }
 }
 
@@ -2332,7 +2542,31 @@ input,
 
 /* 목록 자리 버튼. 담긴 것이 있는 자리는 점으로 표시한다. */
 .chips--slot {
+  position: relative;
   gap: 4px;
+  padding-left: 26px;
+}
+
+/* 숫자 왼쪽에 세로 라벨을 두고 버튼과 높이 중심을 맞춘다. */
+.chips--slot::before {
+  content: attr(aria-label);
+  position: absolute;
+  top: 50%;
+  left: 0;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 36px;
+  transform: translateY(-50%);
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 1px;
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  white-space: nowrap;
+  pointer-events: none;
 }
 
 /* 슬롯은 다른 칩과 성격이 달라 알약 대신 네모로 두고, 눌러 옮겨 다니는
@@ -2620,10 +2854,19 @@ input,
 /* 계산기 사이를 오가는 공통 탐색. 좁은 화면에서는 왼쪽 서랍, 본문과
    사이드바가 모두 들어가는 넓은 화면에서는 바깥 왼쪽 레일이 된다. */
 .page__title-row {
+  flex: 1;
   min-width: 0;
   display: flex;
   align-items: center;
   gap: 9px;
+}
+
+.page__brand {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 7px;
+  min-height: 40px;
 }
 
 .toolnav {
@@ -2741,12 +2984,13 @@ input,
 }
 
 .toolnav-toggle {
-  max-width: 100%;
-  min-height: 44px;
+  flex: none;
+  width: 40px;
+  height: 40px;
   padding: 8px;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
   background: var(--surface-soft, #171a21);
   color: var(--text);
   border: 1px solid var(--line);
@@ -2786,6 +3030,7 @@ input,
 
 .toolnav-toggle__label {
   word-break: keep-all;
+  white-space: nowrap;
 }
 
 .toolnav-toggle__icon span {
@@ -3398,15 +3643,18 @@ button.character-equipment__slot:focus-visible {
 
 .character-equipment__star {
   position: absolute;
-  right: 2px;
+  left: 50%;
   bottom: 2px;
+  transform: translateX(-50%);
   padding: 1px 3px;
   background: var(--surface-soft, rgba(9, 11, 15, 0.82));
   color: var(--text-gold, #ffe276);
   border-radius: 4px;
-  font-size: 0.5625rem;
+  font-size: calc(0.5625rem * 1.15);
   font-weight: 700;
   line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
 }
 
 /* 좁은 강화 목록에서는 캐릭터 조회를 슬롯 아래에 배치한다. */
@@ -3592,6 +3840,7 @@ button.character-equipment__slot:focus-visible {
   cursor: pointer;
 }
 .site-footer__privacy-button:hover { color: var(--accent); }
+.site-footer__privacy-button[hidden] { display: none; }
 .site-footer__privacy-button:disabled {
   color: var(--muted);
   cursor: wait;

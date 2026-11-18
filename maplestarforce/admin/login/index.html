@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow, noarchive" />
+    <title>스타포스 데브</title>
+    <meta name="application-name" content="스타포스 데브" />
+    <link rel="stylesheet" href="../../src/admin-prices.css" />
+    <link rel="icon" type="image/x-icon" sizes="16x16 32x32 48x48 96x96 256x256" href="/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
+    <link rel="icon" type="image/svg+xml" sizes="any" href="/tool-icons/starforce-star.svg" />
+  </head>
+  <body>
+    <main class="admin-page admin-page--login">
+      <a class="admin-back" href="/">← 계산기로 돌아가기</a>
+      <section class="admin-card">
+        <p class="admin-eyebrow">사이트 관리</p>
+        <h1>관리자 로그인</h1>
+        <p class="admin-description">관리 기능을 사용하려면 관리자 비밀번호를 입력해주세요.</p>
+        <form id="admin-login">
+          <label for="admin-password">관리자 비밀번호</label>
+          <input id="admin-password" name="password" type="password" autocomplete="current-password" required maxlength="512" />
+          <button class="admin-primary" type="submit">로그인</button>
+        </form>
+        <p id="admin-message" class="admin-message" role="status" aria-live="polite"></p>
+      </section>
+    </main>
+    <script type="module" src="../../src/pages/admin-prices.js"></script>
+  </body>
+</html>

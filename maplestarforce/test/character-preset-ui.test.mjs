@@ -81,7 +81,7 @@ test("프리셋 전환 중에는 요청한 자동·활성 기준만 로딩 상�
   assert.equal(isPresetModeLoading("auto", false, { mode: "auto" }), false);
 });
 
-test("프리셋 로딩 아이콘은 버튼이 아닌 계산 기준 박스 우측에 둔다", async () => {
+test("프리셋 로딩 아이콘은 캐릭터 카드 제목 오른쪽에 둔다", async () => {
   const source = await readFile(
     new URL("../src/shared/character-profile.js", import.meta.url),
     "utf8",
@@ -91,9 +91,11 @@ test("프리셋 로딩 아이콘은 버튼이 아닌 계산 기준 박스 우측
     "utf8",
   );
 
-  assert.match(source, /controls\.append\(top, loadingIndicator\)/);
+  assert.match(source, /profileCard\.querySelector\("\.card__head h2"\)/);
+  assert.match(source, /heading\.replaceChildren\(headingText, profileLoadingIndicator\(\)\)/);
+  assert.doesNotMatch(source, /profile-preset-controls__loading/);
   assert.doesNotMatch(source, /profile-preset-mode__spinner/);
-  assert.match(css, /\.profile-preset-controls__loading\[data-visible="true"\]/);
+  assert.match(css, /\.profile-head-loading\[data-visible="true"\]/);
 });
 
 test("이전 장비 요약의 정보 갱신 버튼은 캐시를 건너뛰는 재조회 요청을 보낸다", async () => {

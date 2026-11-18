@@ -2,7 +2,10 @@ export const NEXON_API_BASE = "https://open.api.nexon.com/maplestory/v1";
 
 const MAX_RETRY_DELAY_MS = 2_000;
 const DEFAULT_TIMEOUT_MS = 10_000;
-const REQUEST_INTERVAL_MS = 275;
+// 운영·프리뷰는 서비스 단계 키를 사용한다(애플리케이션 전체 500건/초).
+// 캐릭터 조회 한 건은 최대 50건/초로 나눠 보내 다른 조회의 여유를 둔다.
+// 이는 조회별 간격이며 전체 트래픽의 한도는 429 재시도로 대응한다.
+const REQUEST_INTERVAL_MS = 20;
 // Workers는 한 요청에서 동시에 6개의 outbound connection을 허용한다.
 // 길드 조회와 재시도 여유를 남기고 공개 캐릭터 스냅샷만 최대 4개 겹친다.
 const CHARACTER_FETCH_CONCURRENCY = 4;
@@ -549,9 +552,9 @@ export async function fetchCharacterPotentialData(
     })),
   ] as const;
 
-  /* 개발 키의 초당 5회 제한과 rolling window를 모두 피한다. 요청 시작은
-     275ms 간격으로 유지하되 왕복 응답은 최대 네 개까지 겹쳐, 느린 endpoint
-     하나가 뒤의 모든 조회를 막지 않게 한다. */
+  /* 서비스 키에 맞춰 요청 시작을 20ms 간격으로 나누고, 왕복 응답은 최대
+     네 개까지 겹친다. 느린 endpoint 하나가 뒤의 모든 조회를 막지 않으며
+     길드 조회와 재시도에도 같은 간격을 적용한다. */
   let guildData: JsonObject = {};
   const payloads = await mapWithConcurrency(
     jobs,

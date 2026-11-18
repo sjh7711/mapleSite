@@ -54,7 +54,7 @@ test("비어 있거나 null인 스타포스를 0성으로 오인하지 않는다
   assert.deepEqual(normalized.map(({ name }) => name), ["정상 0성"]);
 });
 
-test("135제 미만과 스타포스 비허용 부위를 자동 시작값 후보에서 제외한다", () => {
+test("130제·135제 이상만 허용하고 스타포스 비허용 부위를 제외한다", () => {
   const normalized = normalizeStarforceEquipment([
     equipped({ name: "134제 망토", level: 134 }),
     equipped({ name: "140제 엠블렘", level: 140, part: "엠블렘" }),
@@ -67,6 +67,15 @@ test("135제 미만과 스타포스 비허용 부위를 자동 시작값 후보�
   ]);
 
   assert.deepEqual(normalized.map(({ name }) => name), ["135제 눈장식"]);
+});
+
+test("130제 플라즈마 하트를 장비판과 130제 가격 프리셋에 연결한다", () => {
+  const heart = equipped({ name: "플라즈마 하트", level: 130, part: "기계 심장", slot: "기계 심장", starforce: 17 });
+  const normalized = normalizeStarforceEquipment([heart]);
+  assert.equal(normalized.length, 1);
+  const generic = preset("level-130", 130);
+  assert.equal(calculatorPresetForEquipment(normalized[0], [generic])?.id, "level-130");
+  assert.equal(startStarForPreset(generic, normalized, 12).startStar, 17);
 });
 
 test("스타포스 가능한 아스트라만 보조무기 예외로 허용하고 전용 프리셋에 연결한다", () => {
@@ -103,8 +112,10 @@ test("장비판은 인게임처럼 벨트·에테르넬 방어구·보조무기�
     ]),
   );
 
-  assert.deepEqual(positions.반지1, [1, 1]);
-  assert.deepEqual(positions.반지4, [4, 1]);
+  assert.deepEqual(positions.반지4, [1, 1]);
+  assert.deepEqual(positions.반지3, [2, 1]);
+  assert.deepEqual(positions.반지2, [3, 1]);
+  assert.deepEqual(positions.반지1, [4, 1]);
   assert.deepEqual(positions.벨트, [5, 1]);
   assert.deepEqual(positions.모자, [1, 6]);
   assert.deepEqual(positions.망토, [1, 7]);

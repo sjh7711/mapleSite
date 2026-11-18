@@ -14,6 +14,7 @@ import {
 } from "../_lib/nexon";
 import { resolveCharacterPresetSnapshot } from "maple-core/stat-efficiency";
 import { inferPotentialStatProfile } from "maple-core/stat-profile";
+import { isExcludedStarforceEquipment, normalizeStarforceGrowthOptions } from "../../src/shared/starforce-stat-gains.js";
 
 export type Bindings = {
   NEXON_API_KEY: string;
@@ -30,7 +31,7 @@ export type CharacterEquipmentDependencies = NexonRequestDependencies & {
 };
 
 const CACHE_SECONDS = 10 * 60;
-const CACHE_VERSION = "starforce-equipment-v5";
+const CACHE_VERSION = "starforce-equipment-v8";
 const CHARACTER_NAME_PATTERN = /^[\p{L}\p{N}]+$/u;
 const EQUIPMENT_PRESET_NUMBERS = [1, 2, 3] as const;
 const STARFORCE_PARTS = new Set([
@@ -59,6 +60,7 @@ type PublicEquipment = {
   level: number;
   starforce: number;
   icon: string | null;
+  growthOptions?: ReturnType<typeof normalizeStarforceGrowthOptions>;
 };
 
 type PublicEquipmentPreset = {
@@ -177,9 +179,10 @@ function sanitizeEquipmentArray(equipment: unknown): PublicEquipment[] | null {
       isStarforceSpecialEquipment(name, part, slot, level);
     if (
       !name ||
+      isExcludedStarforceEquipment(item) ||
       !starforceEligible ||
       level === null ||
-      level < 135 ||
+      (level < 135 && level !== 130) ||
       starforce === null ||
       starforce < 0 ||
       // 시작 성 선택은 0~29성입니다. 완성된 30성 장비를 자동 시작값으로
@@ -189,7 +192,10 @@ function sanitizeEquipmentArray(equipment: unknown): PublicEquipment[] | null {
       return [];
     }
     const icon = sanitizeHttpsUrl(item?.item_icon);
-    return [{ name, part, slot, level, starforce, icon }];
+    const growthOptions = normalizeStarforceGrowthOptions(item);
+    return [{ name, part, slot, level, starforce, icon,
+      ...(growthOptions ? { growthOptions } : {}),
+    }];
   });
 }
 

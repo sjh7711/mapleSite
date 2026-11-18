@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", "lib": ["ES2022"], "module": "ESNext",
+    "moduleResolution": "Bundler", "strict": true, "noEmit": true,
+    "skipLibCheck": true, "allowJs": true, "checkJs": false,
+    "types": ["@cloudflare/workers-types"]
+  },
+  "include": [
+    "starforce-admin-env.d.ts", "_lib/starforce-admin.ts", "_lib/starforce-prices.ts", "_lib/soul-ether-prices.ts", "api/soul-ether-prices.ts",
+    "api/admin/**/*.ts", "api/starforce-prices.ts", "admin/**/*.ts", "api/blacksmith-inboxes/**/*.ts", "api/internal/blacksmith-verify.ts", "_lib/inbox-vm-env.d.ts"
+  ]
+}

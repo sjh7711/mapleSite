@@ -25,26 +25,21 @@ const PUBLIC_URLS = [
   "https://starforce.pages.dev/guide/soul/",
 ];
 
-const PAGE_FAVICONS = new Map([
-  ["../index.html", "./tool-icons/starforce-star.svg"],
-  ["../potential/index.html", "../tool-icons/black-cube.png"],
-  ["../additional/index.html", "../tool-icons/white-additional-cube.png"],
-  ["../add-option/index.html", "../tool-icons/black-rebirth-flame.png"],
-  ["../scroll/index.html", "../tool-icons/spell-trace.png"],
-  ["../ability/index.html", "../tool-icons/large-boss-medal.png"],
-  ["../pet/index.html", "../tool-icons/wisp-wonderberry.png"],
-  ["../item-market/index.html", "../tool-icons/starforce-star.svg"],
-  ["../sitemap-submit/index.html", "../tool-icons/starforce-star.svg"],
-]);
+const FAVICON_PAGES = [
+  "../index.html", "../potential/index.html", "../additional/index.html", "../add-option/index.html",
+  "../scroll/index.html", "../ability/index.html", "../pet/index.html", "../soul/index.html",
+  "../sitemap-submit/index.html", "../about/index.html", "../privacy/index.html", "../sources/index.html",
+  "../guide/index.html", ...["starforce", "potential", "add-option", "scroll", "ability", "pet", "soul"].map((tool) => `../guide/${tool}/index.html`),
+  ...["login", "starforce-prices", "soul-ether-prices", "blacksmith-inboxes"].map((page) => `../admin/${page}/index.html`),
+  "../public/404.html",
+];
 
-test("모든 페이지가 기능을 구분하는 파비콘을 선언한다", async () => {
-  for (const [page, favicon] of PAGE_FAVICONS) {
+test("사이트 전체가 스타포스 별 파비콘과 PNG·ICO 대체 이미지를 선언한다", async () => {
+  for (const page of FAVICON_PAGES) {
     const html = await read(page);
-    assert.match(
-      html,
-      new RegExp(`<link rel="icon"[^>]+href="${favicon.replaceAll(".", "\\.")}"`),
-      `${page} favicon`,
-    );
+    for (const href of ["/favicon.ico", "/favicon-96x96.png", "/tool-icons/starforce-star.svg"]) {
+      assert.ok([...html.matchAll(/<link rel="icon"[^>]+>/gu)].some(([tag]) => tag.includes(`href="${href}"`)), `${page}: ${href}`);
+    }
   }
 });
 
@@ -69,10 +64,9 @@ test("XML과 텍스트 사이트맵은 같은 공개 URL을 중복 없이 포함
   assert.doesNotMatch(sitemap, /<changefreq>/u);
 });
 
-test("robots와 운영 기능 플래그가 사이트맵 공개 범위를 지킨다", async () => {
-  const [robots, productionEnv, headers, redirects, vite] = await Promise.all([
+test("robots와 헤더가 사이트맵 공개 범위를 지킨다", async () => {
+  const [robots, headers, redirects, vite] = await Promise.all([
     read("../public/robots.txt"),
-    read("../.env.production"),
     read("../public/_headers"),
     read("../public/_redirects"),
     read("../vite.config.js"),
@@ -88,7 +82,6 @@ test("robots와 운영 기능 플래그가 사이트맵 공개 범위를 지킨�
     robots,
     /Sitemap:\s*https:\/\/starforce\.pages\.dev\/sitemap\.txt/u,
   );
-  assert.match(productionEnv, /VITE_ITEM_MARKET_ENABLED=false/u);
   assert.match(
     headers,
     /\/sitemap\.xml\s+Content-Type:\s*application\/xml/u,

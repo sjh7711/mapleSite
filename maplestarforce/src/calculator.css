@@ -20,7 +20,7 @@
 
 .page--calculator .page__head {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 10px 24px;
 }
@@ -2358,6 +2358,20 @@
   container-type: inline-size;
 }
 
+.page--calculator .profile-card .card__head h2 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.page--calculator .profile-head-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .page--calculator .profile-head-actions {
   display: flex;
   align-items: center;
@@ -2646,12 +2660,11 @@
 }
 
 .page--calculator .profile-preset-controls {
-  position: relative;
   display: grid;
   grid-column: 1 / -1;
   gap: 7px;
   min-width: 0;
-  padding: 8px 27px 8px 8px;
+  padding: 8px;
   border: 1px solid var(--border-soft, rgba(43, 48, 60, 0.82));
   border-radius: 8px;
   background: var(--surface-soft, #15181f);
@@ -2726,23 +2739,19 @@
   opacity: 1;
 }
 
-.page--calculator .profile-preset-controls__loading {
-  position: absolute;
-  top: 15px;
-  right: 9px;
-  width: 11px;
-  height: 11px;
+.page--calculator .profile-head-loading {
+  display: none;
+  flex: none;
+  width: 1em;
+  height: 1em;
   box-sizing: border-box;
-  border: 1.5px solid rgba(216, 196, 119, 0.35);
+  border: 2px solid rgba(216, 196, 119, 0.35);
   border-top-color: var(--text-gold, #f0d977);
   border-radius: 50%;
-  opacity: 0;
-  visibility: hidden;
 }
 
-.page--calculator .profile-preset-controls__loading[data-visible="true"] {
-  opacity: 1;
-  visibility: visible;
+.page--calculator .profile-head-loading[data-visible="true"] {
+  display: inline-block;
   animation: profile-preset-spin 0.7s linear infinite;
 }
 
@@ -2753,7 +2762,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .page--calculator .profile-preset-controls__loading[data-visible="true"] {
+  .page--calculator .profile-head-loading[data-visible="true"] {
     animation: none;
   }
 }
@@ -3450,24 +3459,49 @@
   border-top: 1px solid var(--border-soft, rgba(255, 255, 255, 0.07));
 }
 
+@font-face {
+  font-family: "Galmuri11";
+  src: url("/fonts/galmuri/Galmuri11.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Galmuri11";
+  src: url("/fonts/galmuri/Galmuri11-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 .page--calculator .profile-equipment-tooltip {
   position: absolute;
   z-index: 2200;
-  width: min(354px, calc(100vw - 16px));
+  width: min(325px, calc(100vw - 16px));
   max-height: none;
   overflow: visible;
-  padding: 0 12px 12px;
-  color: #f0f2f6;
-  background: #292e38;
-  border: 1px solid rgba(192, 204, 220, 0.44);
-  border-radius: 7px;
-  font-family: var(--font-ui);
-  font-size: 0.755rem;
+  padding: 0 13px 8px;
+  color: #f2f5f5;
+  background: #354047;
+  border: 1px solid #81909b;
+  border-radius: 8px;
+  font-family: "Galmuri11", var(--font-ui);
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
-  font-weight: 500;
-  letter-spacing: -0.022em;
-  line-height: 1.34;
+  font-weight: 400;
+  letter-spacing: 0.035em;
+  line-height: 17px;
   pointer-events: auto;
+}
+
+.page--calculator .profile-equipment-tooltip::before {
+  position: absolute;
+  inset: 1px;
+  border: 1px solid #212c34;
+  border-radius: 6px;
+  content: "";
+  pointer-events: none;
 }
 
 .page--calculator .profile-equipment-tooltip[data-placement="inline"] {
@@ -3475,7 +3509,7 @@
   z-index: 1;
   left: auto;
   top: auto;
-  width: min(354px, 100%);
+  width: min(325px, 100%);
   margin: 10px auto 0;
 }
 
@@ -3485,18 +3519,18 @@
 
 .page--calculator .profile-equipment-tooltip__close {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: 4px;
+  right: 4px;
   display: grid;
   width: 32px;
   height: 32px;
   padding: 0;
   place-items: center;
-  color: rgba(226, 231, 240, 0.88);
-  background: rgba(15, 17, 22, 0.3);
-  border: 1px solid rgba(225, 230, 240, 0.26);
+  color: #bac4cb;
+  background: transparent;
+  border: 1px solid transparent;
   border-radius: 5px;
-  font: inherit;
+  font-family: sans-serif;
   font-size: 1.25rem;
   font-weight: 600;
   line-height: 1;
@@ -3513,34 +3547,79 @@
 .page--calculator .profile-equipment-tooltip__header {
   position: relative;
   isolation: isolate;
-  padding: 11px 3px 10px;
-  border-bottom: 1px solid rgba(225, 230, 240, 0.17);
+  padding: 8px 0 6px;
   text-align: center;
 }
 
-.page--calculator .profile-equipment-tooltip__header[data-sparkle="true"]::before {
+.page--calculator .profile-equipment-tooltip__header:not(:has(.profile-equipment-tooltip__stars)) {
+  padding-inline: 22px;
+}
+
+.page--calculator .profile-equipment-tooltip__starlight {
   position: absolute;
   z-index: -1;
   top: 0;
   right: -12px;
-  bottom: 0;
   left: -12px;
-  opacity: 0.68;
-  background-image: url("/tooltip-sparkles.svg");
-  background-size: 64px 60px;
-  content: "";
+  height: 44px;
+  overflow: hidden;
+  border-radius: 6px 6px 0 0;
   pointer-events: none;
+}
+
+.page--calculator .profile-equipment-tooltip__sparkle {
+  position: absolute;
+  width: calc(var(--sparkle-size) * 1.3);
+  height: calc(var(--sparkle-size) * 1.3);
+  background-image: url("/tooltip-sparkles.svg");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  opacity: 0.4;
+  transform: translate(-50%, -50%) scale(0.65);
+  animation: equipment-tooltip-twinkle var(--sparkle-duration) ease-in-out var(--sparkle-delay) infinite;
+}
+
+@keyframes equipment-tooltip-twinkle {
+  0%, 100% {
+    opacity: 0.22;
+    transform: translate(-50%, -50%) scale(0.58);
+  }
+  22% {
+    opacity: 0.7;
+    transform: translate(-50%, -50%) scale(0.9);
+  }
+  42% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.05);
+  }
+  58% {
+    opacity: 0.85;
+    transform: translate(-50%, -50%) scale(0.98);
+  }
+  78% {
+    opacity: 0.4;
+    transform: translate(-50%, -50%) scale(0.72);
+  }
+  93% {
+    opacity: 0.12;
+    transform: translate(-50%, -50%) scale(0.45);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page--calculator .profile-equipment-tooltip__sparkle {
+    animation: none;
+  }
 }
 
 .page--calculator .profile-equipment-tooltip__stars {
   display: grid;
   grid-template-columns: repeat(3, max-content);
   justify-content: center;
-  gap: 1px 9px;
+  gap: 7px 12px;
   width: max-content;
   max-width: 100%;
-  margin: 0 auto 5px;
-  font-size: 0.73rem;
+  margin: 0 auto 9px;
   letter-spacing: 0;
   line-height: 1;
 }
@@ -3551,27 +3630,50 @@
 }
 
 .page--calculator .profile-equipment-tooltip__star {
-  color: rgba(141, 151, 165, 0.48);
+  position: relative;
+  display: block;
+  width: 10px;
+  height: 10px;
+  background: #69757c;
+  clip-path: polygon(50% 0, 64% 32%, 100% 36%, 73% 61%, 81% 99%, 50% 78%, 19% 99%, 27% 61%, 0 36%, 36% 32%);
+}
+
+.page--calculator .profile-equipment-tooltip__star::after {
+  position: absolute;
+  inset: 1px;
+  background: #2a373f;
+  clip-path: inherit;
+  content: "";
 }
 
 .page--calculator .profile-equipment-tooltip__star[data-filled="true"] {
-  color: #ffc400;
+  background: #dba90b;
+}
+
+.page--calculator .profile-equipment-tooltip__star[data-filled="true"]::after {
+  background: #ffe722;
 }
 
 .page--calculator .profile-equipment-tooltip__name {
   display: block;
   color: #f5f6fa;
-  font-size: 0.98rem;
-  font-weight: 760;
-  letter-spacing: -0.028em;
-  line-height: 1.28;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.035em;
+  line-height: 21px;
+  overflow-wrap: anywhere;
+}
+
+.page--calculator .profile-equipment-tooltip__trade {
+  margin: 3px 0 0;
+  color: #ff9c19;
 }
 
 .page--calculator .profile-equipment-tooltip__description {
   margin: 4px 0 0;
   color: #c1c7d1;
-  font-size: 0.69rem;
-  line-height: 1.35;
+  font-size: inherit;
+  line-height: inherit;
   white-space: pre-line;
 }
 
@@ -3579,14 +3681,14 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 0;
-  padding: 8px 5px 9px;
-  border-bottom: 1px solid rgba(225, 230, 240, 0.17);
+  padding: 3px 0 4px;
+  border-bottom: 1px solid #69747b;
 }
 
 .page--calculator .profile-equipment-tooltip__overview-top {
   display: flex;
   min-width: 0;
-  min-height: 76px;
+  min-height: 78px;
   align-items: flex-end;
   justify-content: space-between;
   gap: 12px;
@@ -3594,14 +3696,14 @@
 
 .page--calculator .profile-equipment-tooltip__icon {
   display: grid;
-  width: 76px;
-  height: 76px;
+  width: 78px;
+  height: 78px;
   place-items: center;
   color: #aeb6c5;
-  background: #cbd0da;
-  border: 1px solid rgba(255, 255, 255, 0.68);
-  border-radius: 5px;
-  font-size: 0.68rem;
+  background: #929ca4;
+  border: 1px solid #cbd1d5;
+  border-radius: 3px;
+  font-size: inherit;
 }
 
 .page--calculator .profile-equipment-tooltip__icon img {
@@ -3613,26 +3715,24 @@
 
 .page--calculator .profile-equipment-tooltip__meta {
   display: grid;
-  gap: 2px;
+  gap: 0;
   min-width: 0;
-  margin-top: 7px;
-  padding-top: 6px;
-  color: #e0e4eb;
-  border-top: 1px solid rgba(225, 230, 240, 0.13);
-  font-size: 0.73rem;
-  line-height: 1.35;
+  margin-top: 3px;
+  color: #f2f5f5;
+  font-size: inherit;
+  line-height: inherit;
 }
 
 .page--calculator .profile-equipment-tooltip__meta-row {
   display: grid;
-  grid-template-columns: 58px minmax(0, 1fr);
-  gap: 6px;
+  grid-template-columns: 77px minmax(0, 1fr);
+  gap: 8px;
   min-width: 0;
 }
 
 .page--calculator .profile-equipment-tooltip__meta-label {
-  color: #aeb6c2;
-  font-weight: 450;
+  color: #b1bcc2;
+  font-weight: 400;
   white-space: nowrap;
 }
 
@@ -3640,7 +3740,7 @@
   min-width: 0;
   overflow: hidden;
   color: #f1f3f7;
-  font-weight: 620;
+  font-weight: 400;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -3654,14 +3754,13 @@
 }
 
 .page--calculator .profile-equipment-tooltip__tag {
-  padding: 1px 7px 2px;
-  color: #d5dae3;
-  background: rgba(145, 157, 176, 0.2);
-  border: 1px solid rgba(190, 199, 214, 0.1);
+  padding: 0 8px;
+  color: #d4dbe0;
+  background: #4d5a66;
   border-radius: 999px;
-  font-size: 0.65rem;
-  font-weight: 520;
-  line-height: 1.3;
+  font-size: inherit;
+  font-weight: 400;
+  line-height: 15px;
 }
 
 .page--calculator .profile-equipment-tooltip__body {
@@ -3682,7 +3781,7 @@
 .page--calculator .profile-equipment-tooltip__stats {
   display: grid;
   gap: 0;
-  padding: 8px 3px 9px;
+  padding: 3px 0 5px;
 }
 
 .page--calculator .profile-equipment-tooltip__stat,
@@ -3694,17 +3793,17 @@
   display: inline-block;
   margin-right: 8px;
   color: #dfe3e9;
-  font-weight: 520;
+  font-weight: 400;
 }
 
 .page--calculator .profile-equipment-tooltip__stat-value > b {
   color: #f7f8fb;
-  font-weight: 720;
+  font-weight: 400;
 }
 
 .page--calculator .profile-equipment-tooltip__breakdown {
   color: #a3abb8;
-  font-size: 0.695rem;
+  font-size: inherit;
   white-space: normal;
 }
 
@@ -3733,14 +3832,14 @@
 }
 
 .page--calculator .profile-equipment-tooltip__section {
-  padding: 7px 3px 7px;
+  padding: 5px 0 3px;
   border-top: 0;
 }
 
 .page--calculator .profile-equipment-tooltip__section[data-kind="potential"],
 .page--calculator .profile-equipment-tooltip__section[data-kind="exceptional-upgrade"],
 .page--calculator .profile-equipment-tooltip__section[data-kind="soul"] {
-  border-top: 1px solid rgba(225, 230, 240, 0.22);
+  border-top: 1px solid #69747b;
 }
 
 .page--calculator .profile-equipment-tooltip__section-title {
@@ -3748,46 +3847,44 @@
   align-items: center;
   gap: 4px;
   width: fit-content;
-  margin: 0 0 4px -1px;
-  padding: 1px 5px 2px 1px;
+  margin: 0 0 3px;
+  padding: 0;
   color: #f0f2f7;
   border-radius: 3px;
-  font-size: 0.765rem;
-  font-weight: 720;
-  letter-spacing: -0.025em;
-  line-height: 1.3;
+  font-size: inherit;
+  font-weight: 400;
+  letter-spacing: inherit;
+  line-height: inherit;
 }
 
 .page--calculator .profile-equipment-tooltip__section-title[data-grade="레어"] {
   color: #72aaff;
-  background: rgba(114, 170, 255, 0.07);
 }
 
 .page--calculator .profile-equipment-tooltip__section-title[data-grade="에픽"] {
   color: #c987ff;
-  background: rgba(201, 135, 255, 0.07);
 }
 
 .page--calculator .profile-equipment-tooltip__section-title[data-grade="유니크"] {
   color: #ffd455;
-  background: rgba(255, 212, 85, 0.07);
 }
 
 .page--calculator .profile-equipment-tooltip__section-title[data-grade="레전드리"] {
   color: #bfff46;
-  background: rgba(191, 255, 70, 0.07);
 }
 
 .page--calculator .profile-equipment-tooltip__grade-badge {
   display: inline-grid;
-  flex: 0 0 14px;
-  width: 14px;
-  height: 14px;
+  flex: 0 0 10px;
+  width: 10px;
+  height: 10px;
   place-items: center;
   color: #171a20;
   border-radius: 2px;
-  font-size: 0.61rem;
-  font-weight: 900;
+  font-family: Arial, sans-serif;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: normal;
   line-height: 1;
 }
 
@@ -3809,27 +3906,26 @@
 
 .page--calculator .profile-equipment-tooltip__lines {
   display: grid;
-  gap: 2px;
+  gap: 0;
   margin: 0;
-  padding: 0;
+  padding: 0 0 0 3px;
   list-style: none;
 }
 
 .page--calculator .profile-equipment-tooltip__lines li {
   position: relative;
-  padding-left: 12px;
+  padding-left: 11px;
   color: #f0f2f6;
-  font-weight: 510;
-  line-height: 1.3;
+  font-weight: 400;
+  line-height: inherit;
 }
 
 .page--calculator .profile-equipment-tooltip__lines li::before {
   position: absolute;
-  top: 0.5em;
+  top: 0.55em;
   left: 0;
-  width: 5px;
-  height: 5px;
-  border-radius: 1px;
+  width: 4px;
+  height: 4px;
   background: #a8b0bf;
   content: "";
 }
@@ -3893,32 +3989,17 @@
 
 .page--calculator .profile-equipment-tooltip__scroll strong {
   color: #f2f4f8;
-  font-weight: 650;
+  font-weight: 400;
 }
 
-@media (max-width: 620px) {
-  .page--calculator .profile-equipment-tooltip {
-    border-radius: 11px 11px 7px 7px;
-    font-size: 0.73rem;
+@media (max-width: 380px) {
+  .page--calculator .profile-equipment-tooltip__starlight {
+    height: 40px;
   }
 
-  .page--calculator .profile-equipment-tooltip__overview {
-    padding-right: 3px;
-    padding-left: 3px;
-  }
-
-  .page--calculator .profile-equipment-tooltip__overview-top {
-    min-height: 68px;
-  }
-
-  .page--calculator .profile-equipment-tooltip__icon {
-    width: 68px;
-    height: 68px;
-  }
-
-  .page--calculator .profile-equipment-tooltip__icon img {
-    width: 58px;
-    height: 58px;
+  .page--calculator .profile-equipment-tooltip__star {
+    width: 8px;
+    height: 8px;
   }
 }
 
@@ -4422,6 +4503,14 @@
 }
 
 @media (max-width: 900px) {
+  .page--pet .calculator-grid > .calculator-column {
+    display: contents;
+  }
+
+  .page--pet .pet-probabilities {
+    order: 1;
+  }
+
   .page--calculator .calculator-grid {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -4532,7 +4621,8 @@
   }
 
   .page--calculator .page__head {
-    display: block;
+    align-items: flex-start;
+    gap: 8px;
   }
 
   .page--calculator .page__head p {
@@ -4789,927 +4879,6 @@
 
 .page--calculator .metric-grid > .metric:only-child {
   grid-column: 1 / -1;
-}
-
-/* 입력보다 결과에 폭을 더 배분하고 긴 결과 전체를 고정하지 않는다. */
-.page--item-market .calculator-grid {
-  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
-}
-
-.page--item-market .calculator-result {
-  position: static;
-}
-
-.page--item-market .market-equipment-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.page--item-market .market-equipment-actions .button {
-  flex: none;
-  width: auto;
-  white-space: nowrap;
-}
-
-.page--item-market .market-result-status {
-  margin: 0;
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface-soft);
-  color: var(--text);
-  font-size: 0.875rem;
-}
-
-.page--item-market .market-item-field {
-  min-width: 0;
-}
-
-.page--item-market .market-item-picker {
-  display: block;
-  min-width: 0;
-}
-
-.page--item-market .market-item-picker > .search-select {
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
-.page--item-market .market-item-combobox {
-  position: relative;
-  display: block;
-  width: 100%;
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
-/* 모든 .card가 자체 stacking context(z-index: 1)를 만들기 때문에 목록 자체의
-   z-index만 높여서는 뒤에 그려지는 잠재능력 카드 위로 올라올 수 없다. 장비명
-   목록이 열린 동안 조상 카드도 함께 올려 목록이 다음 카드에 가리지 않게 한다. */
-.page--item-market .calculator-equipment:has(.market-item-combobox .search-select__options:not([hidden])) {
-  z-index: 31;
-}
-
-.page--item-market .market-item-combobox > .search-select__input {
-  width: 100%;
-  min-width: 0;
-  min-height: 38px;
-  padding-right: 34px;
-  border-radius: 8px;
-}
-
-.page--item-market .market-item-combobox__toggle {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 34px;
-  min-height: 38px;
-  margin: 0;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-  z-index: 1;
-}
-
-.page--item-market .market-item-combobox__toggle:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.page--item-market .market-item-combobox__options {
-  position: absolute;
-  top: calc(100% + 5px);
-  right: 0;
-  left: 0;
-  z-index: 30;
-  max-height: 260px;
-  overflow-y: auto;
-  padding: 5px;
-  border: 1px solid var(--line);
-  border-radius: 9px;
-  background: var(--surface-soft, #171a22);
-}
-
-.page--item-market .market-item-combobox__options[hidden] {
-  display: none;
-}
-
-.page--item-market .market-item-combobox__option {
-  display: block;
-  width: 100%;
-  padding: 8px 9px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text);
-  text-align: left;
-  cursor: pointer;
-}
-
-.page--item-market .market-item-combobox__option:hover,
-.page--item-market .market-item-combobox__option[data-active="true"] {
-  background: rgba(255, 193, 7, 0.1);
-  color: var(--text-gold, #ffe083);
-}
-
-.page--item-market .market-item-combobox__option[aria-selected="true"] {
-  font-weight: 800;
-}
-
-.page--item-market .market-item-combobox__empty {
-  padding: 10px 9px;
-  color: var(--muted);
-  font-size: 0.76rem;
-}
-
-.page--item-market .market-item-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  grid-column: 1;
-  grid-row: 1 / span 2;
-  align-self: center;
-  width: 76px;
-  height: 76px;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--surface-wash, rgba(255, 255, 255, 0.04));
-}
-
-.page--item-market .market-item-icon img {
-  display: block;
-  width: 66px;
-  height: 66px;
-  object-fit: contain;
-  image-rendering: pixelated;
-}
-
-.page--item-market .market-item-icon__fallback {
-  display: none;
-  align-items: center;
-  justify-content: center;
-  color: var(--muted);
-  font-size: 1.15rem;
-  font-weight: 800;
-}
-
-.page--item-market .market-item-icon[data-fallback="true"] .market-item-icon__fallback {
-  display: flex;
-}
-
-.page--item-market .market-equipment-layout {
-  display: grid;
-  grid-template-columns: 76px minmax(0, 3fr) minmax(104px, 1fr);
-  grid-template-rows: repeat(2, minmax(0, auto));
-  gap: 9px 12px;
-  align-items: stretch;
-}
-
-.page--item-market .market-equipment-settings {
-  display: contents;
-}
-
-.page--item-market .market-item-field {
-  grid-column: 2;
-  grid-row: 1;
-}
-
-.page--item-market .market-starforce-field {
-  grid-column: 3;
-  grid-row: 1;
-}
-
-.page--item-market .market-trade-field {
-  grid-column: 2;
-  grid-row: 2;
-}
-
-.page--item-market .market-item-field,
-.page--item-market .market-trade-field,
-.page--item-market .market-trade-field > .search-select {
-  width: 100%;
-  min-width: 0;
-}
-
-.page--item-market .market-equipment-secondary-field {
-  grid-column: 3;
-  grid-row: 2;
-}
-
-.page--item-market .market-load-error {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-top: 9px;
-  color: var(--text-red, #ffaaaa);
-  font-size: 0.76rem;
-}
-
-.page--item-market .market-retry {
-  min-height: 31px;
-  flex: none;
-  padding: 4px 9px;
-  font-size: 0.74rem;
-}
-
-.page--item-market .market-potential-grid,
-.page--item-market .market-enhancement-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 9px;
-}
-
-.page--item-market .market-option-panel,
-.page--item-market .market-stat-panel {
-  min-width: 0;
-  padding: 10px;
-  border: 1px solid var(--border-soft, rgba(43, 48, 60, 0.78));
-  border-radius: 9px;
-  background: var(--surface-soft, #151820);
-}
-
-.page--item-market .market-option-panel__title,
-.page--item-market .market-stat-panel__title,
-.page--item-market .market-result-subtitle {
-  margin: 0 0 8px;
-  color: var(--text-strong, #e7e9ef);
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-
-.page--item-market .market-equivalence-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-  margin-top: 9px;
-}
-
-.page--item-market .market-equivalence {
-  min-width: 0;
-  padding: 8px;
-  border: 1px solid var(--border-soft, rgba(43, 48, 60, 0.72));
-  border-radius: 8px;
-  background: var(--surface-soft, #161920);
-}
-
-.page--item-market .market-equivalence[data-kind="personal"] {
-  border-color: rgba(103, 160, 255, 0.22);
-  background: rgba(80, 130, 230, 0.045);
-}
-
-.page--item-market .market-equivalence__title,
-.page--item-market .market-equivalence__caption {
-  display: block;
-}
-
-.page--item-market .market-equivalence__title {
-  color: var(--text-strong, #e5e7ec);
-  font-size: 0.72rem;
-}
-
-.page--item-market .market-equivalence__caption {
-  min-height: 2.7em;
-  margin-top: 2px;
-  color: var(--muted);
-  font-size: 0.61rem;
-  line-height: 1.35;
-}
-
-.page--item-market .market-equivalence__values {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 3px 6px;
-  margin-top: 6px;
-}
-
-.page--item-market .market-equivalence__value {
-  display: flex;
-  min-width: 0;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 4px;
-  color: var(--text-strong, #e3e6ed);
-  font-size: 0.67rem;
-}
-
-.page--item-market .market-equivalence__value small {
-  color: var(--muted);
-  font-size: 0.61rem;
-}
-
-.page--item-market .market-equivalence__value b {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.page--item-market .market-option-lines {
-  display: grid;
-  gap: 6px;
-  margin-top: 8px;
-}
-
-.page--item-market .market-option-line {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 88px;
-  gap: 6px;
-  min-width: 0;
-}
-
-.page--item-market .market-option-line .search-select__input,
-.page--item-market .market-option-line input {
-  min-width: 0;
-  min-height: 34px;
-  padding-top: 5px;
-  padding-bottom: 5px;
-  font-size: 0.82rem;
-}
-
-.page--item-market .market-option-line .search-select[data-disabled="true"] .search-select__input,
-.page--item-market .market-option-line input:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
-}
-
-.page--item-market .market-option-value {
-  position: relative;
-  min-width: 0;
-}
-
-.page--item-market .market-option-value input {
-  width: 100%;
-  padding-right: 26px;
-}
-
-.page--item-market .market-option-value__unit {
-  position: absolute;
-  top: 50%;
-  right: 8px;
-  color: var(--muted);
-  font-size: 0.68rem;
-  pointer-events: none;
-  transform: translateY(-50%);
-}
-
-.page--item-market .market-stat-fields {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 7px 6px;
-}
-
-.page--item-market .market-stat-fields .field {
-  gap: 3px;
-  font-size: 0.7rem;
-}
-
-.page--item-market .market-stat-fields input {
-  min-width: 0;
-  min-height: 34px;
-  padding: 5px 7px;
-  font-size: 0.82rem;
-}
-
-.page--item-market .market-manual-expected-cost {
-  margin-top: 9px;
-}
-
-.page--item-market .market-manual-expected-cost input {
-  min-height: 35px;
-}
-
-.page--item-market .market-expected-cost-note,
-.page--item-market .market-recovery-formula {
-  margin-top: 8px;
-  color: var(--muted);
-  font-size: 0.69rem;
-  line-height: 1.45;
-}
-
-.page--item-market .market-recovery-formula {
-  margin: 4px 0 8px;
-}
-
-.page--item-market .market-result-card {
-  min-width: 0;
-}
-
-.page--item-market .market-result-heading {
-  position: sticky;
-  top: 12px;
-  z-index: 3;
-  background: var(--card);
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 10px;
-  border-bottom: 1px solid var(--line);
-}
-
-.page--item-market .market-result-summary {
-  min-width: 0;
-  flex: 1;
-  padding-bottom: 11px;
-}
-
-.page--item-market .market-result-hero {
-  min-width: 0;
-  margin-bottom: 0;
-  padding-bottom: 4px;
-  border-bottom: 0;
-}
-
-.page--item-market .market-result-hero strong {
-  overflow-wrap: anywhere;
-}
-
-.page--item-market .market-result-range {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 3px 8px;
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.72rem;
-  line-height: 1.4;
-}
-
-.page--item-market .market-result-range strong {
-  color: var(--text);
-  font-size: 0.8rem;
-  overflow-wrap: anywhere;
-}
-
-.page--item-market .market-confidence {
-  display: inline-flex;
-  flex: none;
-  margin-top: 10px;
-  padding: 3px 7px;
-  border: 1px solid rgba(255, 193, 7, 0.24);
-  border-radius: 999px;
-  background: rgba(255, 193, 7, 0.08);
-  color: var(--text-gold, #d8c477);
-  font-size: 0.68rem;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.page--item-market .market-confidence[data-level="high"] {
-  border-color: rgba(90, 211, 156, 0.28);
-  background: rgba(90, 211, 156, 0.08);
-  color: var(--text-green, #8ee6bd);
-}
-
-.page--item-market .market-confidence[data-level="low"] {
-  border-color: rgba(255, 152, 152, 0.25);
-  background: rgba(255, 110, 110, 0.07);
-  color: var(--text-red, #ffb0b0);
-}
-
-.page--item-market .market-stat-comparison {
-  display: grid;
-  gap: 7px;
-  margin: 10px 0;
-  padding: 9px;
-  border: 1px solid rgba(112, 142, 201, 0.24);
-  border-radius: 8px;
-  background: rgba(83, 113, 171, 0.055);
-}
-
-.page--item-market .market-stat-comparison__heading {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.page--item-market .market-stat-comparison__heading strong {
-  color: var(--text-strong, #e5eaf5);
-  font-size: 0.76rem;
-}
-
-.page--item-market .market-stat-comparison__heading span {
-  color: var(--muted);
-  font-size: 0.65rem;
-  white-space: nowrap;
-}
-
-.page--item-market .market-stat-comparison__list {
-  display: grid;
-  gap: 4px;
-}
-
-.page--item-market .market-stat-comparison__row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  padding: 6px 7px;
-  border-radius: 6px;
-  background: var(--surface-soft, rgba(16, 19, 25, 0.62));
-}
-
-.page--item-market .market-stat-comparison__identity {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  min-width: 0;
-}
-
-.page--item-market .market-stat-comparison__identity strong {
-  flex: none;
-  color: var(--text-strong, #dfe4ee);
-  font-size: 0.72rem;
-}
-
-.page--item-market .market-stat-comparison__identity small {
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 0.64rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.page--item-market .market-stat-comparison[data-mode="job_peer_items"]
-  .market-stat-comparison__identity {
-  align-items: flex-start;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.page--item-market .market-stat-comparison__delta {
-  color: var(--text-strong, #d9deea);
-  font-size: 0.7rem;
-  text-align: right;
-  white-space: nowrap;
-}
-
-.page--item-market .market-stat-comparison__row[data-relation="cheaper"]
-  .market-stat-comparison__delta {
-  color: var(--text-green, #8ee6bd);
-}
-
-.page--item-market .market-stat-comparison__row[data-relation="more-expensive"]
-  .market-stat-comparison__delta {
-  color: var(--text-gold, #f2d46c);
-}
-
-.page--item-market .market-result-subtitle {
-  margin-top: 12px;
-  padding-top: 10px;
-  border-top: 1px solid var(--border-soft, rgba(43, 48, 60, 0.62));
-}
-
-.page--item-market .market-components {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
-  align-items: start;
-  gap: 8px;
-}
-
-.page--item-market .market-component {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  padding: 7px 8px;
-  border: 1px solid var(--border-soft, rgba(43, 48, 60, 0.72));
-  border-radius: 7px;
-  background: var(--surface-soft, #161920);
-}
-
-.page--item-market .market-component__expectation {
-  grid-column: 1 / -1;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 3px 8px;
-  min-width: 0;
-  padding-top: 6px;
-  border-top: 1px solid var(--border-soft, rgba(43, 48, 60, 0.68));
-  color: var(--text-secondary, #aeb6c6);
-  font-size: 0.73rem;
-}
-
-.page--item-market .market-component__expectation-copy {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
-
-.page--item-market .market-component__details-toggle {
-  align-self: end;
-  padding: 2px 0;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  font: inherit;
-  font-size: 0.7rem;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.page--item-market .market-component__details-toggle::after {
-  content: " ▾";
-}
-
-.page--item-market .market-component__details-toggle[aria-expanded="true"]::after {
-  content: " ▴";
-}
-
-.page--item-market .market-component__details-toggle:hover,
-.page--item-market .market-component__details-toggle:focus-visible {
-  color: var(--text);
-}
-
-.page--item-market .market-component__expected-cost {
-  min-width: 0;
-}
-
-.page--item-market .market-component__recovery {
-  flex: none;
-  color: var(--text-gold, #f2d46c);
-  font-size: 0.72rem;
-  white-space: nowrap;
-}
-
-.page--item-market .market-component__recovery:empty {
-  display: none;
-}
-
-.page--item-market .market-disclosure {
-  min-width: 0;
-  margin-top: 10px;
-  border-top: 1px solid var(--line);
-  padding-top: 8px;
-  color: var(--muted);
-  font-size: 0.76rem;
-}
-
-.page--item-market .market-disclosure > summary {
-  cursor: pointer;
-  padding: 3px 0;
-  font-weight: 600;
-}
-
-.page--item-market .market-disclosure > summary:hover,
-.page--item-market .market-disclosure > summary:focus-visible {
-  color: var(--text);
-}
-
-.page--item-market .market-disclosure__body {
-  padding-top: 6px;
-  overflow-wrap: anywhere;
-  line-height: 1.55;
-}
-
-.page--item-market .market-disclosure__body > p {
-  margin: 0 0 6px;
-}
-
-.page--item-market .market-component__evidence {
-  grid-column: 1 / -1;
-  color: var(--muted);
-  font-size: 0.7rem;
-}
-
-.page--item-market .market-component__expectation[data-expectation-status="excluded"],
-.page--item-market .market-component__expectation[data-expectation-status="unavailable"] {
-  color: var(--text-red, #d7a8a8);
-}
-
-.page--item-market .market-component__expectation[data-expectation-status="manual_required"] {
-  color: var(--text-blue, #b8c8e8);
-}
-
-.page--item-market .market-component__copy {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.page--item-market .market-component__label {
-  color: var(--text-strong, #e5e7ec);
-  font-size: 0.76rem;
-}
-
-.page--item-market .market-component__range {
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 0.64rem;
-  line-height: 1.35;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.page--item-market .market-component__value {
-  color: var(--accent);
-  font-size: 0.82rem;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-  white-space: nowrap;
-}
-
-.page--item-market .market-component[data-confidence="low"]
-  .market-component__value {
-  color: var(--text-gold, #dbc884);
-}
-
-.page--item-market .market-component[data-identifiable="false"] {
-  border-style: dashed;
-}
-
-.page--item-market .market-component[data-identifiable="false"]
-  .market-component__value {
-  max-width: 150px;
-  color: var(--muted);
-  font-size: 0.7rem;
-  white-space: normal;
-}
-
-.page--item-market .market-component-sum {
-  margin-top: 7px;
-  padding-top: 8px;
-  border-top-color: rgba(255, 193, 7, 0.2);
-}
-
-.page--item-market .market-component-sum[data-matches="false"] strong {
-  color: var(--text-red, #ffaaaa);
-}
-
-.page--item-market .market-warnings {
-  display: grid;
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.page--item-market .market-warning {
-  position: relative;
-  padding: 7px 8px 7px 21px;
-  border: 1px solid rgba(255, 193, 7, 0.16);
-  border-radius: 7px;
-  background: rgba(255, 193, 7, 0.045);
-  color: var(--text-secondary, #c7cbd5);
-  font-size: 0.7rem;
-  line-height: 1.5;
-}
-
-.page--item-market .market-warning::before {
-  position: absolute;
-  top: 7px;
-  left: 8px;
-  color: var(--text-gold, #d8c477);
-  content: "!";
-  font-weight: 800;
-}
-
-.page--item-market .market-warning[data-severity="high"] {
-  border-color: rgba(255, 130, 130, 0.2);
-  background: rgba(255, 100, 100, 0.05);
-}
-
-.page--item-market .market-warning[data-severity="high"]::before {
-  color: var(--text-red, #ffaaaa);
-}
-
-@media (max-width: 1040px) {
-  .page--item-market .calculator-grid {
-    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
-  }
-
-  .page--item-market .market-potential-grid,
-  .page--item-market .market-enhancement-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .page--item-market .market-stat-fields {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 900px) {
-  .page--item-market .calculator-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .page--item-market .calculator-column {
-    display: contents;
-  }
-
-  .page--item-market .calculator-equipment {
-    order: 1;
-  }
-
-  .page--item-market .calculator-market-options {
-    order: 2;
-  }
-
-  .page--item-market .calculator-market-enhancement {
-    order: 3;
-  }
-
-  .page--item-market .calculator-result {
-    order: 4;
-  }
-
-  .page--item-market .calculator-profile {
-    order: 5;
-  }
-
-  .page--item-market .market-stat-fields {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 680px) {
-  .page--item-market .market-equipment-layout {
-    grid-template-columns: 62px minmax(0, 1fr) minmax(74px, 84px);
-    gap: 9px 8px;
-  }
-
-  .page--item-market .market-item-icon {
-    width: 62px;
-    height: 62px;
-  }
-
-  .page--item-market .market-item-icon img {
-    width: 56px;
-    height: 56px;
-  }
-
-  .page--item-market .market-potential-grid,
-  .page--item-market .market-enhancement-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
-@media (max-width: 430px) {
-  .page--item-market .market-result-heading {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .page--item-market .market-confidence {
-    align-self: flex-start;
-    margin-top: 0;
-    margin-bottom: 10px;
-  }
-
-  .page--item-market .market-equivalence-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .page--item-market .market-equivalence__caption {
-    min-height: 0;
-  }
-
-  .page--item-market .market-stat-comparison__heading,
-  .page--item-market .market-stat-comparison__identity {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .page--item-market .market-stat-comparison__heading span {
-    white-space: normal;
-  }
-
-  .page--item-market .market-stat-comparison__row {
-    align-items: start;
-  }
-
-  .page--item-market .market-stat-comparison__identity small,
-  .page--item-market .market-stat-comparison__delta {
-    white-space: normal;
-  }
-
-  .page--item-market .market-stat-fields {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .page--item-market .market-option-line {
-    grid-template-columns: minmax(0, 1fr) 82px;
-  }
-
-  .page--item-market .market-component {
-    align-items: start;
-  }
-
-  .page--item-market .market-component__value {
-    max-width: 130px;
-    white-space: normal;
-  }
 }
 
 .page--calculator .target-item[data-disabled="true"] {

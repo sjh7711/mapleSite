@@ -1,10 +1,19 @@
 node_modules/
 dist/
 .wrangler/
+functions/_generated/
 .env*
-!.env.preview
-!.env.production
 
 # 연무장 원본에는 공개 캐릭터 닉네임과 원본 피해량이 들어간다.
 tools/battle-practice-dataset/raw/
 tools/battle-practice-dataset/generated/
+
+# Only blank/sanitized configuration examples may be committed.
+!**/.env.example
+!**/.env.*.example
+
+# Retained datasets are local archives, never public application assets.
+data/item-market/
+
+# Built VM backend bundles; SQLite/configuration live outside the repository.
+tools/inbox-api/.build/

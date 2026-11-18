@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow, noarchive" />
+    <title>스타포스 데브</title>
+    <meta name="application-name" content="스타포스 데브" />
+    <link rel="stylesheet" href="../../src/admin-prices.css" />
+    <link rel="icon" type="image/x-icon" sizes="16x16 32x32 48x48 96x96 256x256" href="/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
+    <link rel="icon" type="image/svg+xml" sizes="any" href="/tool-icons/starforce-star.svg" />
+  </head>
+  <body>
+    <main class="admin-page">
+      <header class="admin-header">
+        <div><a class="admin-back" href="/">← 계산기로 돌아가기</a><h1>스타포스 스페어값 관리</h1></div>
+        <button id="admin-logout" type="button">로그아웃</button>
+      </header>
+      <nav id="admin-navigation" class="admin-nav" aria-label="관리 메뉴" hidden>
+        <a href="/admin/starforce-prices/" aria-current="page">스페어값 관리</a>
+        <a href="/admin/soul-ether-prices/">소울 에테르 가격</a>
+        <a href="/admin/blacksmith-inboxes/">대장장이 관리</a>
+      </nav>
+      <section class="admin-card">
+        <div class="admin-intro">
+          <p id="price-updated" class="admin-updated"></p>
+        </div>
+        <form id="admin-prices">
+          <div class="admin-list-heading"><h2>장비별 노작값</h2><span>단위: 억 메소</span></div>
+          <div id="admin-price-rows" class="admin-price-list"></div>
+          <div class="admin-footer">
+            <p id="admin-message" class="admin-message" role="status" aria-live="polite">가격을 불러오는 중입니다.</p>
+            <div class="admin-actions">
+              <button id="admin-reload" type="button">최신 가격 불러오기</button>
+              <button id="admin-save" class="admin-primary" type="submit" disabled>변경사항 저장</button>
+            </div>
+          </div>
+        </form>
+      </section>
+    </main>
+    <script type="module" src="../../src/pages/admin-prices.js"></script>
+  </body>
+</html>

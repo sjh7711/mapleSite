@@ -5,7 +5,7 @@
   "description": "여러 장비를 한 번에 계산하는 메이플스토리 스타포스 기대값 웹 계산기",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": "^22.23.4"
   },
   "scripts": {
     "adsense:check": "node scripts/check-adsense.mjs",
@@ -15,13 +15,6 @@
     "build:production": "vite build --mode production",
     "preview": "vite preview",
     "test": "node --test --test-concurrency=1 test/*.test.mjs",
-    "market:status": "node scripts/refresh-item-market-data.mjs --status",
-    "market:check": "node scripts/refresh-item-market-data.mjs --check",
-    "market:refresh": "node --max-old-space-size=4096 scripts/refresh-item-market-data.mjs",
-    "market:sync": "node tools/item-market-sync/service.mjs refresh --wait",
-    "market:sync-status": "node tools/item-market-sync/service.mjs status",
-    "market:model-check": "node scripts/check-item-market-model.mjs",
-    "market:prior-check": "node scripts/check-item-market-pooled-prior.mjs",
     "battle-practice:collect": "node scripts/collect-battle-practice-records.mjs",
     "battle-practice:enrich": "node scripts/enrich-battle-practice-records.mjs",
     "battle-practice:collect-efficiency": "node scripts/collect-maplescouter-efficiency.mjs",
@@ -41,7 +34,14 @@
     "skills:research-defense": "node scripts/research-defense-normalized-error.mjs",
     "skills:research-provenance": "node scripts/research-combat-effect-provenance.mjs",
     "skills:research-protocols": "node scripts/research-skill-dictionary-protocols.mjs",
-    "skills:audit-provenance": "node scripts/audit-combat-effect-provenance.mjs"
+    "skills:audit-provenance": "node scripts/audit-combat-effect-provenance.mjs",
+    "market:status": "node scripts/refresh-item-market-data.mjs --status",
+    "market:check": "node scripts/refresh-item-market-data.mjs --check",
+    "market:refresh": "node --max-old-space-size=4096 scripts/refresh-item-market-data.mjs",
+    "market:sync": "node tools/item-market-sync/service.mjs refresh --wait",
+    "market:sync-status": "node tools/item-market-sync/service.mjs status",
+    "market:model-check": "node scripts/check-item-market-model.mjs",
+    "market:prior-check": "node scripts/check-item-market-pooled-prior.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260829.1",
@@ -49,7 +49,8 @@
     "esbuild": "^0.25.12",
     "typescript": "^7.0.2",
     "vite": "^6.4.3",
-    "wrangler": "^4.127.1"
+    "wrangler": "^4.127.1",
+    "miniflare": "5.20260828.0-alpha"
   },
   "dependencies": {
     "@msgpack/msgpack": "3.1.3",

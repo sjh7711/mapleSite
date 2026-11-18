@@ -2,6 +2,8 @@
 
 ## 현재 구성
 
+실행 작업본은 `/home/ubuntu/maple-platform/mapleSite/maplestarforce`이며 시세 원본도 이 작업본의 `item_price_raw`에 저장합니다. `/home/ubuntu/maplestarforce`는 같은 작업본으로 연결되는 호환 링크입니다.
+
 확장 프로그램 → Cloudflare Tunnel → VM `127.0.0.1:8793` → `item_price_raw/incoming/<해시 앞 2글자>/<SHA-256>.jsonl`
 
 고정 주소 `https://maple-market-upload.apfhd159862.workers.dev/route`는 인증된 확장 프로그램에 현재 터널 주소만 제공합니다. Worker에는 원본을 받는 API가 없고 원본을 중계하거나 보관하지 않습니다. KV에는 터널 주소 하나만 저장합니다.
@@ -30,7 +32,7 @@ maple-market status
 maple-market refresh --wait
 ```
 
-운영은 `VITE_ITEM_MARKET_ENABLED=false`를 유지합니다.
+장비 시세 웹페이지는 제거했으며, 수신·자동 갱신 서비스와 별도 시세 데이터 서버는 유지합니다. 시세 데이터는 계산기 앱의 빌드에 포함하지 않습니다.
 
 ## 점검 / 복구
 

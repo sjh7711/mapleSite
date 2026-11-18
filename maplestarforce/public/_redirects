@@ -7,3 +7,8 @@
 /naver6526b7604fe109e188978032cf9d98cc.html  /naver6526b7604fe109e188978032cf9d98cc  200
 /additional/  /potential/?system=additional  301
 /additional  /potential/?system=additional  301
+# 제거된 웹 도구의 기존 주소는 계산기 홈으로 안내한다.
+/item-market / 302
+/item-market/* / 302
+/spec-up / 302
+/spec-up/* / 302

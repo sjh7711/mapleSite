@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow, noarchive" />
+    <title>스타포스 데브</title>
+    <meta name="application-name" content="스타포스 데브" />
+    <link rel="stylesheet" href="../../src/admin-prices.css" />
+    <link rel="icon" type="image/x-icon" sizes="16x16 32x32 48x48 96x96 256x256" href="/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
+    <link rel="icon" type="image/svg+xml" sizes="any" href="/tool-icons/starforce-star.svg" />
+  </head>
+  <body>
+    <main class="admin-page admin-page--inboxes">
+      <header class="admin-header">
+        <div><a class="admin-back" href="/">← 계산기로 돌아가기</a><h1>대장장이 관리</h1></div>
+        <button id="admin-logout" type="button">로그아웃</button>
+      </header>
+      <nav class="admin-nav" aria-label="관리 메뉴">
+        <a href="/admin/starforce-prices/">스페어값 관리</a>
+        <a href="/admin/soul-ether-prices/">소울 에테르 가격</a>
+        <a href="/admin/blacksmith-inboxes/" aria-current="page">대장장이 관리</a>
+      </nav>
+      <section class="admin-card">
+        <div class="admin-inbox-views" role="group" aria-label="대장장이 관리 화면">
+          <button id="inbox-current-view" type="button" aria-pressed="true">현재 대장장이</button>
+          <button id="inbox-history-view" type="button" aria-pressed="false">종료 이력</button>
+        </div>
+        <p id="inbox-history-help" class="admin-description" hidden>종료 후 3일 동안 신청자별 장비와 종료 당시 처리 상태를 보관합니다.</p>
+        <div id="inbox-summary" class="admin-inbox-summary" aria-label="전체 대장장이 현황"></div>
+        <form id="inbox-search" class="admin-inbox-toolbar" role="search">
+          <label class="admin-inbox-search">대장장이 이름<input id="inbox-query" type="search" placeholder="대장장이 이름 검색" maxlength="64" /></label>
+          <label><span id="inbox-filter-label">접수 상태</span><select id="inbox-status"><option value="all">전체</option><option value="accepting">접수 중</option><option value="paused">접수 일시 중지</option><option value="expired">자동 종료</option></select></label>
+          <label>정렬<select id="inbox-sort"><option value="created">최근 생성 순</option><option value="submitted">최근 신청 순</option><option value="completed">최근 완료 순</option></select></label>
+          <button id="inbox-reload" type="submit">새로고침</button>
+        </form>
+        <p id="admin-message" class="admin-message" role="status" aria-live="polite">대장장이를 불러오는 중입니다.</p>
+        <div id="admin-inboxes" class="admin-inbox-list" aria-label="전체 대장장이"></div>
+        <nav class="admin-inbox-pagination" aria-label="대장장이 목록 페이지">
+          <button id="inbox-prev" type="button" disabled>이전</button><span id="inbox-page"></span><button id="inbox-next" type="button" disabled>다음</button>
+        </nav>
+        <details class="admin-inbox-blocks">
+          <summary>차단한 IP 관리 <span id="inbox-block-count"></span></summary>
+          <div id="inbox-blocks" aria-label="차단한 IP 목록"></div>
+          <nav class="admin-inbox-pagination" aria-label="차단 목록 페이지">
+            <button id="inbox-block-prev" type="button" disabled>이전</button><span id="inbox-block-page"></span><button id="inbox-block-next" type="button" disabled>다음</button>
+          </nav>
+        </details>
+      </section>
+    </main>
+    <script type="module" src="../../src/pages/admin-inboxes.js"></script>
+  </body>
+</html>

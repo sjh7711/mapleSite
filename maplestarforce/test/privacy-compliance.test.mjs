@@ -27,14 +27,14 @@ function consentFixture() {
   };
 }
 
-test("공통 푸터는 항상 보이는 Google 광고 동의 변경 제어와 실패 경로를 제공한다", async () => {
+test("공통 푸터는 Google 광고 동의 버튼을 임시로 숨기고 연결 기능을 보존한다", async () => {
   const [footer, controls, styles] = await Promise.all([
     read("../partials/site-footer.html"),
     read("../src/shared/privacy-controls.js"),
     read("../src/style.css"),
   ]);
   assert.match(footer, /id="google-consent-settings"/u);
-  assert.doesNotMatch(footer, /google-consent-settings[^>]+hidden/u);
+  assert.match(footer, /google-consent-settings[^>]+hidden/u);
   assert.match(footer, /aria-describedby="google-consent-status google-consent-fallback"/u);
   assert.match(footer, /광고 코드가 있는 계산기 페이지에서 다시 시도/u);
   assert.match(footer, /myadcenter\.google\.com/u);
@@ -98,7 +98,8 @@ test("계산기 저장은 신뢰할 수 있는 계산기 조작 전까지 영구
   }
   assert.match(entry, /enableCalculatorStoragePersistence\(\)/u);
   assert.match(entry, /\.site-footer, \.calculator-guide, \.toolnav, \.page__head/u);
-  assert.ok(entry.indexOf("installCalculatorStorageActivation();") < entry.indexOf("void start();"));
+  assert.match(entry, /\.calculator-startup-error/u);
+  assert.ok(entry.indexOf("installCalculatorStorageActivation();") < entry.indexOf("void start().catch("));
 });
 
 test("개인정보처리방침은 실제 저장 시점·처리 근거·국외 처리·권리·철회 방법을 설명한다", async () => {

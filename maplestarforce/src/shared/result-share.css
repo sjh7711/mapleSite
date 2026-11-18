@@ -90,6 +90,8 @@
 }
 .result-share-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 @media (max-width: 760px) {
+  .page__head,
+  .page__head:has(.result-share-button) { align-items: flex-start; gap: 8px; }
   .result-share-button { width: 40px; min-height: 40px; padding: 8px; }
   .result-share-button span { display: none; }
   .page__title-row:has(.result-share-button) { gap: 4px; }

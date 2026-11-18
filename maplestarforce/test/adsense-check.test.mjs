@@ -5,6 +5,12 @@ import { assessAdCode, assessAdsTxt, documentSignals } from "../scripts/check-ad
 const publisherId = "pub-1234567890123456";
 const validText = `google.com, ${publisherId}, DIRECT, f08c47fec0942fa0\n`;
 
+test("중첩된 버튼·span 안의 제목도 실제 h1 본문으로 판정한다", () => {
+  assert.equal(documentSignals('<h1><button><span>스타포스 기댓값</span></button></h1>').hasHeading, true);
+  assert.equal(documentSignals('<h1><span> </span></h1>').hasHeading, false);
+  assert.equal(documentSignals('<div>스타포스 기댓값</div>').hasHeading, false);
+});
+
 test("ads.txt 주소가 정상 상태의 홈페이지 HTML을 돌려줘도 승인 정보로 인정하지 않는다", () => {
   for (const contentType of ["text/html", "text/plain"]) {
     assert.equal(assessAdsTxt({ status: 200, contentType, body: "<!doctype html><html><body>home</body></html>" }, publisherId).status, "fail");

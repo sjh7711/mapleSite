@@ -1,4 +1,8 @@
-import { calculatorStorage, registerResultShare } from "../shared/result-share-state.js";
+import { calculatorStorage, isSharedResult, registerResultShare } from "../shared/result-share-state.js";
+import {
+  applyPublishedSoulEtherPrices, DEFAULT_SOUL_ETHER_PRICES, fetchPublishedSoulEtherPrices,
+  initializeSoulEtherPrices, SOUL_ETHER_PRICE_UPDATE_KEY,
+} from "../shared/soul-ether-prices.js";
 import {
   SOUL_REFORM_2026_09_17, calculateSoulAmplificationPath,
   calculateSoulPotentialRankUpExpected, calculateSoulPotentialExpected,
@@ -28,7 +32,7 @@ const STAGES = SOUL_REFORM_2026_09_17.amplification.stages;
 const LIVE_RULES = { asOfDate: "2026-09-17", maintenanceCompleted: true };
 const defaults = {
   mode: "amplification", currentStage: 0, targetStage: 4, failures: 0,
-  etherPrices: [18, 18, 18, 70],
+  etherPrices: [...DEFAULT_SOUL_ETHER_PRICES],
   grade: "legendary", toGrade: "legendary", resetCount: 0, miracle: false,
   potentialStage: 4, chance: 80, chanceAverage: true,
   targets: [{ type: "attack-power-percent", value: 16 }],
@@ -49,11 +53,7 @@ state.targetStage = Math.round(clamp(state.targetStage, state.currentStage + 1, 
 state.failures = Math.round(clamp(state.failures, 0, STAGES[state.currentStage].guaranteeAfterFailures));
 state.potentialStage = Math.round(clamp(state.potentialStage, 1, 4));
 state.chance = clamp(state.chance, 0.01, 99.99, 80);
-state.etherPrices = Array.from({ length: 4 }, (_, i) => {
-  const price = state.etherPrices?.[i];
-  return price !== null && price !== undefined && Number.isFinite(Number(price))
-    ? Math.max(0, Number(price)) : defaults.etherPrices[i];
-});
+Object.assign(state, initializeSoulEtherPrices(state, { preservePrices: isSharedResult() }));
 delete state.etherStocks;
 state.chanceAverage = state.chanceAverage === true;
 if (!GRADE_ORDER.includes(state.grade)) state.grade = defaults.grade;
@@ -165,13 +165,17 @@ function amplificationControls() {
   );
   const prices = row(...STAGES.map((config) => {
     const index = config.stage - 1;
-    const price = numberInput(state.etherPrices[index], (value) => update(() => { state.etherPrices[index] = value; }), { min: "0", step: "0.01" });
+    const price = numberInput(state.etherPrices[index], (value) => update(() => {
+      state.etherPrices[index] = value;
+      state.etherPriceOverrides[index] = true;
+    }), { min: "0", step: "0.01" });
     price.dataset.key = `soul-ether-price-${index}`;
     return field(`${config.stage}단계 에테르 (억 메소)`, price);
   }));
   prices.classList.add("soul-ether-prices");
   const costs = cardWithHead("에테르 비용 설정", resetAction("가격 초기화", () => update(() => {
-    state.etherPrices = [...defaults.etherPrices];
+    state.etherPrices = [...state.publishedEtherPrices];
+    state.etherPriceOverrides = [false, false, false, false];
   }), { className: "button--compact" }), prices,
   note("에테르 가격이 0이면 증폭에 직접 소비하는 메소만 합산합니다."));
   const column = element("div", "calculator-column");
@@ -369,3 +373,23 @@ save();
 render();
 
 registerResultShare(() => ({ local: { [STORAGE_KEY]: state } }));
+
+let pricesLoading = false;
+let pricesCheckedAt = 0;
+async function refreshEtherPrices(force = false) {
+  if (pricesLoading || (!force && Date.now() - pricesCheckedAt < 60_000)) return;
+  pricesLoading = true;
+  pricesCheckedAt = Date.now();
+  try {
+    const document = await fetchPublishedSoulEtherPrices();
+    if (applyPublishedSoulEtherPrices(state, document, { preservePrices: isSharedResult() })) {
+      save(); render();
+    }
+  } catch { /* Keep cached prices and render the calculator even while the API is unavailable. */ }
+  finally { pricesLoading = false; }
+}
+void refreshEtherPrices();
+window.addEventListener("focus", () => { void refreshEtherPrices(); });
+window.addEventListener("storage", (event) => {
+  if (event.key === SOUL_ETHER_PRICE_UPDATE_KEY) void refreshEtherPrices(true);
+});

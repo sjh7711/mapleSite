@@ -19,7 +19,7 @@ npm run market:check
 npm run market:refresh
 ```
 
-Node.js 20 이상이 필요하며 이 저장소의 `.nvmrc`는 현재 검증 버전인 22.12.0을 지정합니다.
+Node.js 22.23.4 이상의 22.x 버전이 필요하며 이 저장소의 `.nvmrc`는 보안 수정 버전인 22.23.4를 지정합니다.
 
 - `market:status`: 신규 형식 파일 수와 현재 적용 버전을 확인합니다.
 - `market:check`: 원본을 변경하지 않고 스키마, SHA-256, 검색 조건, 네이티브 거래 ID와

@@ -22,10 +22,13 @@ test("잠재 페이지가 선택한 큐브의 공식 표와 등업 정보를 함
   assert.match(source, /row\(field\("목표 등급", targetGradePicker\)\)/);
   assert.match(source, /rankProgressByGrade: \{ rare: 0, epic: 0, unique: 0 \}/);
   assert.match(source, /`rank-progress-\$\{stage\.fromGrade\}`/);
-  assert.match(source, /천장 \(최대 \$\{maxProgress\}\)/);
+  assert.match(source, /스택 \(최대 \$\{maxProgress\}\)/);
   assert.doesNotMatch(source, /현재 천장 진행은 시작 등급에만 적용합니다\./);
   assert.match(source, /평균 총비용/);
-  assert.match(source, /rankUpReachChanceSection\(plan, methodInfo\)/);
+  assert.match(
+    source,
+    /rankUpReachChanceSection\(\s*plan,\s*methodInfo,\s*updateStages,?\s*\)/u,
+  );
   assert.match(source, /calculationMode: "options"/);
   assert.match(source, /potentialSelectorGroup\("현재 등급", gradePicker\)/);
   assert.match(source, /potentialSelectorGroup\("목표", calculationModePicker, "target"\)/);

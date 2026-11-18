@@ -1,0 +1,28 @@
+[Unit]
+Description=Starforce production inbox API (SQLite)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/maple-platform/mapleSite/maplestarforce
+Environment=NODE_ENV=production
+Environment=INBOX_API_CONFIG=/home/ubuntu/.config/starforce-inbox-production/config.json
+ExecStart=/home/ubuntu/.nvm/versions/node/v22.23.4/bin/node tools/inbox-api/service.mjs
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=25
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ubuntu/.local/share/starforce-inbox-production
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+MemoryMax=512M
+TasksMax=64
+
+[Install]
+WantedBy=multi-user.target

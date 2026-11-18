@@ -6,9 +6,9 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=ubuntu
-WorkingDirectory=/home/ubuntu/maplestarforce
+WorkingDirectory=/home/ubuntu/maple-platform/mapleSite/maplestarforce
 Environment=MAPLE_UPLOAD_CONFIG=/home/ubuntu/.config/maple-market-upload/config.json
-ExecStart=/home/ubuntu/.nvm/versions/node/v22.12.0/bin/node /home/ubuntu/maplestarforce/tools/item-market-upload/service.mjs
+ExecStart=/home/ubuntu/.nvm/versions/node/v22.23.4/bin/node /home/ubuntu/maple-platform/mapleSite/maplestarforce/tools/item-market-upload/service.mjs
 Restart=always
 RestartSec=10
 NoNewPrivileges=true

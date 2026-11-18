@@ -8,18 +8,49 @@
       crossorigin="anonymous"></script>
     <meta name="google-adsense-account" content="ca-pub-9238104084479585" />
     <link rel="canonical" href="https://starforce.pages.dev/" />
-    <title>메이플 스타포스 기댓값 계산기</title>
+    <title>스타포스 데브</title>
+    <meta name="application-name" content="스타포스 데브" />
+    <meta property="og:site_name" content="스타포스 데브" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "스타포스 데브",
+        "url": "https://starforce.pages.dev/"
+      }
+    </script>
     <meta
       name="description"
       content="여러 장비를 한 번에 계산하는 메이플스토리 스타포스 기댓값 계산기. 2026 강화 개편 기준."
     />
-    <link rel="icon" type="image/svg+xml" href="./tool-icons/starforce-star.svg" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="ko_KR" />
+    <meta property="og:url" content="https://starforce.pages.dev/" />
+    <meta property="og:title" content="스타포스 데브" />
+    <meta property="og:description" content="여러 장비를 한 번에 계산하는 메이플스토리 스타포스 기댓값 계산기. 2026 강화 개편 기준." />
+    <meta property="og:image" content="https://starforce.pages.dev/social/starforce-star.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="스타포스 메뉴의 노란 별" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="스타포스 데브" />
+    <meta name="twitter:description" content="여러 장비를 한 번에 계산하는 메이플스토리 스타포스 기댓값 계산기. 2026 강화 개편 기준." />
+    <meta name="twitter:image" content="https://starforce.pages.dev/social/starforce-star.png" />
+    <meta name="twitter:image:alt" content="스타포스 메뉴의 노란 별" />
     <link rel="stylesheet" href="./src/style.css" />
+    <link rel="stylesheet" href="./src/shared/result-share.css" />
+    <link rel="stylesheet" href="./src/shared/starforce-equipment-text.css" />
+    <link rel="stylesheet" href="./src/shared/blacksmith-inbox.css" />
+    <link rel="stylesheet" href="./src/shared/starforce-variance.css" />
+    <link rel="icon" type="image/x-icon" sizes="16x16 32x32 48x48 96x96 256x256" href="/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
+    <link rel="icon" type="image/svg+xml" sizes="any" href="/tool-icons/starforce-star.svg" />
   </head>
   <body>
     <main data-calculator="starforce" class="page" google-side-rail-overlap="false">
       <header class="page__head">
-        <h1>스타포스 기댓값</h1>
+        <h1>스타포스 데브</h1>
         <button
           id="menu"
           class="menu-button"
@@ -71,7 +102,7 @@
           <section class="card card--enhance" aria-label="강화 목록">
             <div class="enhance-toolbar">
               <div class="enhance-toolbar__left">
-                <div id="slots" class="chips chips--slot"></div>
+                <div id="slots" class="chips chips--slot" role="group" aria-label="슬롯"></div>
                 <form id="starforce-character" class="starforce-character" novalidate>
                   <div class="starforce-character__field">
                     <label class="sr-only" for="character-name">캐릭터 닉네임</label>
@@ -139,7 +170,18 @@
                   <span class="fee__label">대장장이 배율</span>
                   <div id="multipliers" class="chips chips--multiplier"></div>
                 </div>
-                <h2>준비할 메소</h2>
+                <div class="total__heading">
+                  <h2>준비할 메소</h2>
+                  <div
+                    id="total-benefits"
+                    class="total__benefits"
+                    role="list"
+                    aria-label="적용 중인 강화 혜택"
+                    hidden
+                  ></div>
+                  <span id="total-equipment-count" class="total__equipment-count">장비 0개</span>
+                  <button id="total-variance" class="chip total__variance" type="button" aria-label="전체 장비 비용 편차 확인" aria-haspopup="dialog" disabled>편차 확인</button>
+                </div>
               </div>
               <p class="total">
                 <span id="total-scaled" class="total__scaled"></span>
@@ -147,8 +189,10 @@
               </p>
               <p id="total-storage" class="total__storage"></p>
             </section>
-            <div id="items" class="items"></div>
-            <p id="total-meta" class="total__meta"></p>
+            <div class="enhance-results">
+              <div id="items" class="items"></div>
+              <p id="total-meta" class="total__meta"></p>
+            </div>
           </section>
 
         </div>

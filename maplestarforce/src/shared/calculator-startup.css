@@ -1,0 +1,11 @@
+/* Reserve the existing controls' exact geometry without displaying stale
+   default selections before the visitor's saved/shared settings are restored. */
+[data-startup-control] { visibility: hidden; }
+.calculator-startup-error[hidden] { display: none; }
+.calculator-startup-error {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  padding: 12px 14px; margin-bottom: 16px;
+  border: 1px solid var(--line); border-radius: 10px; font-size: .875rem;
+}
+.calculator-startup-error span { flex: 1; }
+

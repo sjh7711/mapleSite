@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { gzipSync } from "node:zlib";
+import { gzipSync, gunzipSync } from "node:zlib";
 import { encode, decode, ExtData } from "@msgpack/msgpack";
 import { packShareSnapshot } from "../src/shared/result-share-schema.js";
 import {
@@ -73,16 +73,84 @@ test("Unicode settings and chosen ability route survive MessagePack link round t
   await assert.rejects(decodeResultSnapshot(token, "soul"));
 });
 
-test("starforce shares only the selected list, with no other list or character equipment cache", () => {
-  const local = native({ [key("v5")]: '{"event":"shining"}', [key("pet:v3")]: '{"count":999}' });
+test("starforce shares selected equipment prices without personal-view caches, preserving old links", async () => {
+  const settings = Object.freeze({ event: "shining", priceOverrides: { "giant-fear": 77 },
+    publishedPriceDefaults: { version: 1, revision: 2, prices: { "giant-fear": 52 } } });
+  const stored = JSON.stringify(settings);
+  const local = native({ [key("v5")]: stored, [key("pet:v3")]: '{"count":999}' });
+  const selected = { name: "selected", presetId: "giant-fear", startStar: 17, targetStar: 23, replacementEok: 77 };
   const session = native({ [key("items:v1")]: JSON.stringify({
-    slots: [[{ name: "private" }], [{ name: "selected", targetStar: 23 }], [{ name: "other" }]],
+    slots: [[{ name: "private" }], [selected], [{ name: "other" }]],
     slot: 1, characterSources: [{ name: "not shared" }],
   }) });
   const snapshot = buildResultSnapshot("starforce", {}, local, session);
   assert.deepEqual(Object.keys(snapshot.local), [key("v5")]);
-  assert.deepEqual(snapshot.session[key("items:v1")], { slots: [[{ name: "selected", targetStar: 23 }], [], []], slot: 0 });
+  assert.deepEqual(snapshot.session[key("items:v1")], { slots: [[selected], [], []], slot: 0 });
+  assert.deepEqual(snapshot.local[key("v5")], { event: "shining", priceOverrides: { "giant-fear": 77 } });
+  assert.equal(local.getItem(key("v5")), stored);
+  assert.deepEqual(buildResultSnapshot("starforce", { local: { [key("v5")]: settings } }, local, session), snapshot);
+  assert.deepEqual(await decodeResultSnapshot(await encodeResultSnapshot(snapshot), "starforce"), snapshot);
+  // Existing v2/v2g links may contain the old cache and must still decode unchanged.
+  const legacy = { ...snapshot, local: { [key("v5")]: settings } };
+  assert.deepEqual(await decodeResultSnapshot(await encodeResultSnapshot(legacy), "starforce"), legacy);
   assert.ok(!JSON.stringify(snapshot).includes("private"));
+});
+
+test("v3 shares Nexon icon codes, restoring exact URLs and preserving legacy v2 links", async () => {
+  const prefix = "https://open.api.nexon.com/static/maplestory/item/icon/";
+  const value = { ...snapshot("starforce", "v5", { event: "shining", multiplier: 1.07 }),
+    session: { [key("items:v1")]: { slots: [Array.from({ length: 10 }, (_, index) => ({
+      presetId: `item-${index}`, displayIcon: `${prefix}KEPDJBN${index}`,
+      startStar: 17, targetStar: 21, replacementEok: 14.5,
+    })), [], []], slot: 0 } } };
+  const before = JSON.stringify(value);
+  const legacyBytes = encode(packShareSnapshot(value));
+  for (const legacy of [wireToken(packShareSnapshot(value)), `v2g.${gzipSync(legacyBytes).toString("base64url")}`]) {
+    assert.deepEqual(await decodeResultSnapshot(legacy, "starforce"), value);
+  }
+  const token = await encodeResultSnapshot(value);
+  assert.match(token, /^v3g?\./);
+  assert.deepEqual(await decodeResultSnapshot(token, "starforce"), value);
+  const [tag, payload] = token.split(".");
+  const bytes = Buffer.from(payload, "base64url");
+  const wire = decode(tag.endsWith("g") ? gunzipSync(bytes) : bytes);
+  assert.ok(!JSON.stringify(wire).includes(prefix));
+  assert.ok(JSON.stringify(wire).includes("KEPDJBN0"));
+  assert.ok(token.length < `v2g.${gzipSync(legacyBytes).toString("base64url")}`.length);
+  const previous = [globalThis.CompressionStream, globalThis.DecompressionStream];
+  try {
+    globalThis.CompressionStream = undefined;
+    globalThis.DecompressionStream = undefined;
+    const raw = await encodeResultSnapshot(value);
+    assert.ok(raw.startsWith("v3."));
+    assert.deepEqual(await decodeResultSnapshot(raw, "starforce"), value);
+  } finally {
+    [globalThis.CompressionStream, globalThis.DecompressionStream] = previous;
+  }
+  assert.equal(JSON.stringify(value), before);
+});
+
+test("v3 preserves custom, relative and nonstandard icon values without guessing URLs", async () => {
+  const prefix = "https://open.api.nexon.com/static/maplestory/item/icon/";
+  const icons = ["./equipments/eternal-shoulder.png", "KEPDJBND", "https://example.com/icon/KEPDJBND",
+    `${prefix}KEPDJBND?size=2`, `${prefix}KEPDJBND#icon`, `${prefix}../KEPDJBND`,
+    `${prefix}한글`, prefix, "", null, ["KEPDJBND"], { custom: "KEPDJBND" }];
+  const value = { ...snapshot("starforce", "v5", {}), session: { [key("items:v1")]: {
+    slots: [[...Array.from({ length: 10 }, () => ({ displayIcon: `${prefix}KEPDJBND` })),
+      ...icons.map((displayIcon) => ({ displayIcon }))], [], []], slot: 0,
+  } } };
+  const token = await encodeResultSnapshot(value);
+  assert.match(token, /^v3g?\./);
+  assert.deepEqual(await decodeResultSnapshot(token, "starforce"), value);
+});
+
+test("v3 rejects malformed icon codes and wrappers", async () => {
+  const fixture = (icon) => [0, [[11, [new Uint8Array([3]),
+    [[[new Uint8Array([32, 0]), icon]], [], []], 0]]]];
+  for (const icon of ["", "../icon", "https://example.com/icon", [], ["one", "two"], 3, null, {}]) {
+    const token = `v3.${Buffer.from(encode(fixture(icon))).toString("base64url")}`;
+    await assert.rejects(decodeResultSnapshot(token, "starforce"));
+  }
 });
 
 test("potential shares active subsystem and calculation profile, excluding saved names, presets and equipment tooltips", () => {

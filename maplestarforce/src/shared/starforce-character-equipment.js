@@ -1,3 +1,5 @@
+import { isExcludedStarforceEquipment, normalizeStarforceGrowthOptions } from "./starforce-stat-gains.js";
+
 const STARFORCE_PARTS = new Set([
   "무기",
   "모자",
@@ -122,9 +124,10 @@ export function normalizeStarforceEquipment(equipment) {
 
     if (
       !name ||
+      isExcludedStarforceEquipment(raw) ||
       !eligiblePart ||
       level === null ||
-      level < 135 ||
+      (level < 135 && level !== 130) ||
       starforce === null ||
       starforce < 0 ||
       // 계산기의 시작 성급은 0~29성이다. 30성 완성 장비는 더 강화할
@@ -134,6 +137,7 @@ export function normalizeStarforceEquipment(equipment) {
       return [];
     }
 
+    const growthOptions = normalizeStarforceGrowthOptions(raw);
     return [{
       name,
       part,
@@ -141,6 +145,7 @@ export function normalizeStarforceEquipment(equipment) {
       level,
       starforce,
       icon: normalizedText(raw.icon) || null,
+      ...(growthOptions ? { growthOptions } : {}),
     }];
   });
 }
@@ -149,10 +154,10 @@ export function normalizeStarforceEquipment(equipment) {
 // 3~5열의 1~4행을 차지하고, 나머지 장비는 실제 장비창 순서로 둘러싼다.
 export const STARFORCE_EQUIPMENT_BOARD_SLOTS = Object.freeze(
   [
-    ["반지1", 1, 1],
-    ["반지2", 2, 1],
-    ["반지3", 3, 1],
-    ["반지4", 4, 1],
+    ["반지4", 1, 1],
+    ["반지3", 2, 1],
+    ["반지2", 3, 1],
+    ["반지1", 4, 1],
     ["얼굴장식", 1, 2],
     ["눈장식", 2, 2],
     ["귀고리", 3, 2],
@@ -198,7 +203,7 @@ function groupedCandidates(preset, equipment) {
     );
   }
 
-  const levelMatch = /^level-(135|145|150)$/u.exec(String(preset.id ?? ""));
+  const levelMatch = /^level-(130|135|145|150)$/u.exec(String(preset.id ?? ""));
   if (!levelMatch || Number(levelMatch[1]) !== Number(preset.level)) return [];
   return equipment.filter((item) => item.level === preset.level);
 }

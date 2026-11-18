@@ -45,7 +45,7 @@ Search Console에 사용한 Google Cloud 서비스 계정(`…iam.gserviceaccoun
 
 ## 반복 점검 명령
 
-Node.js 22.12.0 이상에서 실행한다.
+Node.js 22.23.4 이상의 22.x 버전에서 실행한다.
 
 ```bash
 npm run adsense:check -- --publisher-id pub-9238104084479585 --expect-ad-code
@@ -62,10 +62,6 @@ npm run adsense:check -- --url https://starforce.pages.dev/ --environment produc
 - `INFO`: 자동으로 판단할 수 없는 항목.
 
 이 도구는 HTML·텍스트만 읽고 광고 JavaScript를 실행하지 않는다. Google의 실제 접근, AdSense 계정 상태·승인, 콘텐츠 품질, 동의 관리, 자료 이용 권한을 판단하지 않는다. ads.txt는 권장 항목으로 표시한다. 기술 항목이 통과해도 신청 준비 전체가 끝난 것은 아니다.
-
-## 비활성 장비 시세 주소
-
-`VITE_ITEM_MARKET_ENABLED=false`인 빌드에서는 HTML과 시세 자료를 제외하고 `/item-market` 및 `/item-market/`를 홈으로 302 이동시킨다. 기능을 다시 켤 수 있으므로 임시 이동을 사용한다. Preview에서는 기존 시세 기능과 자료를 유지한다. 이 규칙은 빌드 결과의 `_redirects`에만 추가해 환경 간 설정이 섞이지 않게 한다.
 
 ## 운영자가 확인할 사항
 

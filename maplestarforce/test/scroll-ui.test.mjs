@@ -704,7 +704,6 @@ test("순백 5/10% 허용을 끄면 입력을 유지한 채 계산 후보에서 
     source,
     /resetModeSelector\("preserveStarforce"[\s\S]*toggle\("useCleanScrolls", "순백 5\/10% 허용"\)[\s\S]*"주흔 반값 썬데이"/,
   );
-  assert.match(source, /보유 순백 100%를 먼저 사용하고, 모두 소진되면 주흔 순백 100%로 복구합니다/);
   assert.match(source, /현재 전략에서 사용 안 함/);
 });
 
@@ -1106,7 +1105,7 @@ test("보유 100%와 구매 주문서를 순백·이노센트별 한 카드에 �
   assert.match(css, /\.support-metric__source--paid/);
 });
 
-test("순백·이노센트 직접 구매 기준을 첫 작 비용 바로 아래에 표시한다", async () => {
+test("순백을 사용하는 주흔작·귀지작에 구매 기준을 표시하고 긴 설명은 생략한다", async () => {
   const source = await readFile(
     new URL("../src/pages/scroll.js", import.meta.url),
     "utf8",
@@ -1121,14 +1120,14 @@ test("순백·이노센트 직접 구매 기준을 첫 작 비용 바로 아래�
   );
   const firstCost = slotResultSource.indexOf('first ? line("첫 작 비용"');
   const guide = slotResultSource.indexOf(
-    'state.method === "trace" ? supportScrollPurchaseGuide() : null',
+    'supportScrollPurchaseGuide(),',
   );
 
   assert.ok(firstCost >= 0 && guide > firstCost);
   assert.match(source, /"순백·이노센트 구매 기준"/);
   assert.match(source, /"이 가격 이하면 구매"/);
-  assert.match(source, /경매장에서 주문서를 사는 편이 주흔 100%를 쓰는 것보다 저렴하거나 같습니다/);
-  assert.match(source, /복구 1회당 평균 비용이 더 낮은 주문서를 자동으로 사용합니다/);
+  assert.doesNotMatch(slotResultSource, /state\.method === "trace" \? supportScrollPurchaseGuide/);
+  assert.doesNotMatch(source, /현재 주문의 흔적 시세|복구 1회당 평균 비용이 더 낮은 주문서를 자동으로 사용합니다/);
   assert.doesNotMatch(source, /주흔 100% 대비 구매 상한|1장 구매 상한|비싸지 않으며/);
   assert.match(source, /\["순백 10%", thresholds\.clean10\]/);
   assert.match(source, /\["순백 5%", thresholds\.clean5\]/);

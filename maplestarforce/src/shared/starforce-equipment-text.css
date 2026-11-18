@@ -1,0 +1,36 @@
+.equipment-text-target:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.equipment-text-actions {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: 6px;
+  max-width: 100%;
+}
+.equipment-text-dialog {
+  box-sizing: border-box;
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+}
+.equipment-text-help, .equipment-text-preview {
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.equipment-text-input {
+  height: 180px;
+  min-height: 100px;
+  resize: vertical;
+  line-height: 1.7;
+}
+.equipment-text-preview { min-height: 1.6em; margin-block: 10px; }
+.equipment-text-preview[data-invalid="true"] { color: var(--text); }
+.equipment-text-append {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.equipment-text-dialog button:disabled { opacity: 0.45; cursor: default; }
+.equipment-text-dialog .result-share-actions { flex-wrap: wrap; }

@@ -19,7 +19,7 @@ test("강화 목록 세 슬롯은 캐릭터 이름과 장비 응답을 각각 �
   assert.match(source, /characterSources: blankCharacterSources\(\)/u);
   assert.match(
     source,
-    /calculatorSessionStorage\.setItem\([\s\S]*characterSources: state\.characterSources/u,
+    /calculatorStorage\.setItem\(\s*ITEMS_KEY,[\s\S]*characterSources: state\.characterSources/u,
   );
   assert.doesNotMatch(source, /let characterEquipmentMatches = new Map\(\)/u);
 });

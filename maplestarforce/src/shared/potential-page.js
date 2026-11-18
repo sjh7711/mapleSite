@@ -855,10 +855,10 @@ function mountPotentialSystem({ system, onSystemChange }) {
           { min: "0", max: String(maxProgress) },
         );
         const progressField = field(
-          `${GRADE_NAMES[stage.fromGrade]} → ${GRADE_NAMES[stage.toGrade]} 천장 (최대 ${maxProgress})`,
+          `${GRADE_NAMES[stage.fromGrade]} → ${GRADE_NAMES[stage.toGrade]} 스택 (최대 ${maxProgress})`,
           control,
         );
-        progressField.title = `${GRADE_NAMES[stage.fromGrade]}에서 ${GRADE_NAMES[stage.toGrade]}로 상승하는 현재 천장 진행`;
+        progressField.title = `${GRADE_NAMES[stage.fromGrade]}에서 ${GRADE_NAMES[stage.toGrade]}로 상승하는 현재 스택`;
         return progressField;
       });
     const progressRow = progressFields.length ? row(progressFields) : null;

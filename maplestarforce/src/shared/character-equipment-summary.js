@@ -16,10 +16,10 @@ import { loadPotentialTables } from "./potential-tables.js";
 // 세로로 배치하고 무기·보조무기·엠블렘만 최하단 중앙에 둔다. 캐릭터는
 // 가운데 3열의 윗부분을 사용한다.
 export const CHARACTER_PROFILE_EQUIPMENT_BOARD_SLOTS = Object.freeze([
-  ["반지1", 1, 1],
-  ["반지2", 2, 1],
-  ["반지3", 3, 1],
-  ["반지4", 4, 1],
+  ["반지4", 1, 1],
+  ["반지3", 2, 1],
+  ["반지2", 3, 1],
+  ["반지1", 4, 1],
   ["벨트", 5, 1],
   ["포켓아이템", 6, 1],
   ["얼굴장식", 1, 2],
@@ -984,9 +984,9 @@ function tooltipStrings(values) {
 const HIDDEN_TOOLTIP_DESCRIPTION_PATTERNS = Object.freeze([
   /일부 상황에서는 보이지 않는 아이템/u,
   /NPC\s*\/\s*채집\s*키/u,
-  /플래티넘 카르마/u,
-  /현재 장착\s*중인 장비/u,
-  /전투력 증가량/u,
+  /플래티넘\s*카르마/u,
+  /현재\s*장착\s*중인\s*장비/u,
+  /전투력\s*증가량/u,
 ]);
 
 function tooltipDescription(value) {
@@ -1198,16 +1198,20 @@ export function getCharacterEquipmentTooltipModel(item, lineGrades = null) {
   const tags = [category, part].filter((value, index, values) =>
     value && values.indexOf(value) === index
   );
-  const upgraded = scroll?.upgraded;
+  const cuttableCount = tooltipInteger(raw.cuttableCount);
   return {
     name: typeof item?.name === "string" && item.name.trim()
-      ? `${item.name.trim()}${upgraded ? ` (+${upgraded})` : ""}`
+      ? item.name.trim()
       : "장비",
     icon: typeof item?.icon === "string" ? item.icon : null,
     grade: typeof item?.potentialGrade === "string"
       ? item.potentialGrade
       : null,
     stars: tooltipInteger(raw.starforce),
+    // 255 등 특수 값에서 교환 상태나 최대 가위 횟수를 추측하지 않는다.
+    tradeNotice: cuttableCount !== null && cuttableCount <= 10
+      ? `가위 사용 잔여 횟수 : ${cuttableCount}회`
+      : null,
     description: tooltipDescription(raw.description),
     rawAvailable,
     metadata,
@@ -1408,12 +1412,44 @@ function tooltipScrollSection(data) {
   return section;
 }
 
+// 별 양옆과 둘째 줄 아래에 빛을 흩뿌린다. 위치는 고정하고 밝기·크기만
+// 서로 다른 위상으로 바꿔, 장비를 바꿀 때마다 무늬가 뛰지 않게 한다.
+const TOOLTIP_STARLIGHT_PARTICLES = Object.freeze([
+  [4, 24, 5], [8, 12, 8], [12, 36, 6], [16, 23, 7], [20, 31, 3],
+  [5, 65, 3], [9, 55, 4], [14, 67, 5], [18, 57, 4], [23, 49, 3],
+  [3, 83, 5], [7, 91, 9], [12, 81, 7], [17, 75, 12], [21, 69, 8],
+  [24, 94, 5], [28, 84, 4], [32, 95, 3], [36, 89, 5], [40, 95, 4],
+  [44, 80, 3], [47, 93, 6], [51, 86, 4], [55, 97, 3], [58, 80, 6],
+  [62, 93, 8], [66, 82, 5], [70, 93, 4], [74, 80, 7], [78, 87, 5],
+  [82, 75, 8], [87, 81, 5], [91, 71, 10], [95, 86, 9], [98, 79, 4],
+  [80, 29, 3], [84, 19, 7], [89, 11, 7], [84, 59, 4], [88, 46, 4],
+  [93, 57, 7], [97, 50, 4],
+  [7, 41, 2], [14, 15, 2], [22, 16, 2], [26, 54, 2], [31, 47, 2],
+  [36, 57, 3], [42, 45, 2], [48, 57, 2], [54, 44, 3], [59, 56, 2],
+  [65, 47, 2], [71, 58, 3], [77, 51, 2], [86, 95, 3], [96, 27, 2],
+]);
+
+function tooltipStarlight() {
+  const layer = element("span", "profile-equipment-tooltip__starlight");
+  layer.setAttribute("aria-hidden", "true");
+  TOOLTIP_STARLIGHT_PARTICLES.forEach(([x, y, size], index) => {
+    const particle = element("span", "profile-equipment-tooltip__sparkle");
+    particle.style.left = `${x}%`;
+    particle.style.top = `${y * 0.88}%`;
+    particle.style.setProperty("--sparkle-size", `${size}px`);
+    particle.style.setProperty("--sparkle-duration", `${1600 + index % 7 * 160}ms`);
+    particle.style.setProperty("--sparkle-delay", `${-((index * 431) % 2600)}ms`);
+    layer.append(particle);
+  });
+  return layer;
+}
+
 function renderEquipmentTooltip(tooltip, item, lineGrades = null) {
   const model = getCharacterEquipmentTooltipModel(item, lineGrades);
   const header = element("header", "profile-equipment-tooltip__header");
   if (model.stars > 0) {
     const visibleStars = model.stars;
-    const starSlotCount = Math.max(25, Math.ceil(visibleStars / 5) * 5);
+    const starSlotCount = Math.max(30, Math.ceil(visibleStars / 5) * 5);
     const stars = element("div", "profile-equipment-tooltip__stars");
     for (
       let groupIndex = 0;
@@ -1421,20 +1457,28 @@ function renderEquipmentTooltip(tooltip, item, lineGrades = null) {
       groupIndex += 1
     ) {
       const group = element("span", "profile-equipment-tooltip__star-group");
+      group.setAttribute("aria-hidden", "true");
       for (let index = 0; index < 5; index += 1) {
         const starIndex = groupIndex * 5 + index;
-        const star = element("span", "profile-equipment-tooltip__star", "★");
+        const star = element("span", "profile-equipment-tooltip__star");
         star.dataset.filled = String(starIndex < visibleStars);
         group.append(star);
       }
       stars.append(group);
     }
     stars.setAttribute("aria-label", `${model.stars}성`);
+    stars.setAttribute("role", "img");
     header.append(stars);
-    if (visibleStars >= 23) header.dataset.sparkle = "true";
+    if (visibleStars >= 23) {
+      header.dataset.sparkle = "true";
+      header.append(tooltipStarlight());
+    }
   }
   const title = element("strong", "profile-equipment-tooltip__name", model.name);
   header.append(title);
+  if (model.tradeNotice) {
+    header.append(element("p", "profile-equipment-tooltip__trade", model.tradeNotice));
+  }
   if (model.description) {
     header.append(element(
       "p",
@@ -1668,6 +1712,12 @@ function createEquipmentTooltipController(grid, board, inlineReference) {
     tooltip.hidden = false;
     position();
     requestAnimationFrame(position);
+    // 처음 여는 순간 웹폰트가 늦게 도착해도 바뀐 높이로 배치한다.
+    document.fonts?.ready.then(() => {
+      if (revision === renderRevision && activeSlot === slot && !tooltip.hidden) {
+        position();
+      }
+    });
     resolveCharacterEquipmentPotentialLineGrades(item).then((lineGrades) => {
       if (
         revision !== renderRevision || activeSlot !== slot || tooltip.hidden

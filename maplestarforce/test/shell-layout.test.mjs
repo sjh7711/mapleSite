@@ -119,14 +119,12 @@ test("계산기 페이지 제목 아래의 장식 설명을 표시하지 않는�
     read("../additional/index.html"),
     read("../add-option/index.html"),
     read("../scroll/index.html"),
-    read("../item-market/index.html"),
   ]);
   const removedDescriptions = [
     "원하는 옵션 조합의 확률과 비용을 한 화면에서 비교합니다.",
     "에디셔널 옵션 조합과 개인 환산값을 밀도 있게 계산합니다.",
     "개인 스탯 효율로 환산한 환불별 기댓값을 나란히 비교합니다.",
     "현재 장비 상태와 목표에 맞춰 완작과 놀긍 첫작의 기댓값을 계산합니다.",
-    "장비의 구성요소별 시장 반영 가격을 나누어 합산합니다.",
   ];
 
   for (const [index, html] of pages.entries()) {

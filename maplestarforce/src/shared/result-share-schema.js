@@ -1,6 +1,9 @@
-// Wire schema for v2 links. These positions are independent of UI defaults.
+// Wire schema for v2/v3 links. These positions are independent of UI defaults.
 // Never reorder/change these tables: publish a new wire version instead.
 // Unknown fields are retained in a final map, so nothing is silently discarded.
+// v3 stores Nexon item icon suffixes; a one-element array preserves any other value.
+const ITEM_ICON_PREFIX = "https://open.api.nexon.com/static/maplestory/item/icon/";
+const ITEM_ICON_CODE = /^[A-Za-z0-9_-]+$/;
 const fields = (text) => Object.freeze(text.split(/\s+/).filter(Boolean));
 const SCHEMAS = Object.freeze({
   // wheel·pricesLocked 필드는 기존 공유 링크의 위치를 보존하기 위한 예약 자리다.
@@ -60,16 +63,35 @@ const STORES = Object.freeze([
 const record = (value) => value !== null && typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype;
 const invalid = () => { throw new Error("공유 설정이 손상되었습니다."); };
 
-function transform(shape, value, unpack) {
+function transformIcon(value, unpack) {
+  if (unpack) {
+    if (typeof value === "string" && ITEM_ICON_CODE.test(value)) return ITEM_ICON_PREFIX + value;
+    if (Array.isArray(value) && value.length === 1) return value[0];
+    invalid();
+  }
+  if (typeof value === "string" && value.startsWith(ITEM_ICON_PREFIX)) {
+    const code = value.slice(ITEM_ICON_PREFIX.length);
+    if (ITEM_ICON_CODE.test(code)) return code;
+  }
+  return [value];
+}
+
+function transformField(schema, name, value, unpack, compactIcons) {
+  if (compactIcons && schema === "item" && name === "displayIcon") return transformIcon(value, unpack);
+  const shape = NESTED[`${schema}.${name}`];
+  return shape ? transform(shape, value, unpack, compactIcons) : value;
+}
+
+function transform(shape, value, unpack, compactIcons) {
   if (value === null) return null;
   if (shape.endsWith("[]")) {
     if (!Array.isArray(value)) invalid();
-    return value.map((entry) => transform(shape.slice(0, -2), entry, unpack));
+    return value.map((entry) => transform(shape.slice(0, -2), entry, unpack, compactIcons));
   }
-  return unpack ? unpackRecord(shape, value) : packRecord(shape, value);
+  return unpack ? unpackRecord(shape, value, compactIcons) : packRecord(shape, value, compactIcons);
 }
 
-function packRecord(schema, value) {
+function packRecord(schema, value, compactIcons) {
   if (!record(value)) invalid();
   const names = SCHEMAS[schema];
   const mask = new Uint8Array(Math.ceil(names.length / 8));
@@ -77,15 +99,14 @@ function packRecord(schema, value) {
   names.forEach((name, index) => {
     if (!Object.hasOwn(value, name)) return;
     mask[index >> 3] |= 1 << (index % 8);
-    const shape = NESTED[`${schema}.${name}`];
-    packed.push(shape ? transform(shape, value[name], false) : value[name]);
+    packed.push(transformField(schema, name, value[name], false, compactIcons));
   });
   const extra = Object.fromEntries(Object.entries(value).filter(([key]) => !names.includes(key)));
   if (Object.keys(extra).length) packed.push(extra);
   return packed;
 }
 
-function unpackRecord(schema, packed) {
+function unpackRecord(schema, packed, compactIcons) {
   if (!Array.isArray(packed)) invalid();
   const names = SCHEMAS[schema];
   const mask = packed[0];
@@ -97,8 +118,7 @@ function unpackRecord(schema, packed) {
     if (!(mask[index >> 3] & (1 << (index % 8)))) return;
     if (position >= packed.length) invalid();
     const entry = packed[position++];
-    const shape = NESTED[`${schema}.${name}`];
-    value[name] = shape ? transform(shape, entry, true) : entry;
+    value[name] = transformField(schema, name, entry, true, compactIcons);
   });
   if (position < packed.length) {
     if (packed.length !== position + 1 || !record(packed[position])) invalid();
@@ -110,19 +130,19 @@ function unpackRecord(schema, packed) {
   return value;
 }
 
-export function packShareSnapshot(snapshot) {
+export function packShareSnapshot(snapshot, { compactIcons = false } = {}) {
   const tool = TOOLS.indexOf(snapshot.tool);
   if (tool < 0) invalid();
   const entries = [];
   STORES.forEach(([storage, key, schema], id) => {
-    if (Object.hasOwn(snapshot[storage], key)) entries.push([id, packRecord(schema, snapshot[storage][key])]);
+    if (Object.hasOwn(snapshot[storage], key)) entries.push([id, packRecord(schema, snapshot[storage][key], compactIcons)]);
   });
   const packed = [tool, entries];
-  if (snapshot.view !== undefined) packed.push(packRecord("view", snapshot.view));
+  if (snapshot.view !== undefined) packed.push(packRecord("view", snapshot.view, compactIcons));
   return packed;
 }
 
-export function unpackShareSnapshot(packed) {
+export function unpackShareSnapshot(packed, { compactIcons = false } = {}) {
   if (!Array.isArray(packed) || ![2, 3].includes(packed.length)) invalid();
   const [tool, entries] = packed;
   if (!Number.isInteger(tool) || !TOOLS[tool] || !Array.isArray(entries) || entries.length > STORES.length) invalid();
@@ -134,8 +154,8 @@ export function unpackShareSnapshot(packed) {
     if (!Number.isInteger(id) || !STORES[id] || seen.has(id)) invalid();
     seen.add(id);
     const [storage, key, schema] = STORES[id];
-    snapshot[storage][key] = unpackRecord(schema, value);
+    snapshot[storage][key] = unpackRecord(schema, value, compactIcons);
   }
-  if (packed.length === 3) snapshot.view = unpackRecord("view", packed[2]);
+  if (packed.length === 3) snapshot.view = unpackRecord("view", packed[2], compactIcons);
   return snapshot;
 }
