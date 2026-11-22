@@ -136,7 +136,23 @@ function displayedResetMethods(system, grade) {
   return getAvailablePotentialResetMethods(system, grade);
 }
 
-function mountPotentialSystem({ system, onSystemChange }) {
+function resetMethodForSystem(system, { grade, resetMethod, calculationMode, rankTargetGrade }) {
+  const counterpart = system === "regular"
+    ? { white: "black" }
+    : { black: "white" };
+  const method = counterpart[resetMethod] ?? resetMethod;
+  if (!displayedResetMethods(system, grade).some(({ id }) => id === method)) return "meso";
+  if (calculationMode === "rank-up") {
+    const rankInfo = getPotentialRankUpInfo({ system, method, grade });
+    if (!rankInfo.canRankUp ||
+      POTENTIAL_GRADES[rankTargetGrade]?.id > POTENTIAL_GRADES[rankInfo.maxGrade].id) {
+      return "meso";
+    }
+  }
+  return method;
+}
+
+function mountPotentialSystem({ system, onSystemChange, switchedSettings }) {
   const isAdditional = system === "additional";
   const toolId = isAdditional ? "additional" : "potential";
   const getPotentialProfile = () =>
@@ -298,6 +314,18 @@ function mountPotentialSystem({ system, onSystemChange }) {
   state.sharedTargetsRevision = 1;
   delete state.primeTargetSets;
   delete state.primeLineTargets;
+  let preferredResetMethod = null;
+  if (switchedSettings) {
+    const resetMethod = resetMethodForSystem(system, switchedSettings);
+    // 이 잠재에 저장된 스택은 동일한 재설정 방식에서만 사용한다.
+    if (state.resetMethod !== resetMethod) {
+      state.rankProgressByGrade = { ...gradeProgressDefaults };
+    }
+    Object.assign(state, switchedSettings, { resetMethod });
+    if (resetMethod === "meso" && switchedSettings.resetMethod !== "meso") {
+      preferredResetMethod = switchedSettings.resetMethod;
+    }
+  }
   if (!displayedResetMethods(system, state.grade).some(
     (method) => method.id === state.resetMethod,
   )) {
@@ -366,6 +394,16 @@ function mountPotentialSystem({ system, onSystemChange }) {
   }
 
   registerResultShare(() => ({ local: { [storageKey]: state } }));
+
+  function switchPotentialSystem(nextSystem) {
+    onSystemChange(nextSystem, {
+      grade: state.grade,
+      resetMethod: preferredResetMethod ?? state.resetMethod,
+      calculationMode: state.calculationMode,
+      rankTargetGrade: state.rankTargetGrade,
+      miracle: state.miracle,
+    });
+  }
 
   function persistTargetPresets() {
     safeSave(targetPresetStorageKey, savedTargetPresets);
@@ -673,10 +711,10 @@ function mountPotentialSystem({ system, onSystemChange }) {
     }, { min: "0", max: "250", update: { reload: true, normalizeTargets: true } });
     const systemPicker = chipRow(
       chip("윗잠", system === "regular", () => {
-        if (system !== "regular") onSystemChange("regular");
+        if (system !== "regular") switchPotentialSystem("regular");
       }),
       chip("아랫잠", system === "additional", () => {
-        if (system !== "additional") onSystemChange("additional");
+        if (system !== "additional") switchPotentialSystem("additional");
       }),
       chip("통합", false, () => onSystemChange("combined")),
     );
@@ -686,6 +724,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
     const gradeChips = Object.keys(POTENTIAL_GRADES).map((grade) =>
       chip(gradeButtonLabel(grade), state.grade === grade, () => {
         update(() => {
+          if (state.grade !== grade) preferredResetMethod = null;
           state.grade = grade;
           state.rankTargetGrade = "";
           if (!displayedResetMethods(system, grade).some(
@@ -712,6 +751,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
         method.shortLabel,
         state.resetMethod === method.id,
         () => {
+          preferredResetMethod = null;
           if (state.resetMethod === method.id) return;
           update(() => {
             state.resetMethod = method.id;
@@ -1333,6 +1373,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
           const targetSets = normalizedPresetTargetSets(preset.targetSets);
           if (targetSets.length === 0) return;
           update(() => {
+            preferredResetMethod = null;
             state.part = Number(preset.part);
             state.itemLevel = Math.max(0, Math.min(250, Math.round(preset.itemLevel)));
             state.grade = Object.hasOwn(POTENTIAL_GRADES, preset.grade)
@@ -1854,7 +1895,7 @@ function mountPotentialSystem({ system, onSystemChange }) {
 
 export function mountPotentialCalculator({ system: initialSystem = "regular" } = {}) {
   let cleanup = null;
-  const switchSystem = (requestedSystem) => {
+  const switchSystem = (requestedSystem, switchedSettings) => {
     const system = ["additional", "combined"].includes(requestedSystem)
       ? requestedSystem
       : "regular";
@@ -1865,7 +1906,7 @@ export function mountPotentialCalculator({ system: initialSystem = "regular" } =
     window.history.replaceState(window.history.state, "", canonical);
     cleanup = system === "combined"
       ? mountCombinedPotentialSystem({ onSystemChange: switchSystem })
-      : mountPotentialSystem({ system, onSystemChange: switchSystem });
+      : mountPotentialSystem({ system, onSystemChange: switchSystem, switchedSettings });
   };
 
   renderToolNav(document.querySelector("#toolnav"), "potential");
