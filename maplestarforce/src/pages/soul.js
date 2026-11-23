@@ -6,10 +6,13 @@ import {
 import {
   SOUL_REFORM_2026_09_17, calculateSoulAmplificationPath,
   calculateSoulPotentialRankUpExpected, calculateSoulPotentialExpected,
-  getSoulPotentialRankUpInfo,
+  getSoulPotentialRankUpInfo, getSoulPotentialTables,
   calculateSoulAmplificationReachForChance, calculateSoulPotentialRankUpReachForChance,
 } from "maple-core/soul";
-import { POTENTIAL_PAGE_TARGETS, calculateResetsForChance, calculateGeometricMeanChance } from "maple-core/potential";
+import {
+  POTENTIAL_PAGE_TARGETS, calculateResetsForChance, calculateGeometricMeanChance,
+  getPotentialSuccessCombinations,
+} from "maple-core/potential";
 import { renderToolNav } from "../shared/shell.js";
 import { chip, field, numberInput } from "../shared/ui.js";
 import {
@@ -19,9 +22,10 @@ import {
 } from "../shared/calculator-ui.js";
 
 import {
-  potentialCalculatorLayout, potentialOptionSet, potentialSelectorGroup, potentialTargetItem,
+  potentialCalculatorLayout, potentialOptionSet, potentialSelectorGroup,
+  potentialSuccessCombinationList, potentialTargetItem,
 } from "../shared/potential-form-ui.js";
-import { isCompletePotentialTarget } from "../shared/potential-target-ui.js";
+import { formatPotentialTargetSummary, isCompletePotentialTarget } from "../shared/potential-target-ui.js";
 
 const STORAGE_KEY = "maplestarforce:soul:v1";
 const EOK = 100_000_000;
@@ -63,6 +67,8 @@ if (!GRADE_ORDER.includes(state.toGrade) || GRADE_ORDER.indexOf(state.toGrade) <
 state.resetCount = state.grade === "legendary" ? 0
   : Math.round(clamp(state.resetCount, 0, getSoulPotentialRankUpInfo({ grade: state.grade }).guaranteeAtResetCount - 1));
 state.miracle = state.miracle === true;
+state.successConditionsOpen = state.successConditionsOpen === true;
+state.successConditionsSortDirection = state.successConditionsSortDirection === "desc" ? "desc" : "asc";
 const TARGET_TYPES = [
   "attack-power-percent", "magic-power-percent", "boss-damage", "ignore-defense",
   "damage", "critical-rate", "str-percent", "dex-percent", "int-percent",
@@ -226,6 +232,46 @@ function potentialControls() {
     state.targets = Array.from({ length: 3 }, () => ({ type: "", value: "" }));
   }), { className: "button--compact", key: "soul-reset-targets" }), set);
 }
+
+function soulSuccessConditions(options) {
+  const result = getPotentialSuccessCombinations({
+    ...options,
+    tables: getSoulPotentialTables(options),
+    sortDirection: state.successConditionsSortDirection,
+  });
+  const targetSummary = options.targets.map(({ targetType, target }) =>
+    formatPotentialTargetSummary({ type: targetType, value: target }),
+  ).join(" + ");
+  const item = element("div", "success-condition success-condition--stat-equivalent");
+  item.append(potentialSuccessCombinationList({
+    title: `${targetSummary} 이상 조합`,
+    setNumber: 1,
+    result,
+  }));
+  const list = element("div", "success-conditions");
+  list.append(item);
+  const node = details("성공 조건 보기", list);
+  node.dataset.detailsKey = "soul-success-conditions";
+  node.open = state.successConditionsOpen;
+  node.addEventListener("toggle", () => {
+    if (!node.isConnected) return;
+    state.successConditionsOpen = node.open;
+    save();
+  });
+
+  const sortControls = chipRow([["asc", "오름차순"], ["desc", "내림차순"]].map(([direction, label]) =>
+    chip(label, state.successConditionsSortDirection === direction, () => update(() => {
+      state.successConditionsSortDirection = direction;
+    }), false, { key: `soul-success-sort-${direction}` }),
+  ));
+  sortControls.classList.add("success-condition-sort");
+  sortControls.setAttribute("role", "group");
+  sortControls.setAttribute("aria-label", "성공 조건 정렬");
+  const panel = element("div", "success-conditions-panel");
+  panel.append(node, sortControls);
+  return panel;
+}
+
 function soulReachControl(result) {
   const attemptsMetric = metric("목표 도달 재설정", "-");
   const costMetric = metric("목표 도달 비용", "-");
@@ -349,12 +395,16 @@ function results() {
         section.append(element("div", "result-empty", "목표 옵션과 수치를 입력해 주세요."));
         return section;
       }
-      const result = calculateSoulPotentialExpected({ grade: state.grade, stage: Number(state.potentialStage), mainStat: "STR", characterLevel: 290,
-        targets: targets.map((target) => ({ targetType: target.type, target: Number(target.value) })) });
+      const options = {
+        grade: state.grade, stage: Number(state.potentialStage), mainStat: "STR", characterLevel: 290,
+        targets: targets.map(({ type, value }) => ({ targetType: type, target: Number(value) })),
+      };
+      const result = calculateSoulPotentialExpected(options);
       section.append(metricGrid(metric("평균 재설정", formatAttempts(result.expectedResets)), metric("평균 총비용", formatMeso(result.expectedCost))),
         soulReachControl(result),
         resultLine("1회 성공 확률", formatProbability(result.probability, 8)),
         resultLine("1회 재설정 비용", formatMeso(result.resetCost)));
+      if (result.probability > 0) section.append(soulSuccessConditions(options));
       section.append(note("현재 옵션은 공식 분포로 평균합니다. 목표 도달 확률별 횟수는 평균을 이용한 근사값입니다."));
       if (result.probability === 0) section.append(note("현재 등급과 증폭 단계의 공식 옵션으로는 해당 목표에 도달할 수 없습니다."));
     }
