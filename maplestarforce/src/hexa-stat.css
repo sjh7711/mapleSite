@@ -12,6 +12,7 @@
 .hexa-settings fieldset + fieldset { margin-top: 14px; }
 .hexa-settings legend { margin: 0 0 8px; padding: 0; font-weight: 700; }
 .hexa-settings select { width: 100%; min-width: 0; }
+.hexa-settings select[name="target"] { width: min(100%, max(8rem, 100% / 3)); }
 .hexa-levels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .hexa-levels .field { min-width: 0; }
 .hexa-settings .hexa-event { display: flex; align-items: center; gap: 8px; min-height: 44px; }
@@ -39,12 +40,12 @@
 .page--hexa-stat .reach-control__metrics strong { font-variant-numeric: tabular-nums; }
 
 .hexa-policy { width: 100%; margin-top: 5px; border-collapse: collapse; font-size: 0.85rem; }
-.hexa-policy :is(th, td) { padding: 6px; border-block-end: 1px solid var(--border-soft, var(--line)); text-align: start; }
+.page--hexa-stat table.hexa-policy :is(th, td) { padding: 6px; border-block-end: 1px solid var(--border-soft, var(--line)); text-align: left; }
 .hexa-policy thead th { color: var(--muted); }
 .hexa-policy tbody th { font-weight: 650; }
 .hexa-policy tr[aria-current="true"] { background: var(--field-active-bg, var(--surface-soft)); }
-.hexa-policy tr[aria-current="true"] th { box-shadow: inset 3px 0 var(--accent); padding-inline-start: 10px; }
-.hexa-policy__current { display: block; color: var(--text-gold, var(--accent)); }
+.hexa-policy tr[aria-current="true"] th { box-shadow: inset 3px 0 var(--accent); }
+.hexa-policy__current { color: var(--text-gold, var(--accent)); white-space: nowrap; }
 
 @media (max-width: 760px) {
   .page--hexa-stat .hexa-layout { grid-template-columns: minmax(0, 1fr); }
