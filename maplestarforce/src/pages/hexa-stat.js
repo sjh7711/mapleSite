@@ -43,7 +43,7 @@ function save() {
   }
 }
 
-function renderPolicy(reset, grade, main) {
+function renderPolicy(reset, grade) {
   const rows = [];
   function addRow(index, criterion) {
     const row = element("tr");
@@ -51,7 +51,7 @@ function renderPolicy(reset, grade, main) {
     header.scope = "row";
     if (index === grade) {
       row.setAttribute("aria-current", "true");
-      header.append(element("span", "hexa-policy__current", `현재 · 메인 ${main}레벨`));
+      header.append(" ", element("span", "hexa-policy__current", "현재 등급"));
     }
     row.append(header, element("td", "", criterion));
     rows.push(row);
@@ -62,7 +62,7 @@ function renderPolicy(reset, grade, main) {
     const levels = reset[index].flatMap((shouldReset, level) => shouldReset ? [level] : []);
     const continuous = levels.length > 0 && levels.every((level, offset) => level === offset);
     const text = continuous ? `${levels.at(-1)}레벨 이하` : levels.map((level) => `${level}레벨`).join(", ");
-    addRow(index, text || "계속 강화");
+    addRow(index, text ? `${text} 초기화 필요` : "계속 강화");
   }
   policy.replaceChildren(...rows);
 }
@@ -72,7 +72,7 @@ function render() {
   const grade = main + sub1 + sub2;
   const valid = grade <= maxGrade;
   const result = calculateHexaStat({ target, event });
-  renderPolicy(result.reset, grade, main);
+  renderPolicy(result.reset, grade);
   outputs.grade.textContent = valid
     ? `현재 ${grade}등급 · 남은 강화 ${maxGrade - grade}회` : `현재 레벨 합계 ${grade}`;
   error.hidden = valid;
