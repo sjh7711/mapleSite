@@ -19,7 +19,8 @@ import {
 } from "maple-core/potential";
 import { loadPotentialTables } from "./potential-tables.js";
 import {
-  potentialCalculatorLayout, potentialOptionSet, potentialSelectorGroup, potentialTargetItem,
+  potentialCalculatorLayout, potentialOptionSet, potentialSelectorGroup,
+  potentialSuccessCombinationList, potentialTargetItem,
 } from "./potential-form-ui.js";
 import {
   MAX_POTENTIAL_TARGET_SETS,
@@ -35,6 +36,7 @@ import {
   DEFAULT_TARGET_CHANCE_PERCENT,
   MAX_TARGET_CHANCE_PERCENT as MAX_TARGET_CHANCE,
   MIN_TARGET_CHANCE_PERCENT as MIN_TARGET_CHANCE,
+  formatPotentialTargetSummary as targetSummary,
   getPotentialTargetInfo,
   getPotentialTargetTypesForRow,
   isCompletePotentialTarget,
@@ -1181,18 +1183,6 @@ function mountPotentialSystem({ system, onSystemChange, switchedSettings }) {
     return JSON.stringify(signature(left)) === JSON.stringify(signature(right));
   }
 
-  function targetSummary(target) {
-    const info = getPotentialTargetInfo(target.type);
-    if (!info) return String(target.type);
-    let label = info.label;
-    if (info.unit === "%" && label.endsWith(" %")) {
-      label = label.slice(0, -2);
-    } else if (info.unit === "%급" && label.endsWith("%급")) {
-      label = label.slice(0, -2);
-    }
-    return `${label} ${target.value}${info.unit}`;
-  }
-
   function targetSetSummary(targets) {
     return targets.map(targetSummary).join(" + ");
   }
@@ -1453,24 +1443,12 @@ function mountPotentialSystem({ system, onSystemChange, switchedSettings }) {
     const title = statEquivalent
       ? `주스탯 ${formatGrade(threshold)}%급 이상 조합`
       : `${targetSetSummary(targets)} 이상 조합`;
-    const content = element("div", "stat-combinations");
-    const head = element("header", "stat-combinations__head");
-    head.append(
-      element("span", "success-condition__label", `세트 ${setNumber}`),
-      element(
-        "h4",
-        "stat-combinations__title",
-        title,
-      ),
-    );
-    content.append(head);
-
     const combinationOptions = {
       tables: activeResetMethod().fixedFirstLine ? tables.slice(1) : tables,
       limit: MAX_STAT_EQUIVALENT_COMBINATIONS,
       sortDirection: state.statEquivalentSortDirection,
     };
-    const { combinations, conditions, totalCount, hiddenCount, truncated } = statEquivalent
+    const result = statEquivalent
       ? getStatEquivalentSuccessCombinations({
         ...combinationOptions,
         target: threshold,
@@ -1482,55 +1460,15 @@ function mountPotentialSystem({ system, onSystemChange, switchedSettings }) {
         enemyDefense: Number(state.enemyDefense),
         targets: targets.map(({ type, value }) => ({ targetType: type, target: Number(value) })),
       });
-    if (combinations.length === 0) {
-      content.append(
-        element(
-          "p",
-          "stat-combinations__empty",
-          statEquivalent
-            ? `현재 확률표에는 ${formatGrade(threshold)}%급 이상이 되는 옵션 조합이 없습니다.`
-            : "현재 확률표에는 모든 목표를 만족하는 옵션 조합이 없습니다.",
-        ),
-      );
-      return content;
-    }
-
-    const list = element("ol", "stat-combinations__list");
-    list.tabIndex = 0;
-    list.setAttribute("role", "region");
-    list.setAttribute(
-      "aria-label",
+    return potentialSuccessCombinationList({
       title,
-    );
-    combinations.forEach((combination) => {
-      const item = element("li", "stat-combination");
-      const optionList = element("ul", "stat-combination__options");
-      combination.options.forEach(({ name }) => {
-        optionList.append(element("li", "stat-combination__option", name));
-      });
-      item.append(
-        optionList,
-        element(
-          "span",
-          "stat-combination__total",
-          statEquivalent
-            ? `합계 ${formatOptionGrade(combination.score)}%급`
-            : `합계 ${conditions.map(({ targetType }, index) => targetSummary({
-              type: targetType,
-              value: formatOptionGrade(combination.scores[index]),
-            })).join(" · ")}`,
-        ),
-      );
-      list.append(item);
+      setNumber,
+      result,
+      ...(statEquivalent ? {
+        formatTotal: ({ score }) => `${formatOptionGrade(score)}%급`,
+        emptyMessage: `현재 확률표에는 ${formatGrade(threshold)}%급 이상이 되는 옵션 조합이 없습니다.`,
+      } : {}),
     });
-    const countText = truncated
-      ? `전체 ${totalCount.toLocaleString("ko-KR")}개 중 ${combinations.length}개 표시 · ${hiddenCount.toLocaleString("ko-KR")}개 더 있음`
-      : `전체 ${totalCount.toLocaleString("ko-KR")}개 조합`;
-    content.append(
-      list,
-      element("p", "stat-combinations__count", countText),
-    );
-    return content;
   }
 
   function successConditions(targetSets, profile) {

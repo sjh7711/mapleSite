@@ -1,6 +1,7 @@
 import { element } from "./calculator-ui.js";
+import { formatPotentialTargetSummary } from "./potential-target-ui.js";
 
-// 잠재능력과 소울이 함께 쓰는 폼. 계산 규칙과 입력 상태는 각 페이지가 관리한다.
+// 잠재능력과 소울의 공통 UI. 계산 규칙과 입력 상태는 각 페이지가 관리한다.
 export function potentialSelectorGroup(label, picker, variant = "grade") {
   const group = element("div", `potential-selector-group potential-selector-group--${variant}`);
   group.setAttribute("role", "group");
@@ -41,6 +42,55 @@ export function potentialOptionSet({ label, targets, onRemove }) {
   list.append(...targets);
   set.append(head, list);
   return set;
+}
+
+export function potentialSuccessCombinationList({
+  title,
+  setNumber,
+  result,
+  formatTotal,
+  emptyMessage = "현재 확률표에는 모든 목표를 만족하는 옵션 조합이 없습니다.",
+}) {
+  const { combinations, conditions, totalCount, hiddenCount, truncated } = result;
+  const content = element("div", "stat-combinations");
+  const head = element("header", "stat-combinations__head");
+  head.append(
+    element("span", "success-condition__label", `세트 ${setNumber}`),
+    element("h4", "stat-combinations__title", title),
+  );
+  content.append(head);
+
+  if (combinations.length === 0) {
+    content.append(element("p", "stat-combinations__empty", emptyMessage));
+    return content;
+  }
+
+  const list = element("ol", "stat-combinations__list");
+  list.tabIndex = 0;
+  list.setAttribute("role", "region");
+  list.setAttribute("aria-label", title);
+  for (const combination of combinations) {
+    const item = element("li", "stat-combination");
+    const options = element("ul", "stat-combination__options");
+    for (const { name } of combination.options) {
+      options.append(element("li", "stat-combination__option", name));
+    }
+    const total = formatTotal
+      ? formatTotal(combination)
+      : conditions.map(({ targetType }, index) =>
+          formatPotentialTargetSummary({
+            type: targetType,
+            value: combination.scores[index].toLocaleString("ko-KR", { maximumFractionDigits: 4 }),
+          }),
+        ).join(" · ");
+    item.append(options, element("span", "stat-combination__total", `합계 ${total}`));
+    list.append(item);
+  }
+  const countText = truncated
+    ? `전체 ${totalCount.toLocaleString("ko-KR")}개 중 ${combinations.length}개 표시 · ${hiddenCount.toLocaleString("ko-KR")}개 더 있음`
+    : `전체 ${totalCount.toLocaleString("ko-KR")}개 조합`;
+  content.append(list, element("p", "stat-combinations__count", countText));
+  return content;
 }
 
 export function potentialCalculatorLayout({ equipment, targets, extraControls = [], results }) {

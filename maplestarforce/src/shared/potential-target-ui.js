@@ -100,6 +100,18 @@ export function getPotentialTargetInfo(type) {
   return null;
 }
 
+export function formatPotentialTargetSummary({ type, value }) {
+  const info = getPotentialTargetInfo(type);
+  if (!info) return String(type);
+  let label = info.label;
+  if (info.unit === "%" && label.endsWith(" %")) {
+    label = label.slice(0, -2);
+  } else if (info.unit === "%급" && label.endsWith("%급")) {
+    label = label.slice(0, -2);
+  }
+  return `${label} ${value}${info.unit}`;
+}
+
 /** 빈 목표는 유지하되, 공식 옵션 원문 목표는 실제 잠재 줄 수(1~3)만 받는다. */
 export function isCompletePotentialTarget(target) {
   const info = getPotentialTargetInfo(target?.type);
