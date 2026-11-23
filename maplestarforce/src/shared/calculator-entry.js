@@ -15,6 +15,7 @@ const entries = {
   scroll: () => import("../pages/scroll.js"),
   pet: () => import("../pages/pet.js"),
   soul: () => import("../pages/soul.js"),
+  "hexa-stat": () => import("../pages/hexa-stat.js"),
 };
 
 // Calculators may render and normalize defaults on import. Keep those writes in

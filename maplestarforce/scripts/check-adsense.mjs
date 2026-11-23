@@ -5,11 +5,11 @@ import { parseArgs } from "node:util";
 
 const PUBLIC_PATHS = [
   "/", "/potential/", "/ability/", "/add-option/", "/scroll/", "/pet/",
-  "/about/", "/privacy/", "/sources/", "/soul/",
+  "/about/", "/privacy/", "/sources/", "/soul/", "/hexa-stat/",
   "/guide/", "/guide/starforce/", "/guide/potential/", "/guide/ability/",
   "/guide/add-option/", "/guide/scroll/", "/guide/pet/", "/guide/soul/",
 ];
-const AD_PATHS = new Set(["/", "/potential/", "/ability/", "/add-option/", "/scroll/", "/pet/", "/soul/"]);
+const AD_PATHS = new Set(["/", "/potential/", "/ability/", "/add-option/", "/scroll/", "/pet/", "/soul/", "/hexa-stat/"]);
 
 function attributes(tag) {
   return Object.fromEntries(

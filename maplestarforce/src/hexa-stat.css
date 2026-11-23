@@ -1,0 +1,61 @@
+.page--hexa-stat .hexa-layout {
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+}
+
+.hexa-settings fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.hexa-settings fieldset + fieldset { margin-top: 14px; }
+.hexa-settings legend { margin: 0 0 8px; padding: 0; font-weight: 700; }
+.hexa-settings select { width: 100%; min-width: 0; }
+.hexa-levels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.hexa-levels .field { min-width: 0; }
+.hexa-settings .hexa-event { display: flex; align-items: center; gap: 8px; min-height: 44px; }
+.hexa-settings .hexa-event input { flex: none; width: 16px; min-height: 0; height: 16px; margin: 0; padding: 0; accent-color: var(--accent); }
+.hexa-settings .hexa-error { color: var(--danger, #f29a9a); }
+
+.hexa-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 0 10px;
+  padding: 12px;
+  border: 1px solid var(--border-soft, var(--line));
+  border-radius: 9px;
+  background: var(--surface-soft, var(--panel));
+}
+
+.hexa-summary > div { display: flex; flex-direction: column; justify-content: space-between; gap: 4px; }
+.hexa-summary > div:nth-child(2) { padding-inline-start: 12px; border-inline-start: 1px solid var(--line); }
+.hexa-summary .hexa-summary__chance { grid-column: 1 / -1; padding-block-start: 10px; border-block-start: 1px solid var(--line); }
+.hexa-summary dt { color: var(--muted); font-size: 0.78rem; word-break: keep-all; }
+.hexa-summary dd { margin: 0; font-size: 1.25rem; font-weight: 750; font-variant-numeric: tabular-nums; }
+
+.page--hexa-stat .reach-control__metrics { grid-template-columns: minmax(0, 1fr); }
+.page--hexa-stat .reach-control__metrics strong { font-variant-numeric: tabular-nums; }
+
+.hexa-policy { width: 100%; margin-top: 5px; border-collapse: collapse; font-size: 0.85rem; }
+.hexa-policy :is(th, td) { padding: 6px; border-block-end: 1px solid var(--border-soft, var(--line)); text-align: start; }
+.hexa-policy thead th { color: var(--muted); }
+.hexa-policy tbody th { font-weight: 650; }
+.hexa-policy tr[aria-current="true"] { background: var(--field-active-bg, var(--surface-soft)); }
+.hexa-policy tr[aria-current="true"] th { box-shadow: inset 3px 0 var(--accent); padding-inline-start: 10px; }
+.hexa-policy__current { display: block; color: var(--text-gold, var(--accent)); }
+
+@media (max-width: 760px) {
+  .page--hexa-stat .hexa-layout { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 460px) {
+  .hexa-summary { grid-template-columns: minmax(0, 1fr); }
+  .hexa-summary > div:nth-child(2) {
+    padding-inline-start: 0;
+    padding-block-start: 10px;
+    border-inline-start: 0;
+    border-block-start: 1px solid var(--line);
+  }
+}

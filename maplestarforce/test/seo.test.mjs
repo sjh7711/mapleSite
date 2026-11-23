@@ -15,6 +15,7 @@ const PUBLIC_URLS = [
   "https://starforce.pages.dev/privacy/",
   "https://starforce.pages.dev/sources/",
   "https://starforce.pages.dev/soul/",
+  "https://starforce.pages.dev/hexa-stat/",
   "https://starforce.pages.dev/guide/",
   "https://starforce.pages.dev/guide/starforce/",
   "https://starforce.pages.dev/guide/potential/",
@@ -28,7 +29,7 @@ const PUBLIC_URLS = [
 const FAVICON_PAGES = [
   "../index.html", "../potential/index.html", "../additional/index.html", "../add-option/index.html",
   "../scroll/index.html", "../ability/index.html", "../pet/index.html", "../soul/index.html",
-  "../sitemap-submit/index.html", "../about/index.html", "../privacy/index.html", "../sources/index.html",
+  "../hexa-stat/index.html", "../sitemap-submit/index.html", "../about/index.html", "../privacy/index.html", "../sources/index.html",
   "../guide/index.html", ...["starforce", "potential", "add-option", "scroll", "ability", "pet", "soul"].map((tool) => `../guide/${tool}/index.html`),
   ...["login", "starforce-prices", "soul-ether-prices", "blacksmith-inboxes"].map((page) => `../admin/${page}/index.html`),
   "../public/404.html",

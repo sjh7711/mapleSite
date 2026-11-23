@@ -7,6 +7,7 @@ const TOOLS = [
   { id: "ability", name: "어빌리티", href: "ability/" },
   { id: "pet", name: "자석펫", href: "pet/" },
   { id: "soul", name: "소울", href: "soul/" },
+  { id: "hexa-stat", name: "헥사 스탯", href: "hexa-stat/" },
 ];
 
 export function getTools() {
@@ -21,6 +22,7 @@ export const TOOL_ITEM_ICONS = {
   ability: "tool-icons/large-boss-medal.png",
   pet: "tool-icons/wisp-wonderberry.png",
   soul: "tool-icons/soul.webp",
+  "hexa-stat": "tool-icons/hexa-stat.png",
 };
 
 export const TOOL_VECTOR_ICONS = {

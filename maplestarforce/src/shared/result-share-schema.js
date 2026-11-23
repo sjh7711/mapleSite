@@ -24,6 +24,7 @@ const SCHEMAS = Object.freeze({
   stats: fields(`STR DEX INT LUK`),
   pet: fields(`targetCount wonderBlackEvent wonderBlackEventIncreasePercent wonderBerryCashPurchaseAllowed outputTradeability wonderBerryBundleMaplePoints wonderBerryAuctionBundleEokPrice lunaCrystalMaplePoints wonderBlackEokPrice lunaSweetEokPrice mesoMarketMaplePointsPerEok cashWonPerEok lunaDreamEokPrice lunaKeyEokPrice auctionFeeRate resultUnit resultMode targetChancePercent`),
   soul: fields(`mode currentStage targetStage failures etherPrices grade toGrade resetCount miracle potentialStage chance chanceAverage targets`),
+  hexaStat: fields(`main sub1 sub2 target event goalProbability`),
   profile: fields(`character profiles mode presetSelection presetRequest dataFreshness`),
   character: fields(`name className level world`),
   profiles: fields(`fullBoss`),
@@ -45,7 +46,7 @@ const NESTED = Object.freeze({
   "profile.profiles": "profiles",
   "profiles.fullBoss": "fullBoss",
 });
-const TOOLS = fields(`starforce potential ability add-option scroll pet soul`);
+const TOOLS = fields(`starforce potential ability add-option scroll pet soul hexa-stat`);
 const STORES = Object.freeze([
   ["local", "maplestarforce:v5", "starforce"],
   ["local", "maplestarforce:potential:v6", "potential"],
@@ -59,6 +60,7 @@ const STORES = Object.freeze([
   ["local", "maplestarforce:pet:v3", "pet"],
   ["local", "maplestarforce:soul:v1", "soul"],
   ["session", "maplestarforce:items:v1", "items"],
+  ["local", "maplestarforce:hexa-stat:v1", "hexaStat"],
 ].map(Object.freeze));
 const record = (value) => value !== null && typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype;
 const invalid = () => { throw new Error("공유 설정이 손상되었습니다."); };

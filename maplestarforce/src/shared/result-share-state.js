@@ -15,6 +15,7 @@ const KEYS = {
   scroll: [`${PREFIX}scroll:v2`, PROFILE_KEY],
   pet: [`${PREFIX}pet:v3`],
   soul: [`${PREFIX}soul:v1`],
+  "hexa-stat": [`${PREFIX}hexa-stat:v1`],
 };
 const ITEMS_KEY = `${PREFIX}items:v1`;
 const MAX_BYTES = 256 * 1024;
