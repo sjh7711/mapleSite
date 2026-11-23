@@ -215,7 +215,7 @@ function potentialControls() {
       placeholder: "옵션 검색", clearable: true,
     });
     const value = numberInput(target.value, (next) => update(() => { target.value = next; }), {
-      min: "0", step: "1", allowEmpty: true, disabled: !target.type,
+      min: "0", step: "any", allowEmpty: true, allowDecimalDraft: true, disabled: !target.type,
     });
     value.dataset.key = `soul-target-value-${index}`;
     value.setAttribute("aria-label", `옵션 세트 1의 ${index + 1}번째 최소 수치`);
