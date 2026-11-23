@@ -45,7 +45,8 @@
 .hexa-policy tbody th { font-weight: 650; }
 .hexa-policy tr[aria-current="true"] { background: var(--field-active-bg, var(--surface-soft)); }
 .hexa-policy tr[aria-current="true"] th { box-shadow: inset 3px 0 var(--accent); }
-.hexa-policy__current { color: var(--text-gold, var(--accent)); white-space: nowrap; }
+.hexa-policy :is(.hexa-policy__current, .hexa-policy__notice) { color: var(--text-gold, var(--accent)); white-space: nowrap; }
+.hexa-policy__notice { display: block; font-weight: 650; }
 
 @media (max-width: 760px) {
   .page--hexa-stat .hexa-layout { grid-template-columns: minmax(0, 1fr); }
