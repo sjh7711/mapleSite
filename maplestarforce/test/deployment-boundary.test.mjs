@@ -169,7 +169,7 @@ test("보존한 시세 데이터와 제거한 도구는 웹 배포에 포함되�
   assert.match(viteConfig, /entry\.name === "item-market"\) continue/u);
   const { getTools } = await import("../src/shared/tool-nav.js");
   assert.deepEqual(getTools().map((tool) => tool.id),
-    ["starforce", "potential", "add-option", "scroll", "ability", "pet", "soul"]);
+    ["starforce", "potential", "add-option", "scroll", "ability", "pet", "soul", "hexa-stat"]);
 });
 
 test("장비 텍스트 복사·붙여넣기는 운영과 프리뷰에서 활성화한다", async () => {
