@@ -146,6 +146,7 @@ const pages = {
   scroll: resolve(__dirname, "scroll/index.html"),
   pet: resolve(__dirname, "pet/index.html"),
   soul: resolve(__dirname, "soul/index.html"),
+  "hexa-stat": resolve(__dirname, "hexa-stat/index.html"),
   "sitemap-submit": resolve(__dirname, "sitemap-submit/index.html"),
   guide: resolve(__dirname, "guide/index.html"),
   "guide-starforce": resolve(__dirname, "guide/starforce/index.html"),

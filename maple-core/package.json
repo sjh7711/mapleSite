@@ -14,6 +14,7 @@
     "./ability-route-reach": "./src/ability-route-reach.js",
     "./ability-reform": "./src/ability-reform.js",
     "./soul": "./src/soul.js",
+    "./hexa-stat": "./src/hexa-stat.js",
     "./reform-2026-09-17": "./src/reform-2026-09-17.js",
     "./potential": "./src/potential.js",
     "./add-option": "./src/add-option.js",

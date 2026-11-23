@@ -8,6 +8,7 @@ https://starforce.pages.dev/about/
 https://starforce.pages.dev/privacy/
 https://starforce.pages.dev/sources/
 https://starforce.pages.dev/soul/
+https://starforce.pages.dev/hexa-stat/
 https://starforce.pages.dev/guide/
 https://starforce.pages.dev/guide/starforce/
 https://starforce.pages.dev/guide/potential/
