@@ -33,3 +33,17 @@ test("목표 확률을 처음 넘는 강화 예산과 유한한 완료 상한을
   const completed = createHexaStatBudget(result, 20, 10);
   assert.equal(completed.requiredFragments(1), 0);
 });
+
+test("목표 메인 레벨을 충족한 코어는 초기화하지 않고 20등급까지 강화한다", () => {
+  const result = calculateHexaStat({ target: 1 });
+  for (let grade = 10; grade <= 20; grade++) {
+    for (let main = 1; main <= 10; main++) {
+      assert.ok(!result.reset[grade][main], `${grade}등급 메인 ${main}레벨`);
+      assert.equal(result.total[grade][main], result.fragments[grade][main]);
+    }
+  }
+  const budget = createHexaStatBudget(result, 11, 10);
+  assert.equal(result.total[11][10], 450);
+  assert.equal(budget.probabilityAt(440), 0);
+  assert.equal(budget.requiredFragments(1), 450);
+});

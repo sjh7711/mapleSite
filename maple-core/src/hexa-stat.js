@@ -42,7 +42,7 @@ export function calculateHexaStat({ target, event = false }) {
     for (let grade = maxGrade - 1; grade >= 0; grade--) {
       for (let main = 0; main <= Math.min(grade, maxLevel); main++) {
         const upgrade = fragmentCosts[main] + nextAverage(total, grade, main);
-        reset[grade][main] = grade >= minResetGrade && restart < upgrade;
+        reset[grade][main] = grade >= minResetGrade && main < target && restart < upgrade;
         total[grade][main] = reset[grade][main] ? restart : upgrade;
       }
     }
