@@ -550,7 +550,8 @@ function matrixSkillCoreSummary(vMatrixData, hexaMatrixData) {
     ) + number(entry?.slot_level),
     linkedSkills: (entry?.linked_skill ?? entry?.linked_skills ?? [])
       .map((skill) => String(
-        skill?.hexa_skill_name ?? skill?.v_skill_name ?? skill?.skill_name ?? "",
+        skill?.hexa_skill_name ?? skill?.hexa_skill_id ??
+          skill?.v_skill_name ?? skill?.skill_name ?? "",
       ).trim())
       .filter(Boolean),
   })).filter((entry) => entry.name || entry.linkedSkills.length);
@@ -569,11 +570,13 @@ export function resolveClassDamageChannels({
   characterClass,
   skillData,
   vMatrixData,
+  hexaMatrixData,
 } = {}) {
   const discovered = skillLocalIgnoreDefenseChannelsFromSkills(skillData);
   const generalized = generalizedBattlePracticeDamageChannelsFromSkills({
     skillData,
     vMatrixData,
+    hexaMatrixData,
     profile: classBattlePracticeDamageProfile(characterClass),
   });
   return generalized.length ? generalized : discovered;
@@ -596,8 +599,11 @@ function weaponBasePower(equipmentData) {
 function activeRingUptime(duration, cooldown, combatDuration) {
   if (!(duration > 0) || !(combatDuration > 0)) return 0;
   if (!(cooldown > 0)) return Math.min(1, duration / combatDuration);
-  const uses = Math.max(1, Math.ceil(combatDuration / cooldown));
-  return Math.min(1, (duration * uses) / combatDuration);
+  if (duration >= cooldown) return 1;
+  const completeCycles = Math.floor(combatDuration / cooldown);
+  const lastCycle = combatDuration - completeCycles * cooldown;
+  return (completeCycles * duration + Math.min(lastCycle, duration)) /
+    combatDuration;
 }
 
 const ACTIVE_SKILL_CYCLE_EXCLUSIONS = new Set([
@@ -1465,6 +1471,7 @@ export function calculateActiveSkillCycleBonuses(
     mapleWarriorPercent = 0,
     characterClass = "",
     equipmentData = null,
+    buffDurationPercent = 0,
   } = {},
 ) {
   const result = {
@@ -1581,11 +1588,16 @@ export function calculateActiveSkillCycleBonuses(
       duration,
       modifiers,
     );
+    const tooltip = `${skill.skill_description ?? ""}\n${effect}`;
+    const affectedByBuffDuration =
+      /버프\s*지속\s*시간\s*증가(?:의)?\s*효과(?:를|가)\s*(?:받는다|적용된다)/u.test(tooltip);
     addCycleEvent(
       result,
       {
         name,
-        duration: enhanced.duration,
+        duration: affectedByBuffDuration
+          ? enhanced.duration * (1 + Math.max(0, number(buffDurationPercent)) / 100)
+          : enhanced.duration,
         cooldown,
         modifiers: enhanced.modifiers,
         baseFlat,
@@ -2115,7 +2127,10 @@ function conditionalDamageFromLink(linkSkillData) {
 }
 
 /** 정적 최종 스탯에 남지 않는 링크 스킬을 보스전 평균값으로 환산한다. */
-export function calculateConditionalLinkCycleBonuses(linkSkillData) {
+export function calculateConditionalLinkCycleBonuses(
+  linkSkillData,
+  buffDurationPercent = 0,
+) {
   const result = {
     damage: 0,
     bossDamage: 0,
@@ -2154,7 +2169,10 @@ export function calculateConditionalLinkCycleBonuses(linkSkillData) {
       name === "시프 커닝" ||
       name === "프라이어 프리퍼레이션"
     ) {
-      const duration = percentFromEffect(effect, /(\d+(?:\.\d+)?)초 동안/u);
+      const baseDuration = percentFromEffect(effect, /(\d+(?:\.\d+)?)초 동안/u);
+      const duration = name === "소울 컨트랙트"
+        ? baseDuration * (1 + Math.max(0, number(buffDurationPercent)) / 100)
+        : baseDuration;
       const cooldown = percentFromEffect(
         effect,
         /재(?:발동|사용) 대기시간\s*(\d+(?:\.\d+)?)초/u,
@@ -3618,6 +3636,22 @@ function conditionalDamageFromAbility(abilityData) {
   }, 0);
 }
 
+/** 최종 스탯의 벞지에 선택 프리셋에서 바뀐 가변 출처만 반영한다. */
+export function selectedBuffDurationPercent(basePercent, active, selected) {
+  function presetBonus({ abilityData, unionRaiderData } = {}) {
+    const values = [
+      ...(abilityData?.ability_info ?? []).map((ability) => ability.ability_value),
+      ...(unionRaiderData?.union_state_stat ?? []),
+    ];
+    return values.reduce((sum, value) =>
+      sum + percentFromEffect(
+        value,
+        /버프\s*(?:스킬의?\s*)?지속\s*시간\s*(\d+(?:\.\d+)?)%\s*증가/u,
+      ), 0);
+  }
+  return Math.max(0, number(basePercent) + presetBonus(selected) - presetBonus(active));
+}
+
 function unreflectedStats({
   symbolData,
   hyperStatData,
@@ -3819,6 +3853,11 @@ export function calculateCharacterPotentialConversion({
     resolvedPresets.selectedSnapshot.unionRaiderData;
   const selectedLinkSkillData = resolvedPresets.selectedSnapshot.linkSkillData;
   const selectedAbilityData = resolvedPresets.selectedSnapshot.abilityData;
+  const buffDurationPercent = selectedBuffDurationPercent(
+    stats["버프 지속시간"],
+    resolvedPresets.activeSnapshot,
+    resolvedPresets.selectedSnapshot,
+  );
   const classDopingAdjustment =
     doping?.classAdjustments?.[character.character_class] ?? {};
   const classAlwaysOnCombat = resolveClassAlwaysOnCombatAdjustment(
@@ -3868,6 +3907,7 @@ export function calculateCharacterPotentialConversion({
   );
   const conditionalLinks = calculateConditionalLinkCycleBonuses(
     selectedLinkSkillData,
+    buffDurationPercent,
   );
   const guildNoblesse = calculateGuildNoblesseBonuses(guildData);
   const supplemental = mergeBonuses(
@@ -3907,6 +3947,7 @@ export function calculateCharacterPotentialConversion({
       mapleWarriorPercent,
       characterClass: character.character_class,
       equipmentData: selectedEquipmentData,
+      buffDurationPercent,
     },
   );
   const enumeratedBaseMain = ensurePositive(
@@ -4782,6 +4823,7 @@ export function calculateCharacterPotentialConversion({
       characterClass: character.character_class,
       skillData,
       vMatrixData,
+      hexaMatrixData,
     }),
   });
   const dopedAttackPercent = combatModel.totals.attackPercent;

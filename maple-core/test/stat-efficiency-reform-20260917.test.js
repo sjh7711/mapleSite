@@ -5,6 +5,7 @@ import {
   calculateConditionalLinkCycleBonuses,
   calculateActiveSkillCycleBonuses,
   equipmentSoulOptionLines,
+  selectedBuffDurationPercent,
 } from 'maple-core/stat-efficiency';
 import { FULL_BOSS_DOPING } from 'maple-core/stat-profile';
 
@@ -74,6 +75,41 @@ test('이전 중첩형 링크 스냅샷도 그대로 해석한다', () => {
     {skill_name:'무아',skill_effect:'발동 시 데미지 1%, 중첩당 데미지 2%, 최대 5회 중첩'},
     {skill_name:'전투의 흐름',skill_effect:'각 중첩당 데미지 4%, 최대 4회 중첩'},
   ]}).damage,27);
+});
+
+test('전수 소울 컨트랙트에는 벞지를 적용하고 발동형 시프 커닝은 기본 지속시간을 쓴다', () => {
+  const links = { character_link_skill: [
+    { skill_name: '소울 컨트랙트', skill_effect: '10초 동안 데미지 60% 증가\n재사용 대기시간 60초' },
+    { skill_name: '시프 커닝', skill_effect: '10초 동안 데미지 27% 증가 재발동 대기시간 20초' },
+  ] };
+  assert.equal(calculateConditionalLinkCycleBonuses(links).damage, 23.5);
+  const parameters = input({ linkSkillData: links, doping: FULL_BOSS_DOPING });
+  parameters.statData.final_stat.push({ stat_name: '버프 지속시간', stat_value: '100' });
+  const result = calculateCharacterPotentialConversion(parameters);
+  assert.equal(result.details.conditionalLinkDamage, 33.5);
+  assert.equal(result.details.conditionalLinkSources[0].uptime, 1 / 3);
+});
+
+test('선택 프리셋의 벞지는 어빌리티와 유니온 설정 차이만 더한다', () => {
+  const active = {
+    abilityData: { ability_info: [{ ability_value: '버프 스킬의 지속 시간 50% 증가' }] },
+    unionRaiderData: { union_state_stat: ['버프 지속시간 15% 증가', '소환수 지속시간 20% 증가'] },
+  };
+  const selected = {
+    abilityData: { ability_info: [{ ability_value: '보스 몬스터 공격 시 데미지 20% 증가' }] },
+    unionRaiderData: { union_state_stat: ['버프 지속시간 20% 증가'] },
+  };
+  assert.equal(selectedBuffDurationPercent(100, active, selected), 55);
+});
+
+test('주기 평균에서 전투 종료 이후의 버프 지속시간을 제외한다', () => {
+  const skills = [{ character_skill: [{
+    skill_name: '다크 레조넌스',
+    skill_level: 30,
+    skill_effect: '31초 동안 보스 몬스터 공격 시 데미지 15% 증가\n재사용 대기시간 70초',
+  }] }];
+  const result = calculateActiveSkillCycleBonuses(skills, 'attack', 360);
+  assert.equal(result.applied[0].uptime, (31 * 5 + 10) / 360);
 });
 
 test('어빌리티 아래 두 줄 레전드리의 프리셋 차이를 등급 제한 없이 반영한다', () => {

@@ -19,6 +19,7 @@ import {
   resolveCharacterExternalBonuses,
   resolveCharacterPresetSnapshot,
 } from "maple-core/stat-efficiency";
+import { CLASS_BATTLE_PRACTICE_DAMAGE_PROFILES } from "../src/class-damage-profiles.js";
 
 function statData(values) {
   return {
@@ -28,6 +29,75 @@ function statData(values) {
     })),
   };
 }
+
+test("직접 방무와 설명에 표시된 오리진 강화 방무를 해당 스킬에만 적용한다", () => {
+  const channels = skillLocalIgnoreDefenseChannelsFromSkills([{
+    character_skill_grade: "6",
+    character_skill: [
+      {
+        skill_name: "캐논 버스터 VI",
+        skill_level: 30,
+        skill_effect: "1170%의 데미지로 4번 공격, 추가 크리티컬 확률 20%, 적 방어율 무시 30%",
+      },
+      {
+        skill_name: "스피릿 칼리버",
+        skill_level: 20,
+        skill_description: "10레벨 : 몬스터 방어율 무시 20% 증가\n30레벨 : 몬스터 방어율 무시 30% 증가",
+        skill_effect: "472%의 데미지로 14번 공격",
+      },
+    ],
+  }]);
+  assert.deepEqual(channels.map(({ source, ignoreDefenseSources }) =>
+    [source, ignoreDefenseSources]
+  ), [["캐논 버스터 VI", [30]], ["스피릿 칼리버", [20]]]);
+});
+
+test("트리니티 중첩 방무는 VI와 퓨전 공격군에 한 번씩 적용한다", () => {
+  const skill = (skill_name, target) => ({
+    skill_name,
+    skill_level: 30,
+    skill_effect: `적중 시 30초 동안 ${target} 트리니티 퓨전의 데미지 및 방어율 무시 15% 증가 버프가 최대 2회 중첩`,
+  });
+  const channels = skillLocalIgnoreDefenseChannelsFromSkills([{
+    character_skill: [
+      skill("트리니티", "트리니티와"),
+      skill("트리니티 VI", "트리니티 VI 및"),
+      { skill_name: "트리니티 퓨전", skill_level: 30 },
+    ],
+  }]);
+  assert.deepEqual(channels.map(({ source, ignoreDefenseSources }) =>
+    [source, ignoreDefenseSources]
+  ), [["트리니티 VI", [30]], ["트리니티 퓨전", [30]]]);
+});
+
+test("HEXA 링크 ID의 강화량으로 해당 공격의 기준 점유율을 조정한다", () => {
+  const profile = {
+    sampleCount: 5,
+    shareBasis: "pre-defense",
+    skillShares: [
+      { source: "버닝 브레이커", weight: 0.5, hexaReferenceFinalDamagePercent: 60 },
+      { source: "일반 공격", weight: 0.5 },
+    ],
+  };
+  const skillData = [{ character_skill: [
+    { skill_name: "버닝 브레이커", skill_level: 30, skill_effect: "적의 방어율 100% 무시하며 공격한다" },
+    { skill_name: "버닝 브레이커 강화", skill_level: 20, skill_effect: "버닝 브레이커의 최종 데미지 40% 증가" },
+  ] }];
+  const hexaMatrixData = { character_hexa_core_equipment: [{
+    hexa_core_type: "강화 코어",
+    hexa_core_level: 20,
+    linked_skill: [{ hexa_skill_id: "버닝 브레이커 강화" }],
+  }] };
+  const channels = generalizedBattlePracticeDamageChannelsFromSkills({
+    skillData,
+    hexaMatrixData,
+    profile,
+  });
+  const skill = channels.find(({ source }) => source === "버닝 브레이커");
+  assert.equal(skill.weight, 0.5 * (1.4 / 1.6));
+  const reference = generalizedBattlePracticeDamageChannelsFromSkills({ skillData, profile });
+  assert.equal(reference.find(({ source }) => source === "버닝 브레이커").weight, 0.5);
+});
 
 test("세트·캐시·펫·마스터라벨 플러스 구성요소를 모두 해석한다", () => {
   const external = resolveCharacterExternalBonuses({
@@ -1735,6 +1805,10 @@ test("V 강화 코어 40레벨 방무 20%를 코어명에 포함된 각 스킬�
 });
 
 test("개인 기록 없이 대표 연무장 프로필을 현재 V 코어 방무와 결합한다", () => {
+  const reference = CLASS_BATTLE_PRACTICE_DAMAGE_PROFILES.나이트워커.skillShares.find(
+    ({ source }) => source === "퀸터플 스로우 VI",
+  );
+  assert.ok(reference);
   const channels = resolveClassDamageChannels({
     characterClass: "나이트워커",
     vMatrixData: {
@@ -1751,7 +1825,7 @@ test("개인 기록 없이 대표 연무장 프로필을 현재 V 코어 방무�
     channel.source === "퀸터플 스로우 VI"
   );
   assert.ok(Math.abs(weighted.reduce((sum, channel) => sum + channel.weight, 0) - 1) < 1e-12);
-  assert.ok(quintupleThrow.weight > 0.30 && quintupleThrow.weight < 0.32);
+  assert.equal(quintupleThrow.weight, reference.weight);
   assert.deepEqual(quintupleThrow.ignoreDefenseSources, [20]);
   assert.equal(
     channels[0].metadata.model,

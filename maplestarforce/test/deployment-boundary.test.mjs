@@ -112,15 +112,8 @@ test("배포용 연무장 프로필은 레테를 포함한 47직업만 계산식
   const entries = Object.entries(profiles);
 
   assert.equal(entries.length, 47);
-  assert.equal(profiles["레테"]?.sampleCount, 3);
+  assert.ok(profiles["레테"]);
   assert.equal(profiles["데몬어벤져"], undefined);
-  assert.deepEqual(
-    entries
-      .filter(([characterClass]) => characterClass !== "레테")
-      .map(([, profile]) => profile.sampleCount)
-      .filter((sampleCount) => sampleCount !== 5),
-    [],
-  );
 
   const allowedProfileFields = new Set([
     "enemyDefense",
@@ -132,11 +125,13 @@ test("배포용 연무장 프로필은 레테를 포함한 47직업만 계산식
     "skillShares",
   ]);
   const allowedSkillFields = new Set([
+    "hexaReferenceFinalDamagePercent",
     "ignoreDefenseSources",
     "source",
     "weight",
   ]);
   for (const [characterClass, profile] of entries) {
+    assert.equal(profile.sampleCount, 5, `${characterClass}: 표본 수`);
     assert.deepEqual(
       Object.keys(profile).filter((field) => !allowedProfileFields.has(field)),
       [],
@@ -158,6 +153,13 @@ test("배포용 연무장 프로필은 레테를 포함한 47직업만 계산식
       );
       assert.ok(skill.source, `${characterClass}: 빈 스킬명`);
       assert.ok(skill.weight > 0, `${characterClass}/${skill.source}: 잘못된 점유율`);
+      if (skill.hexaReferenceFinalDamagePercent !== undefined) {
+        assert.ok(
+          Number.isFinite(skill.hexaReferenceFinalDamagePercent) &&
+            skill.hexaReferenceFinalDamagePercent > 0,
+          `${characterClass}/${skill.source}: 잘못된 HEXA 기준 강화량`,
+        );
+      }
     }
   }
 });

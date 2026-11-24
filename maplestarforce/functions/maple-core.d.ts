@@ -174,12 +174,19 @@ declare module "maple-core/stat-efficiency" {
 
   export function calculateConditionalLinkCycleBonuses(
     linkSkillData: Record<string, unknown>,
+    buffDurationPercent?: number,
   ): {
     damage: number;
     bossDamage: number;
     ignoreDefenseSources: number[];
     applied: Array<Record<string, unknown>>;
   };
+
+  export function selectedBuffDurationPercent(
+    basePercent: number | undefined,
+    active: Record<string, unknown>,
+    selected: Record<string, unknown>,
+  ): number;
 
   export function calculateGuildNoblesseBonuses(
     guildData: Record<string, unknown>,

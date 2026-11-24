@@ -453,7 +453,16 @@ function parsedSkillLocalIgnoreDefenseChannels(skillData) {
     const progressionSources = [];
     const timedSkillEffect = /\d+(?:\.\d+)?초 동안/u.test(effect);
     let hasTimedGlobalIgnoreDefense = false;
-    for (const line of effect.split(/\r?\n/u)) {
+    const effectLines = effect.split(/\r?\n/u);
+    const milestoneLevel = (line) => line.match(/^\s*(\d+)레벨\s*:/u)?.[1];
+    const effectMilestones = new Set(effectLines.map(milestoneLevel).filter(Boolean));
+    const descriptionMilestones = skillLevel > 0 &&
+        (grade === "6" || isSixthMasterySkillName(name))
+      ? description.split(/\r?\n/u).filter((line) =>
+          milestoneLevel(line) && !effectMilestones.has(milestoneLevel(line))
+        )
+      : [];
+    for (const line of [...effectLines, ...descriptionMilestones]) {
       if (!/방어율/u.test(line) || /영구적으로|영구히/u.test(line)) {
         continue;
       }
@@ -479,13 +488,13 @@ function parsedSkillLocalIgnoreDefenseChannels(skillData) {
 
       const directSources = [
         ...line.matchAll(
-          /(?:(?:몬스터|적)(?:의)?\s*)?방어율(?:을)?\s*(\d+(?:\.\d+)?)%\s*(?:를\s*)?(?:(?:추가(?:로)?\s*)?무시|무시(?:하여|하고)|추가\s*적용)/gu,
+          /(?:(?:몬스터|적)(?:의)?\s*)?방어(?:율)?(?:을)?\s*(\d+(?:\.\d+)?)%\s*(?:를\s*)?(?:(?:추가(?:로)?\s*)?무시|무시(?:하여|하고)|추가\s*적용)/gu,
         ),
       ].map((match) => number(match[1]));
       const levelSources = attackLike
         ? [
           ...line.matchAll(
-            /몬스터\s*방어율\s*무시\s*(\d+(?:\.\d+)?)%\s*(?:추가\s*)?증가/gu,
+            /(?:몬스터|적)(?:의)?\s*방어율\s*무시\s*(\d+(?:\.\d+)?)%(?=\s*(?:(?:추가\s*)?증가|[,·.]|$))/gu,
           ),
         ].map((match) => number(match[1]))
         : [];
@@ -558,6 +567,27 @@ function hyperPassiveLocalIgnoreDefenseChannels(skillData) {
   return result;
 }
 
+function maintainedTrinityIgnoreDefenseChannels(skillData) {
+  const skills = (skillData ?? []).flatMap((grade) => grade?.character_skill ?? []);
+  const learned = (name) => skills.find((skill) =>
+    skill.skill_name === name && number(skill.skill_level) > 0
+  );
+  const trinity = learned("트리니티 VI") ?? learned("트리니티");
+  const match = String(trinity?.skill_effect ?? "").match(
+    /(?:트리니티 VI|트리니티)(?:와|\s*및)\s*트리니티 퓨전의 데미지 및 방어율 무시\s*(\d+(?:\.\d+)?)%\s*증가 버프가 최대\s*(\d+)회 중첩/u,
+  );
+  if (!match) return [];
+  const stacks = number(match[2]);
+  const perStack = number(match[1]);
+  return [trinity, learned("트리니티 퓨전")].filter(Boolean).map((skill) =>
+    createDamageChannel({
+      source: skill.skill_name,
+      ignoreDefenseSources: [Math.min(100, stacks * perStack)],
+      metadata: { status: "unweighted", maintainedTrinityStacks: stacks, perStack },
+    })
+  );
+}
+
 /**
  * 공식 스킬 설명에서 특정 공격에만 추가 적용되는 방무를 수집한다.
  * 공격 비중은 API가 제공하지 않으므로 여기서는 발견만 하고 weight=null로
@@ -606,7 +636,10 @@ export function skillLocalIgnoreDefenseChannelsFromSkills(skillData) {
     }));
   }
 
-  for (const channel of hyperPassiveLocalIgnoreDefenseChannels(skillData)) {
+  for (const channel of [
+    ...hyperPassiveLocalIgnoreDefenseChannels(skillData),
+    ...maintainedTrinityIgnoreDefenseChannels(skillData),
+  ]) {
     const key = normalizedBattleSkillName(channel.source);
     const current = selected.find(
       (candidate) => normalizedBattleSkillName(candidate.source) === key,
@@ -617,7 +650,7 @@ export function skillLocalIgnoreDefenseChannelsFromSkills(skillData) {
     }
     // 스킬 고유 방무와 하이퍼 패시브는 서로 다른 방무 출처로 곱연산된다.
     current.ignoreDefenseSources.push(...channel.ignoreDefenseSources);
-    current.metadata.hyperPassive = channel.metadata?.hyperPassive ?? null;
+    Object.assign(current.metadata, channel.metadata);
   }
   return selected;
 }
@@ -770,6 +803,35 @@ function maintainedMarkedTargetIgnoreDefenseFromSkills(skillData) {
   };
 }
 
+/** 명시적으로 한 공격기만 강화하는 HEXA 코어의 현재 레벨 효과. */
+export function hexaSkillDamageBonuses(skillData, hexaMatrixData) {
+  const skills = new Map((skillData ?? []).flatMap(
+    (grade) => grade?.character_skill ?? [],
+  ).filter((skill) => number(skill?.skill_level) > 0).map((skill) => [
+    String(skill.skill_name ?? "").trim(),
+    skill,
+  ]));
+  const bonuses = new Map();
+  for (const core of hexaMatrixData?.character_hexa_core_equipment ?? []) {
+    if (core?.hexa_core_type !== "강화 코어") continue;
+    for (const link of core?.linked_skill ?? []) {
+      const name = String(link?.hexa_skill_name ?? link?.hexa_skill_id ?? "").trim();
+      const skill = skills.get(name);
+      if (!skill || number(skill.skill_level) !== number(core.hexa_core_level)) {
+        continue;
+      }
+      const effect = String(skill.skill_effect ?? "").trim().match(
+        /^([^\r\n]+)의\s*최종 데미지\s*(\d+(?:\.\d+)?)%\s*증가$/u,
+      );
+      if (!effect) continue;
+      const attack = effect[1].trim();
+      const multiplier = 1 + number(effect[2]) / 100;
+      bonuses.set(attack, (bonuses.get(attack) ?? 1) * multiplier);
+    }
+  }
+  return bonuses;
+}
+
 /**
  * 여러 정상 자동 종료 연무장 표본을 합친 직업 프로필을 현재 캐릭터의
  * 스킬·V 강화 코어 상태와 결합한다. 프로필은 피해 점유율만 제공하며,
@@ -778,6 +840,7 @@ function maintainedMarkedTargetIgnoreDefenseFromSkills(skillData) {
 export function generalizedBattlePracticeDamageChannelsFromSkills({
   skillData,
   vMatrixData,
+  hexaMatrixData,
   profile,
 } = {}) {
   const profileSkills = Array.isArray(profile?.skillShares)
@@ -799,6 +862,7 @@ export function generalizedBattlePracticeDamageChannelsFromSkills({
     skillData,
     vMatrixData,
   );
+  const hexaBonuses = hexaSkillDamageBonuses(skillData, hexaMatrixData);
   const markedTarget = maintainedMarkedTargetIgnoreDefenseFromSkills(skillData);
   const maintainedTargetSources = markedTarget
     ? [markedTarget.ignoreDefense]
@@ -818,10 +882,15 @@ export function generalizedBattlePracticeDamageChannelsFromSkills({
   const matchedSources = new Set();
 
   for (const entry of profileSkills) {
-    const weight = Math.max(0, number(entry?.weight));
-    if (!(weight > 0)) continue;
-    profiledWeight += weight;
+    const referenceWeight = Math.max(0, number(entry?.weight));
+    if (!(referenceWeight > 0)) continue;
+    profiledWeight += referenceWeight;
     if (unavailableBossSkills.has(String(entry?.source ?? "").trim())) continue;
+    const hexaReference = number(entry?.hexaReferenceFinalDamagePercent);
+    const hexaMultiplier = hexaBonuses.get(entry?.source);
+    const weight = hexaReference > 0 && hexaMultiplier !== undefined
+      ? referenceWeight * hexaMultiplier / (1 + hexaReference / 100)
+      : referenceWeight;
     const localChannel = matchingLocalChannel(entry?.source, localChannels);
     if (!localChannel?.ignoreDefenseSources?.length) {
       generalWeight += weight;
