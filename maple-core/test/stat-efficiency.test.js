@@ -19,6 +19,7 @@ import {
   resolveCharacterExternalBonuses,
   resolveCharacterPresetSnapshot,
 } from "maple-core/stat-efficiency";
+import { CLASS_BATTLE_PRACTICE_DAMAGE_PROFILES } from "../src/class-damage-profiles.js";
 
 function statData(values) {
   return {
@@ -1804,6 +1805,10 @@ test("V 강화 코어 40레벨 방무 20%를 코어명에 포함된 각 스킬�
 });
 
 test("개인 기록 없이 대표 연무장 프로필을 현재 V 코어 방무와 결합한다", () => {
+  const reference = CLASS_BATTLE_PRACTICE_DAMAGE_PROFILES.나이트워커.skillShares.find(
+    ({ source }) => source === "퀸터플 스로우 VI",
+  );
+  assert.ok(reference);
   const channels = resolveClassDamageChannels({
     characterClass: "나이트워커",
     vMatrixData: {
@@ -1820,7 +1825,7 @@ test("개인 기록 없이 대표 연무장 프로필을 현재 V 코어 방무�
     channel.source === "퀸터플 스로우 VI"
   );
   assert.ok(Math.abs(weighted.reduce((sum, channel) => sum + channel.weight, 0) - 1) < 1e-12);
-  assert.ok(quintupleThrow.weight > 0.30 && quintupleThrow.weight < 0.32);
+  assert.equal(quintupleThrow.weight, reference.weight);
   assert.deepEqual(quintupleThrow.ignoreDefenseSources, [20]);
   assert.equal(
     channels[0].metadata.model,
