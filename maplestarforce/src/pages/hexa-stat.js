@@ -52,7 +52,7 @@ function renderPolicy(reset, grade, main) {
     header.scope = "row";
     if (index === grade) {
       row.setAttribute("aria-current", "true");
-      header.append(" ", element("span", "hexa-policy__current", "현재 등급"));
+      header.append(element("span", "hexa-policy__current", "현재 등급"));
       if (reset[index][main]) cell.append(element("span", "hexa-policy__notice", "현재 초기화 필요"));
     }
     row.append(header, cell);
