@@ -92,16 +92,16 @@ const profiles = {
     }
   },
   "렌": {
-    "id": "렌-special-ring-516af0a77648",
-    "profileHash": "516af0a776487285cf1373c1016431f32e3c6f3e80b366ffc8826b658c027e14",
+    "id": "렌-special-ring-e83447e8c298",
+    "profileHash": "e83447e8c298d01a359205f56147bbcdbdb905d7a2f2bc60006efe9a6165d9e2",
     "sampleCount": 5,
     "basis": "battle-practice-restraint-timeline",
     "damageShareByDuration": {
-      "9": 0.2475737615511,
-      "11": 0.2649271975995,
-      "13": 0.2835160376965,
-      "15": 0.3002960996201,
-      "20": 0.3493955593651
+      "9": 0.2065593423849,
+      "11": 0.2298385545064,
+      "13": 0.2623059994738,
+      "15": 0.2878269968305,
+      "20": 0.3394156591121
     }
   },
   "루미너스": {
