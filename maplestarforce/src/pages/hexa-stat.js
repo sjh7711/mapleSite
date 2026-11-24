@@ -27,10 +27,11 @@ const reach = root.querySelector("#hexa-reach");
 const outputs = Object.fromEntries([...root.querySelectorAll("[data-hexa-output]")]
   .map((node) => [node.dataset.hexaOutput, node]));
 
+const coreLevels = Array.from({ length: maxLevel + 1 }, (_, level) => level);
 for (const name of ["main", "sub1", "sub2", "target"]) {
   const isTarget = name === "target";
   const select = form.elements.namedItem(name);
-  for (let level = isTarget ? 1 : 0; level <= maxLevel; level++) {
+  for (const level of isTarget ? coreLevels.slice(1).reverse() : coreLevels) {
     select.add(new Option(`${level}레벨${isTarget ? " 이상" : ""}`, level));
   }
   select.value = state[name];
