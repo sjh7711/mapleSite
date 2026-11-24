@@ -92,29 +92,29 @@ const profiles = {
     }
   },
   "렌": {
-    "id": "렌-special-ring-516af0a77648",
-    "profileHash": "516af0a776487285cf1373c1016431f32e3c6f3e80b366ffc8826b658c027e14",
+    "id": "렌-special-ring-e83447e8c298",
+    "profileHash": "e83447e8c298d01a359205f56147bbcdbdb905d7a2f2bc60006efe9a6165d9e2",
     "sampleCount": 5,
     "basis": "battle-practice-restraint-timeline",
     "damageShareByDuration": {
-      "9": 0.2475737615511,
-      "11": 0.2649271975995,
-      "13": 0.2835160376965,
-      "15": 0.3002960996201,
-      "20": 0.3493955593651
+      "9": 0.2065593423849,
+      "11": 0.2298385545064,
+      "13": 0.2623059994738,
+      "15": 0.2878269968305,
+      "20": 0.3394156591121
     }
   },
   "루미너스": {
-    "id": "루미너스-special-ring-16f11e919174",
-    "profileHash": "16f11e919174c5aaa593b86565e069e1499853ab2c0a42db6d3996c1d0e16929",
+    "id": "루미너스-special-ring-02d93bb7cdba",
+    "profileHash": "02d93bb7cdbaa94c399980dba199a0248ff3e2569f03a6b15397269e04d04002",
     "sampleCount": 5,
     "basis": "battle-practice-restraint-timeline",
     "damageShareByDuration": {
-      "9": 0.1622554712529,
-      "11": 0.1885314407765,
-      "13": 0.2173191997978,
-      "15": 0.2397684447593,
-      "20": 0.2979984501903
+      "9": 0.1601804052687,
+      "11": 0.2015001747053,
+      "13": 0.2249645007454,
+      "15": 0.2504151214392,
+      "20": 0.3084311508108
     }
   },
   "메르세데스": {
@@ -209,16 +209,16 @@ const profiles = {
     }
   },
   "비숍": {
-    "id": "비숍-special-ring-9cfae1d53924",
-    "profileHash": "9cfae1d53924aa0c466324d5ed37b5fd6b4ec8a07d76bd509a11d1bff17d7d8b",
+    "id": "비숍-special-ring-03114457da87",
+    "profileHash": "03114457da877bf0381da23cd17313a126cd01f50283bafbe2d2e311a331e94f",
     "sampleCount": 5,
     "basis": "battle-practice-restraint-timeline",
     "damageShareByDuration": {
-      "9": 0.1737694860277,
-      "11": 0.1982997985564,
-      "13": 0.2129982878794,
-      "15": 0.2257958635882,
-      "20": 0.2608238240074
+      "9": 0.178876029932,
+      "11": 0.2018787737802,
+      "13": 0.2195070851074,
+      "15": 0.2333933061682,
+      "20": 0.2680342320692
     }
   },
   "섀도어": {
@@ -339,16 +339,16 @@ const profiles = {
     }
   },
   "에반": {
-    "id": "에반-special-ring-1373d7a0422b",
-    "profileHash": "1373d7a0422b02bd6f6df6a1802d405e66fedbf2bc296517b8271e94df490e9c",
+    "id": "에반-special-ring-2794c6fdb852",
+    "profileHash": "2794c6fdb852b87f64f75fa92c87d4b3da69b2fdd3c17279104cc0ea95c641a3",
     "sampleCount": 5,
     "basis": "battle-practice-restraint-timeline",
     "damageShareByDuration": {
-      "9": 0.1767822109027,
-      "11": 0.2001770548811,
-      "13": 0.2212840735969,
-      "15": 0.2373123345332,
-      "20": 0.2644735388845
+      "9": 0.161715063769,
+      "11": 0.1925876437673,
+      "13": 0.2132324242007,
+      "15": 0.2269382452134,
+      "20": 0.2540624375564
     }
   },
   "엔젤릭버스터": {
