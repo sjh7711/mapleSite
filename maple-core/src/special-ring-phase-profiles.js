@@ -144,16 +144,16 @@ const profiles = {
     }
   },
   "미하일": {
-    "id": "미하일-special-ring-11fc55e1e8ca",
-    "profileHash": "11fc55e1e8ca8055b3938fb6ce489b105b397637fb979f51edbda1eb7f7eeb65",
+    "id": "미하일-special-ring-beb08632d823",
+    "profileHash": "beb08632d82368a83a502537351f4d98d1526a78b90af5231480abf682fa06a3",
     "sampleCount": 5,
     "basis": "battle-practice-restraint-timeline",
     "damageShareByDuration": {
-      "9": 0.162198188578,
-      "11": 0.195828157708,
-      "13": 0.228024544839,
-      "15": 0.2545905408,
-      "20": 0.318250677969
+      "9": 0.184705983771,
+      "11": 0.2150709479887,
+      "13": 0.2526679298611,
+      "15": 0.2801503479196,
+      "20": 0.3503242216672
     }
   },
   "바이퍼": {
@@ -196,16 +196,16 @@ const profiles = {
     }
   },
   "블래스터": {
-    "id": "블래스터-special-ring-c0aac1d0e9a7",
-    "profileHash": "c0aac1d0e9a76dcd54fe9285f4a026f25f18affe24074307687c491b4fe6ae29",
+    "id": "블래스터-special-ring-dff264b26327",
+    "profileHash": "dff264b26327c3ddbcfb6ce9f43ee433f35b54f9f17fad7e0b7d9f7937182828",
     "sampleCount": 5,
     "basis": "battle-practice-restraint-timeline",
     "damageShareByDuration": {
-      "9": 0.197475062621,
-      "11": 0.216775804191,
-      "13": 0.234035069017,
-      "15": 0.25434499358,
-      "20": 0.306018696671
+      "9": 0.2090257613859,
+      "11": 0.2361694298429,
+      "13": 0.2623349964069,
+      "15": 0.2881752892213,
+      "20": 0.3439643645833
     }
   },
   "비숍": {
@@ -248,16 +248,16 @@ const profiles = {
     }
   },
   "스트라이커": {
-    "id": "스트라이커-special-ring-a697768450d5",
-    "profileHash": "a697768450d5f1dcfd0cd520a32e69a65d10972d940ae4d751e0b44afdb62811",
+    "id": "스트라이커-special-ring-f0883d1fc7cb",
+    "profileHash": "f0883d1fc7cbb81a57e30a5dcbaebaf7343e7115e2e49587f7784806241b6e1b",
     "sampleCount": 5,
     "basis": "battle-practice-restraint-timeline",
     "damageShareByDuration": {
-      "9": 0.112408095183,
-      "11": 0.125882899681,
-      "13": 0.140717909221,
-      "15": 0.15533692106,
-      "20": 0.184204170553
+      "9": 0.118710871285,
+      "11": 0.1348724455366,
+      "13": 0.1500196042639,
+      "15": 0.1663475282007,
+      "20": 0.1982855547088
     }
   },
   "신궁": {
@@ -326,29 +326,29 @@ const profiles = {
     }
   },
   "아크메이지(썬,콜)": {
-    "id": "아크메이지(썬,콜)-special-ring-fe6bc82d3975",
-    "profileHash": "fe6bc82d397539e9e58c40c5dcd84553f565455ef0b24605516ca5d42bb2338b",
+    "id": "아크메이지(썬,콜)-special-ring-a45b7ab72c9e",
+    "profileHash": "a45b7ab72c9e4b186112504a3e25ed2067843e9ce5923e085a0a945730e2d1ea",
     "sampleCount": 5,
     "basis": "battle-practice-restraint-timeline",
     "damageShareByDuration": {
-      "9": 0.187758103955,
-      "11": 0.205721143003,
-      "13": 0.222131023202,
-      "15": 0.239937370607,
-      "20": 0.291579297344
+      "9": 0.2303640685333,
+      "11": 0.2517212196248,
+      "13": 0.270734125069,
+      "15": 0.2898145213321,
+      "20": 0.3366347575898
     }
   },
   "에반": {
-    "id": "에반-special-ring-8fcb4d0e785c",
-    "profileHash": "8fcb4d0e785c3b2179411d09d291b181b2304acf775fe18e17a14c718065251e",
+    "id": "에반-special-ring-1373d7a0422b",
+    "profileHash": "1373d7a0422b02bd6f6df6a1802d405e66fedbf2bc296517b8271e94df490e9c",
     "sampleCount": 5,
     "basis": "battle-practice-restraint-timeline",
     "damageShareByDuration": {
-      "9": 0.128769035355,
-      "11": 0.154244731622,
-      "13": 0.172052126671,
-      "15": 0.185847802556,
-      "20": 0.227687856784
+      "9": 0.1767822109027,
+      "11": 0.2001770548811,
+      "13": 0.2212840735969,
+      "15": 0.2373123345332,
+      "20": 0.2644735388845
     }
   },
   "엔젤릭버스터": {
@@ -508,16 +508,16 @@ const profiles = {
     }
   },
   "캡틴": {
-    "id": "캡틴-special-ring-a6446234bb42",
-    "profileHash": "a6446234bb42e7b66f3630452976cd8fb5aee757094482b74b7f0c98a248849e",
+    "id": "캡틴-special-ring-5acc07c5cd79",
+    "profileHash": "5acc07c5cd795a8d99df746f84eed08d3ee807d5e9208e58ce96fb2cc9e62d8d",
     "sampleCount": 5,
     "basis": "battle-practice-restraint-timeline",
     "damageShareByDuration": {
-      "9": 0.172924307626,
-      "11": 0.192517982267,
-      "13": 0.210655585436,
-      "15": 0.229065018812,
-      "20": 0.262916893922
+      "9": 0.1915437483981,
+      "11": 0.211089513133,
+      "13": 0.233780162248,
+      "15": 0.2546821136839,
+      "20": 0.2888728120954
     }
   },
   "키네시스": {
@@ -586,16 +586,16 @@ const profiles = {
     }
   },
   "호영": {
-    "id": "호영-special-ring-df242d2bc44b",
-    "profileHash": "df242d2bc44b1ffc7b144412e0efc18948694b17065e9ef3acb9d33e780b5bf8",
+    "id": "호영-special-ring-a5254692a31b",
+    "profileHash": "a5254692a31b76025edc8335ca0e39d905fc7d6237d9fd14332b73497f4d05a3",
     "sampleCount": 5,
     "basis": "battle-practice-restraint-timeline",
     "damageShareByDuration": {
-      "9": 0.123815755137,
-      "11": 0.140905593432,
-      "13": 0.159532974591,
-      "15": 0.178604184304,
-      "20": 0.222595287027
+      "9": 0.2006707113184,
+      "11": 0.2385102639147,
+      "13": 0.2748762916736,
+      "15": 0.3130786132175,
+      "20": 0.4063234429253
     }
   },
   "히어로": {

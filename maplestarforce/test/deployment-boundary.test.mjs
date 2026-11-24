@@ -132,6 +132,7 @@ test("배포용 연무장 프로필은 레테를 포함한 47직업만 계산식
     "skillShares",
   ]);
   const allowedSkillFields = new Set([
+    "hexaReferenceFinalDamagePercent",
     "ignoreDefenseSources",
     "source",
     "weight",
@@ -158,6 +159,13 @@ test("배포용 연무장 프로필은 레테를 포함한 47직업만 계산식
       );
       assert.ok(skill.source, `${characterClass}: 빈 스킬명`);
       assert.ok(skill.weight > 0, `${characterClass}/${skill.source}: 잘못된 점유율`);
+      if (skill.hexaReferenceFinalDamagePercent !== undefined) {
+        assert.ok(
+          Number.isFinite(skill.hexaReferenceFinalDamagePercent) &&
+            skill.hexaReferenceFinalDamagePercent > 0,
+          `${characterClass}/${skill.source}: 잘못된 HEXA 기준 강화량`,
+        );
+      }
     }
   }
 });

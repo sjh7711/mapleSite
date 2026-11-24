@@ -8,6 +8,7 @@ import {
   resolveCharacterExternalBonuses,
   resolveClassAlwaysOnCombatAdjustment,
   resolveClassDamageChannels,
+  selectedBuffDurationPercent,
 } from "maple-core/stat-efficiency";
 import {
   composeCombatModel,
@@ -619,6 +620,11 @@ function calculateXenon(
   const activeSnapshot = input.activeSnapshot
     ? resolvedSnapshot({ ...input, snapshot: input.activeSnapshot })
     : snapshot;
+  const buffDurationPercent = selectedBuffDurationPercent(
+    stats["버프 지속시간"],
+    activeSnapshot,
+    snapshot,
+  );
   const characterLevel = number(input.character.character_level);
   const selectedPresetMode = input.presetSelection?.mode === "auto"
     ? "auto"
@@ -696,10 +702,12 @@ function calculateXenon(
       mapleWarriorPercent: 15,
       characterClass: text(input.character.character_class),
       equipmentData: snapshot.equipmentData,
+      buffDurationPercent,
     },
   );
   const conditionalLinks = calculateConditionalLinkCycleBonuses(
     snapshot.linkSkillData,
+    buffDurationPercent,
   );
   const guildNoblesse = calculateGuildNoblesseBonuses(snapshot.guildData);
   const doping = object(input.doping);
@@ -981,6 +989,7 @@ function calculateXenon(
       characterClass: text(input.character.character_class),
       skillData: snapshot.skillData,
       vMatrixData: snapshot.vMatrixData,
+      hexaMatrixData: snapshot.hexaMatrixData,
     }),
   });
   const attackPercent = combatModel.totals.attackPercent;

@@ -1527,132 +1527,129 @@ const profiles = {
     ]
   },
   "미하일": {
-    "id": "미하일-raw-cycle-8c09b8103df2",
-    "skillProfileHash": "8c09b8103df2d6d6e82144de061a6d5e08cdcefbae1535d108645ed7b3032603",
-    "profileHash": "8c09b8103df2d6d6e82144de061a6d5e08cdcefbae1535d108645ed7b3032603",
+    "id": "미하일-raw-cycle-8a0548dea9dd",
+    "skillProfileHash": "35b76f63d6f50acfdd6f19f02dd54da757b7c5f25d9fc52b5991d6a46dbb29af",
+    "profileHash": "8a0548dea9dd63ba6414bb497b32ca01d5a1040c9aedc77c57379d0fbe37f5b2",
     "sampleCount": 5,
     "enemyDefense": 3.8,
     "shareBasis": "pre-defense",
     "skillShares": [
       {
         "source": "샤이닝 크로스-어썰트 VI",
-        "weight": 0.1485955161603,
+        "weight": 0.1641265051916,
         "ignoreDefenseSources": [
-          40
+          20
         ]
       },
       {
-        "source": "나이트 임모탈스",
-        "weight": 0.09677846984046,
+        "source": "오펜시브 디펜스 VI",
+        "weight": 0.1116983571473,
         "ignoreDefenseSources": [
-          100
+          20
         ]
       },
       {
-        "source": "로얄 가드 VI",
-        "weight": 0.09397270161558,
+        "source": "시그너스 팔랑크스 VI",
+        "weight": 0.09376054505369
+      },
+      {
+        "source": "파이널 어택 VI",
+        "weight": 0.0799736637865,
         "ignoreDefenseSources": [
-          40
+          20
+        ]
+      },
+      {
+        "source": "데들리 차지 VI",
+        "weight": 0.07814070275545,
+        "ignoreDefenseSources": [
+          20
         ]
       },
       {
         "source": "소울 라이트 슬래시",
-        "weight": 0.06908673049045
-      },
-      {
-        "source": "시그너스 팔랑크스",
-        "weight": 0.06464958647604
+        "weight": 0.07803568180569
       },
       {
         "source": "클라우 솔라스",
-        "weight": 0.06419931615082
+        "weight": 0.07758276116753,
+        "hexaReferenceFinalDamagePercent": 60
       },
       {
-        "source": "데들리 차지 VI",
-        "weight": 0.05389052597208,
+        "source": "소울 마제스티 VI",
+        "weight": 0.05957692138071,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
         "source": "듀란달",
-        "weight": 0.04997740234523,
+        "weight": 0.0468066989802,
         "ignoreDefenseSources": [
-          50
+          20,
+          30
         ]
       },
       {
-        "source": "파이널 어택 VI",
-        "weight": 0.0453507031906,
-        "ignoreDefenseSources": [
-          20
-        ]
-      },
-      {
-        "source": "라이트 포스레이",
-        "weight": 0.04429855059864
-      },
-      {
-        "source": "오펜시브 디펜스 VI",
-        "weight": 0.04062675060399,
+        "source": "솔 헤카테",
+        "weight": 0.04160225234647,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
         "source": "소드 오브 소울 라이트",
-        "weight": 0.04006065340198
+        "weight": 0.03763164702809
       },
       {
-        "source": "솔 헤카테",
-        "weight": 0.03882055987212,
-        "ignoreDefenseSources": [
-          40
-        ]
+        "source": "라이트 포스레이",
+        "weight": 0.03267245143626
       },
       {
         "source": "라이트 오브 커리지",
-        "weight": 0.03573479057358
+        "weight": 0.02577177827468
       },
       {
-        "source": "소울 마제스티 VI",
-        "weight": 0.03252651970594,
-        "ignoreDefenseSources": [
-          20
-        ]
+        "source": "레디언스 오브 발러",
+        "weight": 0.02521014485063
       },
       {
-        "source": "인스톨 실드 VI",
-        "weight": 0.02485133137119,
+        "source": "나이트 임모탈스",
+        "weight": 0.01883582961105,
         "ignoreDefenseSources": [
-          20
-        ]
-      },
-      {
-        "source": "솔 헤카테 : 스틱스",
-        "weight": 0.0181517062139,
-        "ignoreDefenseSources": [
-          40
+          10,
+          20,
+          60
         ]
       },
       {
         "source": "오라 웨폰",
-        "weight": 0.01598925003597
-      },
-      {
-        "source": "크레스트 오브 더 솔라",
-        "weight": 0.008880174929087
-      },
-      {
-        "source": "스파이더 인 미러",
-        "weight": 0.008166170469587
+        "weight": 0.01829726543199,
+        "ignoreDefenseSources": [
+          16
+        ]
       },
       {
         "source": "솔 헤카테 : 플레게톤",
-        "weight": 0.005392589982509,
+        "weight": 0.008327562676643,
         "ignoreDefenseSources": [
-          40
+          20
         ]
+      },
+      {
+        "source": "초월 : 불굴의 결의",
+        "weight": 0.0009217889749434
+      },
+      {
+        "source": "솔 헤카테 : 스틱스",
+        "weight": 0.000537650542722,
+        "ignoreDefenseSources": [
+          20
+        ]
+      },
+      {
+        "source": "창조의 아이온",
+        "weight": 0.0004897915578729
       }
     ]
   },
@@ -2064,149 +2061,153 @@ const profiles = {
     ]
   },
   "블래스터": {
-    "id": "블래스터-raw-cycle-604bcffcc24a",
-    "skillProfileHash": "604bcffcc24a9cc9481dbe1e548c1571182b56028aea627176c904dbef09237e",
-    "profileHash": "604bcffcc24a9cc9481dbe1e548c1571182b56028aea627176c904dbef09237e",
+    "id": "블래스터-raw-cycle-6bc9244cff70",
+    "skillProfileHash": "50a46717830799e0140167bec394d021375193c45d61b5a2dca9ddca310dd6ef",
+    "profileHash": "6bc9244cff708e924e89b607e7b8fdd4823f6058763297e454adda45298bc1eb",
     "sampleCount": 5,
     "enemyDefense": 3.8,
     "shareBasis": "pre-defense",
     "skillShares": [
       {
         "source": "벙커 버스터",
-        "weight": 0.1197152432188,
+        "weight": 0.1187195342918,
         "ignoreDefenseSources": [
           100
-        ]
+        ],
+        "hexaReferenceFinalDamagePercent": 60
       },
       {
         "source": "릴리즈 파일 벙커 VI",
-        "weight": 0.1130719694304,
+        "weight": 0.1035038083344,
         "ignoreDefenseSources": [
-          100
+          20,
+          80
         ]
       },
       {
         "source": "발칸 펀치",
-        "weight": 0.08447050444208
-      },
-      {
-        "source": "더블 팡 VI",
-        "weight": 0.07610811140535,
-        "ignoreDefenseSources": [
-          40
-        ]
+        "weight": 0.0946923538814,
+        "hexaReferenceFinalDamagePercent": 60
       },
       {
         "source": "리볼빙 캐논 VI",
-        "weight": 0.07566495035179,
+        "weight": 0.08679247459345,
+        "ignoreDefenseSources": [
+          20
+        ]
+      },
+      {
+        "source": "더블 팡 VI",
+        "weight": 0.08490559513873,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
         "source": "매그넘 펀치 VI",
-        "weight": 0.0678360864514,
-        "ignoreDefenseSources": [
-          40
-        ]
-      },
-      {
-        "source": "버닝 브레이커",
-        "weight": 0.05861022146337,
-        "ignoreDefenseSources": [
-          40
-        ]
-      },
-      {
-        "source": "뱅가드 임팩트",
-        "weight": 0.05833804867322,
-        "ignoreDefenseSources": [
-          100
-        ]
-      },
-      {
-        "source": "리볼빙 캐논 마스터리 VI",
-        "weight": 0.05246427168639,
+        "weight": 0.07760065952388,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
-        "source": "파이널 디스트로이어",
-        "weight": 0.04315444330325,
+        "source": "버닝 브레이커",
+        "weight": 0.06133702290119,
         "ignoreDefenseSources": [
-          50
+          100
+        ],
+        "hexaReferenceFinalDamagePercent": 60
+      },
+      {
+        "source": "리볼빙 캐논 마스터리 VI",
+        "weight": 0.0591916863539,
+        "ignoreDefenseSources": [
+          20
         ]
       },
       {
         "source": "레지스탕스 라인 인팬트리 VI",
-        "weight": 0.03855973349412
+        "weight": 0.04962522198394
       },
       {
-        "source": "버스트 파일 벙커",
-        "weight": 0.03762538468152,
+        "source": "파이널 디스트로이어",
+        "weight": 0.04939094549093,
         "ignoreDefenseSources": [
-          100
+          20,
+          30
+        ]
+      },
+      {
+        "source": "솔 헤카테",
+        "weight": 0.03819118765327,
+        "ignoreDefenseSources": [
+          20
         ]
       },
       {
         "source": "애프터이미지 쇼크",
-        "weight": 0.03542305302747
+        "weight": 0.03803894337601,
+        "hexaReferenceFinalDamagePercent": 50.67297092591
       },
       {
-        "source": "솔 헤카테",
-        "weight": 0.03159511291558,
-        "ignoreDefenseSources": [
-          40
-        ]
-      },
-      {
-        "source": "블래스트 해머 스매시 VI",
-        "weight": 0.02837454599975,
-        "ignoreDefenseSources": [
-          40
-        ]
+        "source": "버스트 파일 벙커",
+        "weight": 0.03734186995971
       },
       {
         "source": "오버히트 펀치",
-        "weight": 0.02375446274286
+        "weight": 0.03592724066298
       },
       {
-        "source": "솔 헤카테 : 스틱스",
-        "weight": 0.01950415612294,
+        "source": "블래스트 해머 스매시 VI",
+        "weight": 0.02250219702707,
         "ignoreDefenseSources": [
-          40
+          20
+        ]
+      },
+      {
+        "source": "뱅가드 임팩트",
+        "weight": 0.0200642883106,
+        "ignoreDefenseSources": [
+          10,
+          20,
+          60
         ]
       },
       {
         "source": "오라 웨폰",
-        "weight": 0.009944537764511
-      },
-      {
-        "source": "스파이더 인 미러",
-        "weight": 0.007815524624491
-      },
-      {
-        "source": "크레스트 오브 더 솔라",
-        "weight": 0.007627508563433
+        "weight": 0.01085794068576,
+        "ignoreDefenseSources": [
+          16
+        ]
       },
       {
         "source": "솔 헤카테 : 플레게톤",
-        "weight": 0.007123936215184,
+        "weight": 0.01021452072312,
         "ignoreDefenseSources": [
-          40
+          20
         ]
       },
       {
-        "source": "레지스탕스 라인 인팬트리",
-        "weight": 0.002893560060384
+        "source": "초월 : 불굴의 결의",
+        "weight": 0.0004249381836934
       },
       {
-        "source": "쇼크 웨이브 펀치 VI",
-        "weight": 0.0003246333617287,
+        "source": "허리케인 믹서 VI",
+        "weight": 0.0003006988355669,
         "ignoreDefenseSources": [
-          40
+          20
         ]
+      },
+      {
+        "source": "솔 헤카테 : 스틱스",
+        "weight": 0.0002750904987002,
+        "ignoreDefenseSources": [
+          20
+        ]
+      },
+      {
+        "source": "에르다 노바",
+        "weight": 0.0001017815898384
       }
     ]
   },
@@ -2615,144 +2616,131 @@ const profiles = {
     ]
   },
   "스트라이커": {
-    "id": "스트라이커-raw-cycle-4cf3b1a12522",
-    "skillProfileHash": "4cf3b1a125224823e8feea38361d970c8b5beaca9487f7b6e125a803ad8d7270",
-    "profileHash": "4cf3b1a125224823e8feea38361d970c8b5beaca9487f7b6e125a803ad8d7270",
+    "id": "스트라이커-raw-cycle-1ee79e46b552",
+    "skillProfileHash": "134d7faefe0c82ac2acc954826a2b763db837a33b640b2f00f93c06a98e42fae",
+    "profileHash": "1ee79e46b5525e0625b7329172fcd8d53515f69789c86479523074fb00913556",
     "sampleCount": 5,
     "enemyDefense": 3.8,
     "shareBasis": "pre-defense",
     "skillShares": [
       {
         "source": "섬멸 VI",
-        "weight": 0.1562638229862,
-        "ignoreDefenseSources": [
-          40
-        ]
-      },
-      {
-        "source": "태풍 VI",
-        "weight": 0.09522397213806
-      },
-      {
-        "source": "해파 VI",
-        "weight": 0.09425661562751,
+        "weight": 0.1706181067365,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
-        "source": "벽력 VI",
-        "weight": 0.08214876419336,
+        "source": "태풍 VI",
+        "weight": 0.1152788113188
+      },
+      {
+        "source": "낙뢰",
+        "weight": 0.08784747076853,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
         "source": "뇌신창격",
-        "weight": 0.07713702442675
-      },
-      {
-        "source": "낙뢰",
-        "weight": 0.07387875160606,
-        "ignoreDefenseSources": [
-          40
-        ]
+        "weight": 0.0834774522435,
+        "hexaReferenceFinalDamagePercent": 60
       },
       {
         "source": "교아탄",
-        "weight": 0.06848834011497
+        "weight": 0.07408599387055,
+        "hexaReferenceFinalDamagePercent": 60
       },
       {
-        "source": "질도섬멸",
-        "weight": 0.06637748379573,
+        "source": "벽력 VI",
+        "weight": 0.07190797905029,
         "ignoreDefenseSources": [
-          100
+          20
         ]
       },
       {
+        "source": "시그너스 팔랑크스 VI",
+        "weight": 0.06904288554624
+      },
+      {
         "source": "창뇌연격",
-        "weight": 0.05897112464569,
+        "weight": 0.06678866026599,
+        "hexaReferenceFinalDamagePercent": 60
+      },
+      {
+        "source": "해파 VI",
+        "weight": 0.06628384885915,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
         "source": "뇌명벽해파",
-        "weight": 0.05529082814437,
+        "weight": 0.06090660744256,
         "ignoreDefenseSources": [
-          70
+          20,
+          30
         ]
-      },
-      {
-        "source": "시그너스 팔랑크스 VI",
-        "weight": 0.03647821154667
       },
       {
         "source": "솔 헤카테",
-        "weight": 0.036010504064,
-        "ignoreDefenseSources": [
-          40
-        ]
-      },
-      {
-        "source": "신뇌합일",
-        "weight": 0.02932361686436
-      },
-      {
-        "source": "솔 헤카테 : 스틱스",
-        "weight": 0.01909585461306,
-        "ignoreDefenseSources": [
-          40
-        ]
-      },
-      {
-        "source": "시그너스 팔랑크스",
-        "weight": 0.01541618144018
-      },
-      {
-        "source": "해황폭쇄",
-        "weight": 0.009852627615022
-      },
-      {
-        "source": "스파이더 인 미러",
-        "weight": 0.007171578676223
-      },
-      {
-        "source": "크레스트 오브 더 솔라",
-        "weight": 0.007015581641449
-      },
-      {
-        "source": "솔 헤카테 : 플레게톤",
-        "weight": 0.006719836307667,
-        "ignoreDefenseSources": [
-          40
-        ]
-      },
-      {
-        "source": "해신강림 VI",
-        "weight": 0.003798851931047,
+        "weight": 0.0371867561045,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
-        "source": "파도",
-        "weight": 0.0004004478972916,
+        "source": "해황폭쇄",
+        "weight": 0.03423442128745
+      },
+      {
+        "source": "신뇌합일",
+        "weight": 0.0313889966332
+      },
+      {
+        "source": "질도섬멸",
+        "weight": 0.01845902102551,
         "ignoreDefenseSources": [
-          100
+          10,
+          20,
+          60
+        ]
+      },
+      {
+        "source": "솔 헤카테 : 플레게톤",
+        "weight": 0.007682558153944,
+        "ignoreDefenseSources": [
+          20
+        ]
+      },
+      {
+        "source": "해신강림 VI",
+        "weight": 0.003428500096801,
+        "ignoreDefenseSources": [
+          20
+        ]
+      },
+      {
+        "source": "솔 헤카테 : 스틱스",
+        "weight": 0.0005430833441594,
+        "ignoreDefenseSources": [
+          20
         ]
       },
       {
         "source": "초월 : 불굴의 결의",
-        "weight": 0.0003471243116828
-      },
-      {
-        "source": "창조의 아이온",
-        "weight": 0.0001945029799321
+        "weight": 0.000486047510929
       },
       {
         "source": "에르다 노바",
-        "weight": 0.0001383524327566
+        "weight": 0.0001973271086159
+      },
+      {
+        "source": "파도",
+        "weight": 0.0001554726327384,
+        "ignoreDefenseSources": [
+          20
+        ]
       }
     ]
   },
@@ -3565,330 +3553,282 @@ const profiles = {
     ]
   },
   "아크메이지(썬,콜)": {
-    "id": "아크메이지(썬,콜)-raw-cycle-e37f826e0d73",
-    "skillProfileHash": "e37f826e0d734bc65fefcc207066383338f0a20dd074675ed479c1fc9f764cf6",
-    "profileHash": "e37f826e0d734bc65fefcc207066383338f0a20dd074675ed479c1fc9f764cf6",
+    "id": "아크메이지(썬,콜)-raw-cycle-19de4dd83beb",
+    "skillProfileHash": "c87d27789860da29d7e6f92670a8a6399ac42e9884264be561c8b9e689acd37b",
+    "profileHash": "19de4dd83beb07b4ff5ea047af9232f40cc7dde281b3a5d2dab3c6282a87c515",
     "sampleCount": 5,
     "enemyDefense": 3.8,
     "shareBasis": "pre-defense",
     "skillShares": [
       {
         "source": "체인 라이트닝 VI",
-        "weight": 0.2010227898495,
-        "ignoreDefenseSources": [
-          20
-        ]
-      },
-      {
-        "source": "파라볼릭 볼트",
-        "weight": 0.09248561026995,
-        "ignoreDefenseSources": [
-          40
-        ]
-      },
-      {
-        "source": "크라이오 쇼크",
-        "weight": 0.08431522717924,
+        "weight": 0.217526897313,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
         "source": "썬더 브레이크",
-        "weight": 0.07761541753026
+        "weight": 0.1012268455852,
+        "hexaReferenceFinalDamagePercent": 60
       },
       {
-        "source": "주피터 썬더",
-        "weight": 0.06825930623295,
-        "ignoreDefenseSources": [
-          50
-        ]
+        "source": "크라이오 쇼크",
+        "weight": 0.09769840390772
       },
       {
-        "source": "라이트닝 스피어 VI",
-        "weight": 0.06529153905302,
+        "source": "블리자드 VI",
+        "weight": 0.08916467188889,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
         "source": "스피릿 오브 스노우",
-        "weight": 0.05365787862429
+        "weight": 0.07581985141038,
+        "hexaReferenceFinalDamagePercent": 60
       },
       {
-        "source": "프로스트 아크",
-        "weight": 0.05273825125144
-      },
-      {
-        "source": "썬더 스피어 VI",
-        "weight": 0.05181010927601,
+        "source": "라이트닝 스피어 VI",
+        "weight": 0.07337298717774,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
-        "source": "블리자드 VI",
-        "weight": 0.05000935332469,
+        "source": "주피터 썬더",
+        "weight": 0.07253932802381,
+        "hexaReferenceFinalDamagePercent": 60
+      },
+      {
+        "source": "프로스트 아크",
+        "weight": 0.05375350460252,
+        "hexaReferenceFinalDamagePercent": 60
+      },
+      {
+        "source": "프로즌 라이트닝",
+        "weight": 0.05330689800221,
+        "ignoreDefenseSources": [
+          20,
+          30
+        ]
+      },
+      {
+        "source": "프로즌 오브 VI",
+        "weight": 0.05280162732182,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
         "source": "솔 헤카테",
-        "weight": 0.04743737953329,
+        "weight": 0.04177378208933,
         "ignoreDefenseSources": [
-          40
+          20
         ]
       },
       {
-        "source": "프로즌 라이트닝",
-        "weight": 0.04743084024005,
+        "source": "서브제로 퍼미네이션",
+        "weight": 0.03361080092586
+      },
+      {
+        "source": "파라볼릭 볼트",
+        "weight": 0.02041509536169,
         "ignoreDefenseSources": [
-          50
+          10,
+          20,
+          60
         ]
       },
       {
-        "source": "프로즌 오브 VI",
-        "weight": 0.04643572994847,
+        "source": "솔 헤카테 : 플레게톤",
+        "weight": 0.008881369508205,
+        "ignoreDefenseSources": [
+          20
+        ]
+      },
+      {
+        "source": "엘퀴네스 VI",
+        "weight": 0.00748580022245,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
         "source": "솔 헤카테 : 스틱스",
-        "weight": 0.02345113052847,
-        "ignoreDefenseSources": [
-          40
-        ]
-      },
-      {
-        "source": "스파이더 인 미러",
-        "weight": 0.009648654866235
-      },
-      {
-        "source": "크레스트 오브 더 솔라",
-        "weight": 0.009585937768734
-      },
-      {
-        "source": "엘퀴네스 VI",
-        "weight": 0.007217354637749,
+        "weight": 0.0004838790780501,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
-        "source": "솔 헤카테 : 플레게톤",
-        "weight": 0.006433540833753,
-        "ignoreDefenseSources": [
-          40
-        ]
-      },
-      {
-        "source": "서브제로 퍼미네이션",
-        "weight": 0.004278942930318
-      },
-      {
-        "source": "텔레포트 마스터리",
-        "weight": 0.0004894529602088
-      },
-      {
-        "source": "초월 : 불굴의 결의",
-        "weight": 0.0002571491046387
-      },
-      {
-        "source": "창조의 아이온",
-        "weight": 0.0001284040567346
+        "source": "에르다 노바",
+        "weight": 0.0001382575811295
       }
     ]
   },
   "에반": {
-    "id": "에반-raw-cycle-fdcd484126d7",
-    "skillProfileHash": "fdcd484126d77a9280eb941cad4a45dbf4658e6652f1f9fb01ace962c7b55ee0",
-    "profileHash": "fdcd484126d77a9280eb941cad4a45dbf4658e6652f1f9fb01ace962c7b55ee0",
+    "id": "에반-raw-cycle-bb3b0620a1df",
+    "skillProfileHash": "1034e2e64e7ec5bec70e5c449f222dfaf1c79d0eb142cc85c88c56f93a6371ff",
+    "profileHash": "bb3b0620a1df5a0d234a7752f8744d7ec39854455e11ebd2f2e72416bcbbd5e8",
     "sampleCount": 5,
     "enemyDefense": 3.8,
     "shareBasis": "pre-defense",
     "skillShares": [
       {
         "source": "서클 오브 마나 VI",
-        "weight": 0.1205960516046,
+        "weight": 0.1273087510343,
         "ignoreDefenseSources": [
           20
-        ]
-      },
-      {
-        "source": "다이브 오브 어스 VI",
-        "weight": 0.102022606094
-      },
-      {
-        "source": "유니온 드라이브",
-        "weight": 0.0892668664099,
-        "ignoreDefenseSources": [
-          100
         ]
       },
       {
         "source": "스위프트 오브 썬더 VI",
-        "weight": 0.08338774727198
+        "weight": 0.1130763188597
       },
       {
-        "source": "조디악 레이",
-        "weight": 0.08276677170624,
-        "ignoreDefenseSources": [
-          100
-        ]
+        "source": "다이브 오브 어스 VI",
+        "weight": 0.1125335273354
       },
       {
         "source": "드래곤 브레이크",
-        "weight": 0.08202873162044
+        "weight": 0.09127492641274
+      },
+      {
+        "source": "조디악 레이",
+        "weight": 0.08481373882999,
+        "ignoreDefenseSources": [
+          100
+        ],
+        "hexaReferenceFinalDamagePercent": 60
       },
       {
         "source": "임페리얼 브레스",
-        "weight": 0.0798561223653
+        "weight": 0.05998322463918
       },
       {
-        "source": "스파이럴 오브 마나",
-        "weight": 0.06749161988946,
-        "ignoreDefenseSources": [
-          100
-        ]
+        "source": "엘리멘탈 블래스트",
+        "weight": 0.05563941414847,
+        "hexaReferenceFinalDamagePercent": 60
       },
       {
         "source": "조디악 버스트",
-        "weight": 0.05539504574422,
+        "weight": 0.0543985175973,
         "ignoreDefenseSources": [
-          50
+          20,
+          30
         ]
       },
       {
+        "source": "버티컬 피니셔",
+        "weight": 0.05435172396624
+      },
+      {
+        "source": "스파이럴 오브 마나",
+        "weight": 0.0462234513911,
+        "hexaReferenceFinalDamagePercent": 60
+      },
+      {
         "source": "솔 헤카테",
-        "weight": 0.04310637305031,
+        "weight": 0.04224737219495,
         "ignoreDefenseSources": [
-          40
+          20
         ]
       },
       {
         "source": "마법 잔해 VI",
-        "weight": 0.02859186513878,
+        "weight": 0.03117691264695,
         "ignoreDefenseSources": [
           20
-        ]
-      },
-      {
-        "source": "엘리멘탈 블래스트",
-        "weight": 0.02715714306301,
-        "ignoreDefenseSources": [
-          100
-        ]
-      },
-      {
-        "source": "솔 헤카테 : 스틱스",
-        "weight": 0.02267327019836,
-        "ignoreDefenseSources": [
-          40
         ]
       },
       {
         "source": "브레스 오브 윈드 VI",
-        "weight": 0.02251721091076
+        "weight": 0.02909835222824
+      },
+      {
+        "source": "드래곤 소어",
+        "weight": 0.02781416831239
       },
       {
         "source": "드래곤 스파킹 VI",
-        "weight": 0.02183155460859,
+        "weight": 0.02044288018681,
         "ignoreDefenseSources": [
           20
+        ]
+      },
+      {
+        "source": "유니온 드라이브",
+        "weight": 0.01981003697835,
+        "ignoreDefenseSources": [
+          10,
+          20,
+          60
         ]
       },
       {
         "source": "드래곤 스위프트 VI",
-        "weight": 0.009154044377689,
+        "weight": 0.01126259087768,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
-        "source": "스파이더 인 미러",
-        "weight": 0.009114474528485
-      },
-      {
-        "source": "크레스트 오브 더 솔라",
-        "weight": 0.009082066900353
-      },
-      {
-        "source": "버티컬 피니셔",
-        "weight": 0.00832837880606
-      },
-      {
         "source": "솔 헤카테 : 플레게톤",
-        "weight": 0.006341027028249,
-        "ignoreDefenseSources": [
-          40
-        ]
-      },
-      {
-        "source": "브레스-돌아와!",
-        "weight": 0.0058446343037,
+        "weight": 0.00795780311159,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
         "source": "드래곤 브레스 VI",
-        "weight": 0.004748987395317,
-        "ignoreDefenseSources": [
-          20
-        ]
-      },
-      {
-        "source": "드래곤 소어",
-        "weight": 0.004418294368502
-      },
-      {
-        "source": "브레이크-돌아와!",
-        "weight": 0.004321345225372
-      },
-      {
-        "source": "드래곤 다이브 VI",
-        "weight": 0.003534533706421,
+        "weight": 0.004694831703693,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
         "source": "서클 오브 어스 VI",
-        "weight": 0.002325854130047,
+        "weight": 0.002934107283313,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
         "source": "서클 오브 윈드 VI",
-        "weight": 0.001213486657415,
+        "weight": 0.001088908687009,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
         "source": "서클 오브 썬더 VI",
-        "weight": 0.001026382723109,
+        "weight": 0.0008818461258424,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
-        "source": "서먼 오닉스 드래곤",
-        "weight": 0.0008149366634489,
+        "source": "드래곤 다이브 VI",
+        "weight": 0.0003914137169131,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
-        "source": "소어-돌아와!",
-        "weight": 0.000612386669674
+        "source": "창조의 아이온",
+        "weight": 0.0002413088884975
       },
       {
-        "source": "스위프트 오브 윈드 VI",
-        "weight": 0.000430186840216
+        "source": "솔 헤카테 : 스틱스",
+        "weight": 0.0002373450543833,
+        "ignoreDefenseSources": [
+          20
+        ]
+      },
+      {
+        "source": "초월 : 불굴의 결의",
+        "weight": 0.0001165277889286
       }
     ]
   },
@@ -4020,150 +3960,137 @@ const profiles = {
     ]
   },
   "와일드헌터": {
-    "id": "와일드헌터-raw-cycle-e3ad01eafda2",
-    "skillProfileHash": "e3ad01eafda25b50fba5598669bee0252334015dec2e0fa380a723278a8579de",
-    "profileHash": "e3ad01eafda25b50fba5598669bee0252334015dec2e0fa380a723278a8579de",
+    "id": "와일드헌터-raw-cycle-ad28f67f061b",
+    "skillProfileHash": "632b64ae7e38c1a8be926dfec6742f8dcd19499c59f19c7778485e27e77220a1",
+    "profileHash": "ad28f67f061b43ee8cbefe643171ae1de53bfa88275b7b2bbf95b8fe8ad3deb7",
     "sampleCount": 5,
     "enemyDefense": 3.8,
     "shareBasis": "pre-defense",
     "skillShares": [
       {
         "source": "와일드 발칸 : 에이펙스 VI",
-        "weight": 0.1383911464062,
+        "weight": 0.1501374988474,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
         "source": "커맨드 : 프레데터스 아이",
-        "weight": 0.08270209025905
+        "weight": 0.09095968472967,
+        "hexaReferenceFinalDamagePercent": 60
       },
       {
         "source": "어나더 바이트 VI",
-        "weight": 0.08142498521551,
+        "weight": 0.09059394845132,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
         "source": "커맨드 : 타이탄 파운스 VI",
-        "weight": 0.08019874606477,
+        "weight": 0.08782491155394,
         "ignoreDefenseSources": [
           20
-        ]
-      },
-      {
-        "source": "기어 스톰",
-        "weight": 0.06551005702322,
-        "ignoreDefenseSources": [
-          100
         ]
       },
       {
         "source": "커맨드 : 알파 서지 VI",
-        "weight": 0.0623917830022,
-        "ignoreDefenseSources": [
-          20
-        ]
-      },
-      {
-        "source": "어시스트 : 스컬 배쉬 VI",
-        "weight": 0.04678725866149,
+        "weight": 0.06887515853299,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
         "source": "오버바이트",
-        "weight": 0.04647891356804
+        "weight": 0.05248166778765,
+        "hexaReferenceFinalDamagePercent": 60
       },
       {
-        "source": "링크드 임팩트",
-        "weight": 0.04447564096239,
-        "ignoreDefenseSources": [
-          50
-        ]
-      },
-      {
-        "source": "어시스트 : 팽 스냅 VI",
-        "weight": 0.04336052641303,
-        "ignoreDefenseSources": [
-          20
-        ]
-      },
-      {
-        "source": "솔 헤카테",
-        "weight": 0.04283300338458,
-        "ignoreDefenseSources": [
-          40
-        ]
-      },
-      {
-        "source": "어시스트 : 렌드 클로우 VI",
-        "weight": 0.04002002411091,
-        "ignoreDefenseSources": [
-          20
-        ]
-      },
-      {
-        "source": "파이널 어택 VI",
-        "weight": 0.03689957718625,
+        "source": "어시스트 : 스컬 배쉬 VI",
+        "weight": 0.05127298641712,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
         "source": "레지스탕스 라인 인팬트리 VI",
-        "weight": 0.03625072310575
+        "weight": 0.05087288212757
       },
       {
-        "source": "와일드 발칸 : 오버 드라이브",
-        "weight": 0.03612711455136
-      },
-      {
-        "source": "레조넌스 : 와일드 피어스",
-        "weight": 0.02518222846606
-      },
-      {
-        "source": "가이디드 애로우",
-        "weight": 0.02516888350501
-      },
-      {
-        "source": "솔 헤카테 : 스틱스",
-        "weight": 0.02002763111171,
+        "source": "링크드 임팩트",
+        "weight": 0.05022118067126,
         "ignoreDefenseSources": [
-          40
+          20,
+          30
         ]
       },
       {
-        "source": "트랩 시더 VI",
-        "weight": 0.01777733024358,
+        "source": "어시스트 : 팽 스냅 VI",
+        "weight": 0.04777846357958,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
-        "source": "스파이더 인 미러",
-        "weight": 0.008643415365726
-      },
-      {
-        "source": "크레스트 오브 더 솔라",
-        "weight": 0.008562063803231
-      },
-      {
-        "source": "솔 헤카테 : 플레게톤",
-        "weight": 0.007210343721738,
+        "source": "어시스트 : 렌드 클로우 VI",
+        "weight": 0.04420079063696,
         "ignoreDefenseSources": [
-          40
+          20
         ]
       },
       {
-        "source": "레지스탕스 라인 인팬트리",
-        "weight": 0.003264895924927
+        "source": "솔 헤카테",
+        "weight": 0.04297797431107,
+        "ignoreDefenseSources": [
+          20
+        ]
+      },
+      {
+        "source": "파이널 어택 VI",
+        "weight": 0.03995105127412,
+        "ignoreDefenseSources": [
+          20
+        ]
+      },
+      {
+        "source": "와일드 발칸 : 오버 드라이브",
+        "weight": 0.03933690645692,
+        "hexaReferenceFinalDamagePercent": 53.09426182532
+      },
+      {
+        "source": "레조넌스 : 와일드 피어스",
+        "weight": 0.03807710737028
+      },
+      {
+        "source": "가이디드 애로우",
+        "weight": 0.02581358254607
+      },
+      {
+        "source": "기어 스톰",
+        "weight": 0.0201950218856,
+        "ignoreDefenseSources": [
+          10,
+          20,
+          60
+        ]
+      },
+      {
+        "source": "솔 헤카테 : 플레게톤",
+        "weight": 0.007873021195982,
+        "ignoreDefenseSources": [
+          20
+        ]
+      },
+      {
+        "source": "솔 헤카테 : 스틱스",
+        "weight": 0.000310609465353,
+        "ignoreDefenseSources": [
+          20
+        ]
       },
       {
         "source": "초월 : 불굴의 결의",
-        "weight": 0.0003116179432772
+        "weight": 0.0002455521591485
       }
     ]
   },
@@ -5780,123 +5707,120 @@ const profiles = {
     ]
   },
   "캡틴": {
-    "id": "캡틴-raw-cycle-dee52fa11c90",
-    "skillProfileHash": "dee52fa11c904327c99fec1dfe3b7ac4915d41998695f7d8b232b562afd441ce",
-    "profileHash": "dee52fa11c904327c99fec1dfe3b7ac4915d41998695f7d8b232b562afd441ce",
+    "id": "캡틴-raw-cycle-a04225d6e25d",
+    "skillProfileHash": "76a2cf1841cd53fe19fb0703a11aa547757d23df70385089724adee09e6dfdfe",
+    "profileHash": "a04225d6e25d93e4f57e4af3bf49ce0e9cc80ab7171a48fb412c10011357926a",
     "sampleCount": 5,
     "enemyDefense": 3.8,
     "shareBasis": "pre-defense",
     "skillShares": [
       {
         "source": "봄바드 템페스트 VI",
-        "weight": 0.1387406086782,
+        "weight": 0.1450194046911,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
         "source": "래피드 파이어 VI",
-        "weight": 0.09851576839751,
+        "weight": 0.1065403527328,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
         "source": "헤드 샷 VI",
-        "weight": 0.09184295869118,
+        "weight": 0.09907533504105,
         "ignoreDefenseSources": [
-          80
+          20,
+          60
         ]
       },
       {
         "source": "서먼 크루 VI : 쌍권총 크루",
-        "weight": 0.08521767334962,
+        "weight": 0.08792921470652,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
         "source": "캡틴 디그니티",
-        "weight": 0.07623176152984,
+        "weight": 0.08448490169385,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
-        "source": "파이어크래커",
-        "weight": 0.07392407505668,
-        "ignoreDefenseSources": [
-          100
-        ]
-      },
-      {
         "source": "데스 헤일",
-        "weight": 0.06792514708382,
-        "ignoreDefenseSources": [
-          80
-        ]
+        "weight": 0.07647291646027
       },
       {
         "source": "불릿 파티",
-        "weight": 0.06605389747654
+        "weight": 0.06889031723825,
+        "hexaReferenceFinalDamagePercent": 52.50281075953
       },
       {
         "source": "드레드노트",
-        "weight": 0.06126190391894,
+        "weight": 0.0640064157092,
         "ignoreDefenseSources": [
-          50
+          20,
+          30
         ]
       },
       {
         "source": "데스 트리거",
-        "weight": 0.05558312289095
+        "weight": 0.05907157763485,
+        "hexaReferenceFinalDamagePercent": 48.86225445927
       },
       {
         "source": "노틸러스 어썰트",
-        "weight": 0.05321214571844
+        "weight": 0.0573911488815,
+        "hexaReferenceFinalDamagePercent": 48.80201376584
       },
       {
         "source": "솔 헤카테",
-        "weight": 0.03654951417268,
+        "weight": 0.04054288510697,
         "ignoreDefenseSources": [
-          40
+          20
         ]
       },
       {
+        "source": "에어리얼 봄바드먼트",
+        "weight": 0.03908167863477
+      },
+      {
         "source": "서먼 크루 VI : 명사수 크루",
-        "weight": 0.02122349081204,
+        "weight": 0.02203035005004,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
         "source": "데드아이",
-        "weight": 0.02104173209157
+        "weight": 0.02188882616015,
+        "hexaReferenceFinalDamagePercent": 31.93201887398
       },
       {
-        "source": "솔 헤카테 : 스틱스",
-        "weight": 0.01979794502858,
+        "source": "파이어크래커",
+        "weight": 0.02014719438681,
         "ignoreDefenseSources": [
-          40
+          10,
+          20,
+          60
         ]
       },
       {
-        "source": "에어리얼 봄바드먼트",
-        "weight": 0.01108999551675
-      },
-      {
-        "source": "스파이더 인 미러",
-        "weight": 0.007606367809911
-      },
-      {
-        "source": "크레스트 오브 더 솔라",
-        "weight": 0.007549984005864
-      },
-      {
         "source": "솔 헤카테 : 플레게톤",
-        "weight": 0.006631907770901,
+        "weight": 0.007120605882111,
         "ignoreDefenseSources": [
-          40
+          20
+        ]
+      },
+      {
+        "source": "솔 헤카테 : 스틱스",
+        "weight": 0.000306874989739,
+        "ignoreDefenseSources": [
+          20
         ]
       }
     ]
@@ -6543,154 +6467,139 @@ const profiles = {
     ]
   },
   "호영": {
-    "id": "호영-raw-cycle-d83b9be435c3",
-    "skillProfileHash": "d83b9be435c33d0a65c9b20ef045f47bdc58ceed5de3b0236e1902d913b3770f",
-    "profileHash": "d83b9be435c33d0a65c9b20ef045f47bdc58ceed5de3b0236e1902d913b3770f",
+    "id": "호영-raw-cycle-afa6b01ea794",
+    "skillProfileHash": "c4ff540672ec4d2b7647250eb0333a676db53ed288675cfb815f93c999820f9e",
+    "profileHash": "afa6b01ea7945e117d28f7276cfa3b74582a37bebb6e68e6686f966074f44e27",
     "sampleCount": 5,
     "enemyDefense": 3.8,
     "shareBasis": "pre-defense",
     "skillShares": [
       {
-        "source": "환영 분신부 VI",
-        "weight": 0.1874273160459,
-        "ignoreDefenseSources": [
-          45
-        ]
+        "source": "선기 : 극대 분신난무",
+        "weight": 0.1551195269102
       },
       {
         "source": "금고봉 : 인 VI",
-        "weight": 0.1102850233402,
+        "weight": 0.134002360883,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
-        "source": "천세휘령",
-        "weight": 0.08193473238452,
-        "ignoreDefenseSources": [
-          100
-        ]
+        "source": "선기 : 천지인 환영",
+        "weight": 0.1247145964898,
+        "hexaReferenceFinalDamagePercent": 60
+      },
+      {
+        "source": "선기 : 강림 괴력난신",
+        "weight": 0.075170396737,
+        "hexaReferenceFinalDamagePercent": 60
       },
       {
         "source": "권술 : 호접지몽 VI",
-        "weight": 0.07377295591413,
+        "weight": 0.07428114820801,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
-        "source": "추적 귀화부 VI",
-        "weight": 0.05991214145768,
-        "ignoreDefenseSources": [
-          20
-        ]
-      },
-      {
-        "source": "권술 : 흡성와류 VI",
-        "weight": 0.0560917706081,
+        "source": "토파류 : 지 VI",
+        "weight": 0.06178046978886,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
         "source": "토파류 : 허/실 VI",
-        "weight": 0.05553581247344
+        "weight": 0.06144593237515
       },
       {
-        "source": "토파류 : 지 VI",
-        "weight": 0.05528737835952,
+        "source": "추적 귀화부 VI",
+        "weight": 0.05642488283288,
         "ignoreDefenseSources": [
           20
         ]
       },
       {
-        "source": "선기 : 강림 괴력난신",
-        "weight": 0.05393759496543
-      },
-      {
-        "source": "선기 : 천지인 환영",
-        "weight": 0.05386342100771
-      },
-      {
         "source": "선기 : 파천황",
-        "weight": 0.05351892652657,
+        "weight": 0.05334708775553,
         "ignoreDefenseSources": [
-          50
+          20,
+          30
+        ]
+      },
+      {
+        "source": "솔 헤카테",
+        "weight": 0.03793391784665,
+        "ignoreDefenseSources": [
+          20
+        ]
+      },
+      {
+        "source": "환영 분신부 VI",
+        "weight": 0.03448934950813,
+        "ignoreDefenseSources": [
+          20
         ]
       },
       {
         "source": "권술 : 산령소환",
-        "weight": 0.03656630338933
+        "weight": 0.03145298136776,
+        "hexaReferenceFinalDamagePercent": 60
       },
       {
-        "source": "솔 헤카테",
-        "weight": 0.02949579531036,
+        "source": "화중군자 VI",
+        "weight": 0.0232898377238
+      },
+      {
+        "source": "선기 : 사흉해방 도철",
+        "weight": 0.01954754497628
+      },
+      {
+        "source": "천세휘령",
+        "weight": 0.01901190927395,
         "ignoreDefenseSources": [
-          40
+          10,
+          20,
+          60
         ]
       },
       {
         "source": "베놈 버스트",
-        "weight": 0.01804728832201
-      },
-      {
-        "source": "솔 헤카테 : 스틱스",
-        "weight": 0.01366143781851,
-        "ignoreDefenseSources": [
-          40
-        ]
-      },
-      {
-        "source": "화중군자 VI",
-        "weight": 0.008987226538197
+        "weight": 0.01688129452709
       },
       {
         "source": "지진쇄 : 지 VI",
-        "weight": 0.007468417032721,
+        "weight": 0.007415612387673,
         "ignoreDefenseSources": [
           20
         ]
-      },
-      {
-        "source": "크레스트 오브 더 솔라",
-        "weight": 0.006971414262837
-      },
-      {
-        "source": "스파이더 인 미러",
-        "weight": 0.006916927922371
       },
       {
         "source": "지진쇄 : 허/실 VI",
-        "weight": 0.006441670786166
-      },
-      {
-        "source": "파초풍 : 천 VI",
-        "weight": 0.005895513600194,
-        "ignoreDefenseSources": [
-          20
-        ]
-      },
-      {
-        "source": "파초풍 : 허/실 VI",
-        "weight": 0.005561832476279
+        "weight": 0.006731430051964
       },
       {
         "source": "솔 헤카테 : 플레게톤",
-        "weight": 0.005072824517242,
-        "ignoreDefenseSources": [
-          40
-        ]
-      },
-      {
-        "source": "선기 : 사흉해방 도철",
-        "weight": 0.004971520466601
-      },
-      {
-        "source": "권술 : 미생강변",
-        "weight": 0.002374754473937,
+        "weight": 0.006352739602698,
         "ignoreDefenseSources": [
           20
         ]
+      },
+      {
+        "source": "초월 : 불굴의 결의",
+        "weight": 0.0002691566710697
+      },
+      {
+        "source": "솔 헤카테 : 스틱스",
+        "weight": 0.0002283374847236,
+        "ignoreDefenseSources": [
+          20
+        ]
+      },
+      {
+        "source": "에르다 노바",
+        "weight": 0.0001094865977444
       }
     ]
   },
