@@ -438,7 +438,7 @@ test("환산 계약 버전으로 이전 단일 부스탯 캐시와 키를 분리
     versionedUrl.searchParams.get("conversionVersion"),
     characterConversionCacheVersion,
   );
-  assert.equal(characterConversionCacheVersion, "combat-profile-v81-buff-sources");
+  assert.equal(characterConversionCacheVersion, "combat-profile-v82-boss-damage");
   const freshSnapshotKey = createSnapshotCacheKey(request, "테스트", "fresh");
   const staleSnapshotKey = createSnapshotCacheKey(request, "테스트", "stale");
   assert.equal(characterSnapshotCacheVersion, "character-snapshot-v2");
@@ -621,7 +621,7 @@ test("같은 세팅에서 쓸만한 샤프 아이즈가 확인되면 풀 보스 
   assert.equal(differentSetup.fullBoss.details.dopedCriticalRate, 115);
 });
 
-test("컨티와 샤프 아이즈가 함께 켜진 응답에서 각 OFF 기준을 적용한다", async () => {
+test("컨티와 샤프 아이즈, 조건부 링크가 함께 켜진 응답에서 각 OFF 기준을 적용한다", async () => {
   const cache = new MemoryCache();
   let buffed = false;
   const fetchConversion = async (references = {}, refresh = false) => {
@@ -663,8 +663,15 @@ test("컨티와 샤프 아이즈가 함께 켜진 응답에서 각 OFF 기준을
               skill_effect: "270초 동안 크리티컬 확률 10%, 크리티컬 데미지 8% 증가",
             }];
           }
+          if (upstream.pathname.endsWith("/link-skill")) {
+            payload.character_link_skill = [
+              { skill_name: "무아", skill_level: 2, skill_effect: "전투 상태에 돌입 시 데미지 11% 증가" },
+              { skill_name: "전투의 흐름", skill_level: 2, skill_effect: "10초 동안 데미지 10% 증가" },
+            ];
+          }
           if (upstream.pathname.endsWith("/stat")) {
             const stats = {
+              데미지: buffed ? 108 : 87,
               공격력: buffed ? 9618 : 9145,
               마력: buffed ? 2254 : 2013,
               "보스 몬스터 데미지": buffed ? 529 : 484,
@@ -687,7 +694,7 @@ test("컨티와 샤프 아이즈가 함께 켜진 응답에서 각 OFF 기준을
   };
 
   const off = await fetchConversion({}, true);
-  const { continuousRing, sharpEyes } = off.fullBoss.details.temporaryBuffs;
+  const { continuousRing, sharpEyes, conditionalLinks } = off.fullBoss.details.temporaryBuffs;
   assert.equal(off.fullBoss.details.currentBossDamage, 484);
   assert.equal(off.fullBoss.details.dopedCriticalDamage, 130.1);
   assert.equal(continuousRing.effect.bossDamage, 45);
@@ -695,6 +702,7 @@ test("컨티와 샤프 아이즈가 함께 켜진 응답에서 각 OFF 기준을
   const on = await fetchConversion({}, true);
   assert.equal(on.fullBoss.details.currentBossDamage, 529);
   const references = {
+    "X-Conditional-Links-Off-Reference": { basis: conditionalLinks.basis, damage: 87 },
     "X-Continuous-Ring-Off-Reference": {
       basis: continuousRing.basis, attack: continuousRing.attack,
       magic: continuousRing.magic, bossDamage: continuousRing.bossDamage,
@@ -706,6 +714,8 @@ test("컨티와 샤프 아이즈가 함께 켜진 응답에서 각 OFF 기준을
   const corrected = await fetchConversion(references);
   assert.equal(corrected.base.details.currentBossDamage, 529);
   assert.equal(corrected.fullBoss.details.currentBossDamage, 484);
+  assert.equal(corrected.fullBoss.details.currentDamage, 87);
+  assert.equal(corrected.fullBoss.details.conditionalLinksNormalization, true);
   assert.equal(corrected.fullBoss.details.continuousRingNormalization, true);
   assert.equal(corrected.fullBoss.details.sharpEyesNormalization, true);
   assert.deepEqual(corrected.fullBoss.statEquivalence, off.fullBoss.statEquivalence);
@@ -713,8 +723,10 @@ test("컨티와 샤프 아이즈가 함께 켜진 응답에서 각 OFF 기준을
 
   const wrongSetup = await fetchConversion({
     "X-Continuous-Ring-Off-Reference": { ...references["X-Continuous-Ring-Off-Reference"], bossDamage: 475 },
+    "X-Conditional-Links-Off-Reference": { ...references["X-Conditional-Links-Off-Reference"], damage: 88 },
   });
   assert.equal(wrongSetup.fullBoss.details.continuousRingNormalization, false);
+  assert.equal(wrongSetup.fullBoss.details.conditionalLinksNormalization, false);
 });
 
 test("manual 정책을 적용하고 선택 장비의 환산 요약만 응답한다", async () => {

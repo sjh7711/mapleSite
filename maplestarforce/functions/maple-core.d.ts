@@ -182,12 +182,20 @@ declare module "maple-core/stat-efficiency" {
     linkSkillData: Record<string, unknown>,
     buffDurationPercent?: number,
     targetLevelIsLower?: boolean,
+    characterClass?: string,
   ): {
     damage: number;
     bossDamage: number;
     ignoreDefenseSources: number[];
     applied: Array<Record<string, unknown>>;
   };
+
+  export function calculateBossItemCombatEffects(options: {
+    symbolData?: Record<string, unknown>;
+    vMatrixData?: Record<string, unknown>;
+    targetBoss?: string;
+    characterClass?: string;
+  }): ReturnType<typeof import("maple-core/combat-model").createCombatEffect>[];
 
   export function selectedBuffDurationPercent(
     basePercent: number | undefined,

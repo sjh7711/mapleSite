@@ -1,10 +1,12 @@
 import type { CharacterPotentialData, JsonObject } from "./nexon";
-import { calculateCombatRingBonuses } from "maple-core/stat-efficiency";
+import { calculateCombatRingBonuses, calculateConditionalLinkCycleBonuses } from "maple-core/stat-efficiency";
 
 type CriticalStats = { criticalRate: number; criticalDamage: number };
 type SharpEyesReading = CriticalStats & { basis: string };
 type ContinuousRingStats = { attack: number; magic: number; bossDamage: number };
 type ContinuousRingReading = ContinuousRingStats & { basis: string };
+type ConditionalLinkReading = { basis: string; damage: number };
+const LINK_STAT_BUFFS = new Set(["무아", "전투의 흐름", "시프 커닝", "프라이어 프리퍼레이션"]);
 const SHARP_EYES_STATS = {
   criticalRate: "크리티컬 확률",
   criticalDamage: "크리티컬 데미지",
@@ -118,7 +120,22 @@ export async function characterTemporaryBuffs(data: CharacterPotentialData) {
         },
       }
     : null;
-  return { registeredPetSkills, auraWeapon, sharpEyes, continuousRing };
+  const damage = stat("데미지");
+  const linkDamageBonuses = calculateConditionalLinkCycleBonuses(setup.linkSkillData)
+    .applied.filter(({ name }) => LINK_STAT_BUFFS.has(String(name)))
+    .map(({ damage, uptime }) => Number(damage) / Number(uptime));
+  const conditionalLinks = validStat(damage) && linkDamageBonuses.length
+    ? {
+        basis: await basisFor([
+          "데미지", "방어율 무시", "최종 데미지",
+          ...Object.values(CONTINUOUS_RING_STATS), ...Object.values(SHARP_EYES_STATS),
+        ]),
+        name: "조건부 링크",
+        damage,
+        damageBonuses: linkDamageBonuses,
+      }
+    : null;
+  return { registeredPetSkills, auraWeapon, sharpEyes, continuousRing, conditionalLinks };
 }
 
 function validStat(value: unknown): value is number {
@@ -151,6 +168,10 @@ export function parseContinuousRingReference(value: string | null): ContinuousRi
   return parseBuffReference(value, ["attack", "magic", "bossDamage"]);
 }
 
+export function parseConditionalLinkReference(value: string | null): ConditionalLinkReading | null {
+  return parseBuffReference(value, ["damage"]);
+}
+
 function restoreStats(statData: JsonObject, values: Record<string, number>): JsonObject {
   return {
     ...statData,
@@ -161,6 +182,25 @@ function restoreStats(statData: JsonObject, values: Record<string, number>): Jso
         : row;
     }),
   };
+}
+
+export function restoreConditionalLinkOffStats(
+  statData: JsonObject,
+  current: (ConditionalLinkReading & { damageBonuses: number[] }) | null,
+  reference: ConditionalLinkReading | null,
+): JsonObject | undefined {
+  if (!current || !reference || current.basis !== reference.basis ||
+    current.damage <= reference.damage) return undefined;
+
+  // 사진과 API에서 확인한 캐릭터 스탯창 버프만 비교한다. 대상에게
+  // 붙는 임피리컬 널리지 등의 효과는 스탯창 데미지에서 제거하지 않는다.
+  const gains = current.damageBonuses.reduce(
+    (totals, bonus) => [...totals, ...totals.map((total) => total + bonus)], [0],
+  );
+  const observedGain = current.damage - reference.damage;
+  return gains.some((gain) => gain > 0 && Math.abs(gain - observedGain) <= 0.011)
+    ? restoreStats(statData, { 데미지: reference.damage })
+    : undefined;
 }
 
 export function restoreSharpEyesOffStats(

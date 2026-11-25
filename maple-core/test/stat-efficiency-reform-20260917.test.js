@@ -90,6 +90,34 @@ test('전수 소울 컨트랙트에는 벞지를 적용하고 발동형 시프 �
   assert.equal(result.details.conditionalLinkSources[0].uptime, 1 / 3);
 });
 
+test('렌의 조건부 링크와 장착 일격필살, 대상 심볼만 전투 환산에 포함한다', () => {
+  const parameters = input({
+    character: { character_level: 296, character_class: '렌' },
+    symbolData: { symbol: [
+      { symbol_name: '어센틱심볼 : 세르니움', symbol_level: 11 },
+      { symbol_name: '어센틱심볼 : 오디움', symbol_level: 10 },
+    ] },
+    vMatrixData: { character_v_core_equipment: [
+      { v_core_name: '일격필살 I', v_core_type: '특수 코어', v_core_level: 1 },
+    ] },
+    linkSkillData: { character_link_skill: [
+      { skill_name: '소울 컨트랙트', skill_effect: '10초 동안 데미지 60% 증가\n재사용 대기시간 60초' },
+      { skill_name: '프라이어 프리퍼레이션', skill_effect: '20초 동안 데미지 17% 증가 재발동 대기시간 40초' },
+    ] },
+  });
+  parameters.statData.final_stat.push({ stat_name: '버프 지속시간', stat_value: '76' });
+  const convert = (doping) => calculateCharacterPotentialConversion({ ...parameters, doping });
+  const full = convert(FULL_BOSS_DOPING).details;
+  assert.ok(Math.abs(full.conditionalLinkSources[0].damage - 37.53) < 0.02);
+  assert.equal(full.conditionalLinkSources[1].damage, 17 * 0.55579);
+  const effects = full.combatModel.effects;
+  assert.equal(effects.find(({ kind }) => kind === 'special-core').averagedModifiers.damage, 9.683);
+  assert.equal(effects.find(({ kind }) => kind === 'boss-symbol').averagedModifiers.bossDamage, 20);
+  assert.equal(full.combatModel.totals.bossDamage, 300 + 85 + 20);
+  assert.equal(convert({ ...FULL_BOSS_DOPING, targetBoss: '최초의 대적자' }).details.combatModel.totals.bossDamage, 300 + 85);
+  assert.equal(convert(null).details.combatModel.totals.bossDamage, 300);
+});
+
 test('선택 프리셋의 벞지는 어빌리티와 유니온 설정 차이만 더한다', () => {
   const active = {
     abilityData: { ability_info: [{ ability_value: '버프 스킬의 지속 시간 50% 증가' }] },
