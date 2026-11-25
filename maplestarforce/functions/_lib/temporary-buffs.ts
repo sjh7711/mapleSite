@@ -1,10 +1,18 @@
 import type { CharacterPotentialData, JsonObject } from "./nexon";
+import { calculateCombatRingBonuses } from "maple-core/stat-efficiency";
 
 type CriticalStats = { criticalRate: number; criticalDamage: number };
 type SharpEyesReading = CriticalStats & { basis: string };
+type ContinuousRingStats = { attack: number; magic: number; bossDamage: number };
+type ContinuousRingReading = ContinuousRingStats & { basis: string };
 const SHARP_EYES_STATS = {
   criticalRate: "크리티컬 확률",
   criticalDamage: "크리티컬 데미지",
+} as const;
+const CONTINUOUS_RING_STATS = {
+  attack: "공격력",
+  magic: "마력",
+  bossDamage: "보스 몬스터 데미지",
 } as const;
 
 function records(value: unknown): JsonObject[] {
@@ -74,58 +82,127 @@ export async function characterTemporaryBuffs(data: CharacterPotentialData) {
   }
   const criticalRate = stat(SHARP_EYES_STATS.criticalRate);
   const criticalDamage = stat(SHARP_EYES_STATS.criticalDamage);
-  // 풀도핑에 이미 반영하는 +10/+8 버전만 보정한다.
-  const sharpEyes = /크리티컬 확률\s*10%,\s*크리티컬 데미지\s*8%/u.test(skillEffect("쓸만한 샤프 아이즈")) &&
-      validCriticalStat(criticalRate) && validCriticalStat(criticalDamage)
+  const sharpEyesName = skillEffect("샤프 아이즈") ? "샤프 아이즈" : "쓸만한 샤프 아이즈";
+  const sharpEyesEffect = skillEffect(sharpEyesName).match(
+    /크리티컬 확률\s*(\d+(?:\.\d+)?)%,\s*크리티컬 데미지\s*(\d+(?:\.\d+)?)%/u,
+  );
+  const sharpEyes = sharpEyesEffect && validStat(criticalRate) && validStat(criticalDamage)
     ? {
-        basis: await basisFor(Object.values(SHARP_EYES_STATS), "쓸만한 샤프 아이즈"),
+        basis: await basisFor(Object.values(SHARP_EYES_STATS), sharpEyesName),
+        name: sharpEyesName,
         criticalRate,
         criticalDamage,
+        effect: { criticalRate: Number(sharpEyesEffect[1]), criticalDamage: Number(sharpEyesEffect[2]) },
       }
     : null;
-  return { registeredPetSkills, auraWeapon, sharpEyes };
+  const ring = calculateCombatRingBonuses(
+    snapshot.equipmentData, snapshot.ringReserveData, skillData, "attack", 360,
+    String(character.character_class ?? ""),
+  ).applied.find(({ name }) => name === "컨티뉴어스 링" || name === "챌린저스 컨티뉴어스 링");
+  const attack = stat(CONTINUOUS_RING_STATS.attack);
+  const magic = stat(CONTINUOUS_RING_STATS.magic);
+  const bossDamage = stat(CONTINUOUS_RING_STATS.bossDamage);
+  const continuousRing = ring && ring.bossDamage > 0 &&
+      [attack, magic, bossDamage].every(validStat)
+    ? {
+        basis: await basisFor(
+          [...Object.values(CONTINUOUS_RING_STATS), ...Object.values(SHARP_EYES_STATS)],
+          sharpEyes?.name,
+        ),
+        name: ring.name,
+        attack,
+        magic,
+        bossDamage,
+        effect: {
+          attackPercent: ring.attackPercent, magicPercent: ring.magicPercent, bossDamage: ring.bossDamage,
+        },
+      }
+    : null;
+  return { registeredPetSkills, auraWeapon, sharpEyes, continuousRing };
 }
 
-function validCriticalStat(value: unknown): value is number {
+function validStat(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0;
 }
 
-export function parseSharpEyesReference(value: string | null): SharpEyesReading | null {
+function parseBuffReference<T extends string>(
+  value: string | null,
+  fields: readonly T[],
+): ({ basis: string } & Record<T, number>) | null {
   if (!value || value.length > 256) return null;
   try {
-    const { basis, criticalRate, criticalDamage } = JSON.parse(value);
-    if (
-      typeof basis === "string" && /^[0-9a-f]{64}$/u.test(basis) &&
-      validCriticalStat(criticalRate) && validCriticalStat(criticalDamage)
-    ) return { basis, criticalRate, criticalDamage };
+    const reference = JSON.parse(value);
+    if (typeof reference?.basis === "string" && /^[0-9a-f]{64}$/u.test(reference.basis) &&
+      fields.every((field) => validStat(reference[field]))) {
+      return { basis: reference.basis, ...Object.fromEntries(fields.map((field) => [field, reference[field]])) } as
+        { basis: string } & Record<T, number>;
+    }
   } catch {
     // 저장 기준을 읽을 수 없으면 기존 API 스탯으로 계산한다.
   }
   return null;
 }
 
-export function restoreSharpEyesOffStats(
-  statData: JsonObject,
-  current: SharpEyesReading | null,
-  reference: SharpEyesReading | null,
-): JsonObject | undefined {
-  if (
-    !current || !reference || current.basis !== reference.basis ||
-    Math.abs(current.criticalRate - reference.criticalRate - 10) > 0.011 ||
-    Math.abs(current.criticalDamage - reference.criticalDamage - 8) > 0.011
-  ) return undefined;
+export function parseSharpEyesReference(value: string | null): SharpEyesReading | null {
+  return parseBuffReference(value, ["criticalRate", "criticalDamage"]);
+}
 
-  const values = {
-    [SHARP_EYES_STATS.criticalRate]: reference.criticalRate,
-    [SHARP_EYES_STATS.criticalDamage]: reference.criticalDamage,
-  };
+export function parseContinuousRingReference(value: string | null): ContinuousRingReading | null {
+  return parseBuffReference(value, ["attack", "magic", "bossDamage"]);
+}
+
+function restoreStats(statData: JsonObject, values: Record<string, number>): JsonObject {
   return {
     ...statData,
     final_stat: records(statData.final_stat).map((row) => {
       const name = String(row.stat_name);
       return Object.hasOwn(values, name)
-        ? { ...row, stat_value: String(values[name as keyof typeof values]) }
+        ? { ...row, stat_value: String(values[name]) }
         : row;
     }),
   };
+}
+
+export function restoreSharpEyesOffStats(
+  statData: JsonObject,
+  current: (SharpEyesReading & { effect: CriticalStats }) | null,
+  reference: SharpEyesReading | null,
+): JsonObject | undefined {
+  if (
+    !current || !reference || current.basis !== reference.basis ||
+    Math.abs(current.criticalRate - reference.criticalRate - current.effect.criticalRate) > 0.011 ||
+    Math.abs(current.criticalDamage - reference.criticalDamage - current.effect.criticalDamage) > 0.011
+  ) return undefined;
+
+  return restoreStats(statData, {
+    [SHARP_EYES_STATS.criticalRate]: reference.criticalRate,
+    [SHARP_EYES_STATS.criticalDamage]: reference.criticalDamage,
+  });
+}
+
+export function restoreContinuousRingOffStats(
+  statData: JsonObject,
+  current: (ContinuousRingReading & {
+    effect: { bossDamage: number; attackPercent: number; magicPercent: number };
+  }) | null,
+  reference: ContinuousRingReading | null,
+): JsonObject | undefined {
+  if (!current || !reference || current.basis !== reference.basis ||
+    Math.abs(current.bossDamage - reference.bossDamage - current.effect.bossDamage) > 0.011) {
+    return undefined;
+  }
+  // 공·마 %는 기본 공·마에 붙는다. 다른 공·마 %가 포함된 최종값
+  // 기준으로는 상승폭이 반지 표기 %를 넘지 않는다.
+  const plausibleGain = (gain: number, off: number, percent: number) =>
+    gain >= 0 && gain <= off * percent / 100 + 1;
+  const attackGain = current.attack - reference.attack;
+  const magicGain = current.magic - reference.magic;
+  if (!(attackGain > 0 || magicGain > 0) ||
+    !plausibleGain(attackGain, reference.attack, current.effect.attackPercent) ||
+    !plausibleGain(magicGain, reference.magic, current.effect.magicPercent)) return undefined;
+  return restoreStats(statData, {
+    [CONTINUOUS_RING_STATS.attack]: reference.attack,
+    [CONTINUOUS_RING_STATS.magic]: reference.magic,
+    [CONTINUOUS_RING_STATS.bossDamage]: reference.bossDamage,
+  });
 }

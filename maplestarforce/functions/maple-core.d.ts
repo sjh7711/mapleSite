@@ -181,6 +181,7 @@ declare module "maple-core/stat-efficiency" {
   export function calculateConditionalLinkCycleBonuses(
     linkSkillData: Record<string, unknown>,
     buffDurationPercent?: number,
+    targetLevelIsLower?: boolean,
   ): {
     damage: number;
     bossDamage: number;

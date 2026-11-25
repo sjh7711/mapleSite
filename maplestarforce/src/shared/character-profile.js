@@ -38,7 +38,18 @@ const STORAGE_KEY = "maplestarforce:character-profile:v2";
 const LEGACY_STORAGE_KEY = "maplestarforce:character-profile:v1";
 const SAVED_NAMES_STORAGE_KEY = "maplestarforce:character-names:v1";
 const AURA_WEAPON_REFERENCE_STORAGE_PREFIX = "maplestarforce:aura-weapon-off:v1:";
-const SHARP_EYES_REFERENCE_STORAGE_PREFIX = "maplestarforce:sharp-eyes-off:v1:";
+const SNAPSHOT_BUFF_REFERENCES = {
+  sharpEyes: {
+    prefix: "maplestarforce:sharp-eyes-off:v1:",
+    header: "X-Sharp-Eyes-Off-Reference",
+    fields: { criticalRate: "크확", criticalDamage: "크뎀" },
+  },
+  continuousRing: {
+    prefix: "maplestarforce:continuous-ring-off:v1:",
+    header: "X-Continuous-Ring-Off-Reference",
+    fields: { attack: "공격력", magic: "마력", bossDamage: "보공" },
+  },
+};
 const EQUIPMENT_TOOLTIP_SUMMARY_VERSION = 12;
 const HIDDEN_CHARACTER_WARNING_PREFIXES = Object.freeze([
   "샤프 아이즈 계열과 직업 보정을 포함한 보스전 크리티컬 확률이",
@@ -392,23 +403,25 @@ function auraWeaponReference(character) {
   return readBuffReference(auraWeaponReferenceKey(character));
 }
 
-function sharpEyesReferenceKey(characterName) {
-  return SHARP_EYES_REFERENCE_STORAGE_PREFIX + characterName.normalize("NFC").toLowerCase();
+function snapshotBuffReferenceKey(buff, characterName) {
+  return SNAPSHOT_BUFF_REFERENCES[buff].prefix + characterName.normalize("NFC").toLowerCase();
 }
 
-function sharpEyesReference(characterName) {
-  return readBuffReference(sharpEyesReferenceKey(characterName));
-}
-
-async function storeSharpEyesReference(characterName, snapshot, correctionApplied) {
-  const key = sharpEyesReferenceKey(characterName);
+async function storeSnapshotBuffReference(buff, name, characterName, snapshot, correctionApplied) {
+  const key = snapshotBuffReferenceKey(buff, characterName);
   if (!snapshot && correctionApplied &&
-    !await searchCharacter(characterName, presetRequest, { withoutSharpEyesReference: true })) return;
-  if (snapshot) calculatorStorage.setItem(key, JSON.stringify(snapshot));
-  else calculatorStorage.removeItem(key);
+    !await searchCharacter(characterName, presetRequest, { withoutBuffReference: buff })) return;
+  if (snapshot) {
+    const fields = Object.keys(SNAPSHOT_BUFF_REFERENCES[buff].fields);
+    const reference = { basis: snapshot.basis };
+    for (const field of fields) reference[field] = snapshot[field];
+    calculatorStorage.setItem(key, JSON.stringify(reference));
+  } else {
+    calculatorStorage.removeItem(key);
+  }
   message = snapshot
-    ? "쓸만한 샤프 아이즈 OFF 기준을 저장했습니다."
-    : "쓸만한 샤프 아이즈 OFF 기준을 지웠습니다.";
+    ? `${name} OFF 기준을 저장했습니다.`
+    : `${name} OFF 기준을 지웠습니다.`;
   messageTone = "success";
   emitProfile();
 }
@@ -712,28 +725,34 @@ function fullBossDopingDetails(profile, conventionalAddOption, collapsed = false
       storeAuraWeaponReference(profile.character, off ? null : aura));
     content.append(action);
   }
-  const sharpEyes = buffs?.sharpEyes;
-  if (profile.statModel !== "demon-avenger" && sharpEyes && !isSharedResult()) {
-    const name = profile.character.name;
-    const off = sharpEyesReference(name);
-    const correctionApplied = profile.details.sharpEyesNormalization === true;
-    const matchesOff = off?.basis === sharpEyes.basis &&
-      off.criticalRate === sharpEyes.criticalRate && off.criticalDamage === sharpEyes.criticalDamage;
-    const status = correctionApplied
-      ? "기본 스탯에 포함 · 중복 보정"
-      : matchesOff ? "OFF 기준과 일치" : "상태 미확인";
-    content.append(element("p", "profile-doping__class",
-      `쓸만한 샤프 아이즈 · ${status} · API 크확 ${coefficient(sharpEyes.criticalRate)}% · 크뎀 ${coefficient(sharpEyes.criticalDamage)}%`));
-    const action = element("button", "button button--quiet",
-      off ? "쓸만한 샤프 아이즈 OFF 기준 지우기" : "쓸만한 샤프 아이즈 OFF 기준 저장");
-    action.type = "button";
-    action.disabled = pending;
-    action.title = off
-      ? "다른 세팅의 OFF 기준을 저장할 때 이 기준을 지울 수 있습니다."
-      : "쓸만한 샤프 아이즈만 끈 상태에서 정보를 갱신한 뒤 저장하세요.";
-    action.addEventListener("click", () =>
-      storeSharpEyesReference(name, off ? null : sharpEyes, correctionApplied));
-    content.append(action);
+  if (profile.statModel !== "demon-avenger" && !isSharedResult()) {
+    for (const [buff, { fields }] of Object.entries(SNAPSHOT_BUFF_REFERENCES)) {
+      const reading = buffs?.[buff];
+      if (!reading) continue;
+      const name = reading.name ?? "쓸만한 샤프 아이즈";
+      const characterName = profile.character.name;
+      const off = readBuffReference(snapshotBuffReferenceKey(buff, characterName));
+      const correctionApplied = profile.details[`${buff}Normalization`] === true;
+      const matchesOff = off?.basis === reading.basis &&
+        Object.keys(fields).every((field) => off[field] === reading[field]);
+      const status = correctionApplied
+        ? "기본 스탯에 포함 · 중복 보정"
+        : matchesOff ? "OFF 기준과 일치" : "상태 미확인";
+      const values = Object.entries(fields).map(([field, label]) =>
+        `${label} ${coefficient(reading[field])}${field === "attack" || field === "magic" ? "" : "%"}`);
+      content.append(element("p", "profile-doping__class",
+        `${name} · ${status} · API ${values.join(" · ")}`));
+      const action = element("button", "button button--quiet",
+        `${name} OFF 기준 ${off ? "지우기" : "저장"}`);
+      action.type = "button";
+      action.disabled = pending;
+      action.title = off
+        ? "다른 세팅의 OFF 기준을 저장할 때 이 기준을 지울 수 있습니다."
+        : `${name} 효과만 꺼진 상태에서 정보를 갱신한 뒤 저장하세요.`;
+      action.addEventListener("click", () =>
+        storeSnapshotBuffReference(buff, name, characterName, off ? null : reading, correctionApplied));
+      content.append(action);
+    }
   }
   const baselineSkills = Array.isArray(profile.details?.baselineSkills)
     ? profile.details.baselineSkills : [];
@@ -954,7 +973,7 @@ function profileCoefficient(
 async function searchCharacter(
   name,
   request = presetRequest,
-  { refresh = false, equipmentTooltipUpgrade = false, withoutSharpEyesReference = false } = {},
+  { refresh = false, equipmentTooltipUpgrade = false, withoutBuffReference = null } = {},
 ) {
   if (pending) return false;
   const characterName = name.trim();
@@ -973,13 +992,18 @@ async function searchCharacter(
   messageTone = "";
   emitProfile();
   try {
-    const sharpEyesOff = withoutSharpEyesReference ? null : sharpEyesReference(characterName);
+    const buffHeaders = {};
+    for (const [buff, { header }] of Object.entries(SNAPSHOT_BUFF_REFERENCES)) {
+      if (buff === withoutBuffReference) continue;
+      const off = readBuffReference(snapshotBuffReferenceKey(buff, characterName));
+      if (off) buffHeaders[header] = JSON.stringify(off);
+    }
     const requestOptions = {
       headers: {
         Accept: "application/json",
-        ...(sharpEyesOff ? { "X-Sharp-Eyes-Off-Reference": JSON.stringify(sharpEyesOff) } : {}),
+        ...buffHeaders,
       },
-      cache: refresh || sharpEyesOff || withoutSharpEyesReference ? "no-store" : "default",
+      cache: refresh || Object.keys(buffHeaders).length || withoutBuffReference ? "no-store" : "default",
     };
     // 구형 로컬 저장본을 올릴 때는 브라우저의 예전 HTTP 응답만
     // 재사용하지 않는다. 서버에서는 refresh=1 없이 버전 캐시와

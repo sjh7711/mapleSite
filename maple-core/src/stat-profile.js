@@ -3,7 +3,7 @@
  * Node, Discord, DOM에 의존하지 않아 브라우저와 Worker에서도 그대로 쓴다.
  */
 
-export const CHARACTER_CONVERSION_CACHE_VERSION = "combat-profile-v80-boss-ied";
+export const CHARACTER_CONVERSION_CACHE_VERSION = "combat-profile-v81-buff-sources";
 
 // 넥슨 유니온 챔피언 가이드의 전투 능력치 5레벨 기준.
 // https://maplestory.nexon.com/Guide/N23GameInformation/Articles/409
@@ -25,6 +25,7 @@ const FULL_BOSS_ATTACK_MAGIC_PERCENT_BUFFS = [
 export const FULL_BOSS_DOPING = {
   label: "풀도핑 (고급 무기 제련·이벤트 버프 포함)",
   championBlessingLevel: CHAMPION_BLESSING_LEVEL_5.level,
+  sayramElixir: true,
   items: [
     "익스트림 레드/블루",
     "길드의 더 큰 축복",
@@ -52,7 +53,9 @@ export const FULL_BOSS_DOPING = {
     hp: 1_500 + CHAMPION_BLESSING_LEVEL_5.hp,
     bossDamage: 95 + CHAMPION_BLESSING_LEVEL_5.bossDamage,
     damage: 111,
-    criticalDamage: 43 + CHAMPION_BLESSING_LEVEL_5.criticalDamage,
+    // 노블레스 30%, 무기 제련 5%, 세이람 16%. 세이람과 샤프
+    // 아이즈 계열의 크뎀은 더 높은 효과만 적용된다.
+    criticalDamage: 30 + 5 + 16 + CHAMPION_BLESSING_LEVEL_5.criticalDamage,
     ignoreDefense: 15,
     ignoreDefenseSources: [15, CHAMPION_BLESSING_LEVEL_5.ignoreDefense],
     // 보스 효율은 짧은 극딜 한 번이 아니라 6분 전투로 비교한다.
@@ -70,14 +73,12 @@ export const FULL_BOSS_DOPING = {
     ignoreDefenseSources: [],
   },
   classAdjustments: {
-    // 자체 샤프 아이즈(+20%/+15%)를 쓰는 모험가 궁수는 공용
-    // 쓸만한 샤프 아이즈(+10%/+8%)와의 차이만 더한다. 쓸만한 샤프
-    // 아이즈의 크확은 실제 스킬 보유 여부를 확인해 별도로 적용한다.
-    보우마스터: { criticalRate: 10, criticalDamage: 7 },
-    신궁: { criticalRate: 10, criticalDamage: 7 },
-    패스파인더: { criticalRate: 10, criticalDamage: 7 },
-    윈드브레이커: { criticalRate: 10, criticalDamage: 7 },
-    와일드헌터: { criticalRate: 10, criticalDamage: 7 },
+    // 크리티컬 리인포스의 크확 계산에는 외부 도핑을 제외한다.
+    보우마스터: { criticalRate: 10 },
+    신궁: { criticalRate: 10 },
+    패스파인더: { criticalRate: 10 },
+    윈드브레이커: { criticalRate: 10 },
+    와일드헌터: { criticalRate: 10 },
     // 메르세데스의 스피릿 인퓨젼처럼 영구 패시브인 크확은 Nexon 최종
     // 스탯에 이미 들어 있으므로 이 호환 보정표에서 다시 더하지 않는다.
     제논: { criticalRate: 40 },
