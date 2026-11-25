@@ -66,6 +66,7 @@ function emptyBonuses() {
     bossDamage: 0,
     criticalRate: 0,
     criticalDamage: 0,
+    buffDuration: 0,
     ignoreDefenseSources: [],
     apPercent: 0,
   };
@@ -89,6 +90,7 @@ function mergeBonuses(...bonuses) {
     result.bossDamage += number(bonus.bossDamage);
     result.criticalRate += number(bonus.criticalRate);
     result.criticalDamage += number(bonus.criticalDamage);
+    result.buffDuration += number(bonus.buffDuration);
     result.ignoreDefenseSources.push(
       ...(Array.isArray(bonus.ignoreDefenseSources)
         ? bonus.ignoreDefenseSources.map(number).filter((value) => value > 0)
@@ -296,6 +298,11 @@ function parseTextBonuses(texts) {
       /크리티컬 데미지(?:가)?\s*\+?\s*(\d+(?:\.\d+)?)%/g,
     )) {
       result.criticalDamage += number(match[1]);
+    }
+    for (const match of text.matchAll(
+      /버프\s*(?:스킬의?\s*)?지속\s*시간\s*\+?\s*(\d+(?:\.\d+)?)%/gu,
+    )) {
+      result.buffDuration += number(match[1]);
     }
     for (const match of text.matchAll(
       /(?:몬스터 )?방어율 무시(?:가)?\s*\+?\s*(\d+(?:\.\d+)?)%/g,
@@ -685,6 +692,7 @@ const ACTIVE_SKILL_CYCLE_EXCLUSIONS = new Set([
   "인탠시브 타임",
   "언다잉 엠버",
   "고급 무기 제련",
+  "샤프 아이즈",
   "쓸만한 샤프 아이즈",
   "쓸만한 어드밴스드 블레스",
   "크리티컬 리인포스",
@@ -1943,6 +1951,8 @@ function otherStatBonuses(otherStatData) {
         result.criticalRate += value;
       } else if (name === "크리티컬 데미지 (+%)") {
         result.criticalDamage += value;
+      } else if (name === "버프 지속시간 (+%)") {
+        result.buffDuration += value;
       } else if (name === "몬스터 방어율 무시 (+%)" || name === "방어율 무시 (+%)") {
         result.ignoreDefenseSources.push(value);
       }
@@ -2080,6 +2090,53 @@ function learnedSkill(skillData, skillName) {
   return allCharacterSkills(skillData).find(
     (candidate) => String(candidate?.skill_name ?? "").trim() === skillName,
   );
+}
+
+/** Choose one Sharp Eyes skill by availability and read its listed effects. */
+function bossSharpEyes(skillData) {
+  const native = learnedSkill(skillData, "샤프 아이즈");
+  const skill = native ?? learnedSkill(skillData, "쓸만한 샤프 아이즈");
+  const effect = String(skill?.skill_effect ?? "");
+  const rate = percentFromEffect(effect, /크리티컬 확률\s*(\d+(?:\.\d+)?)%/u);
+  const damage = percentFromEffect(effect, /크리티컬 데미지\s*(\d+(?:\.\d+)?)%/u);
+  const hyperRate = native ? sharpEyesHyperCriticalRate(skillData) : 0;
+  const guard = native ? learnedSkill(skillData, "샤프 아이즈-이그노어 가드") : null;
+  const ignoreDefense = percentFromEffect(
+    String(guard?.skill_effect ?? ""), /방어율 무시 효과\s*(\d+(?:\.\d+)?)%/u,
+  );
+  return {
+    name: skill?.skill_name ?? null,
+    criticalRate: rate + hyperRate,
+    criticalDamage: damage,
+    ignoreDefense,
+    hyperRate,
+  };
+}
+
+export function bossCriticalEffects(skillData, doping) {
+  const sharpEyes = bossSharpEyes(doping ? skillData : null);
+  const sayram = number(doping?.sayramCriticalDamage);
+  const criticalDamage = Math.max(sayram, sharpEyes.criticalDamage);
+  const effects = [];
+  if (sharpEyes.name) {
+    effects.push(createCombatEffect({
+      layer: "common-skill",
+      source: sharpEyes.name,
+      modifiers: {
+        criticalRate: sharpEyes.criticalRate,
+        criticalDamage: sharpEyes.criticalDamage > sayram ? sharpEyes.criticalDamage : 0,
+        ignoreDefense: sharpEyes.ignoreDefense,
+      },
+    }));
+  }
+  if (sayram > 0 && sayram >= sharpEyes.criticalDamage) {
+    effects.push(createCombatEffect({
+      layer: "general",
+      source: "세이람의 영약",
+      modifiers: { criticalDamage: sayram },
+    }));
+  }
+  return { sharpEyes, criticalDamage, effects };
 }
 
 function skillAverageUptime(skillData, skillName, fallback = 0) {
@@ -3347,17 +3404,18 @@ function selectJointBossPreset({
   characterLevel,
   characterClass,
   skillData,
-  includedNativeSharpEyesDamage,
-  includeUsefulSharpEyes,
+  includeBossCriticalBuffs,
 }) {
   if (!Array.isArray(statData?.final_stat) || !statData.final_stat.length) {
     return null;
   }
   const stats = finalStats(statData);
-  const usefulSharpEyesRate = includedNativeSharpEyesDamage == null &&
-    learnedSkill(skillData, "쓸만한 샤프 아이즈") ? 10 : 0;
-  if (includeUsefulSharpEyes) {
-    stats["크리티컬 확률"] = number(stats["크리티컬 확률"]) + usefulSharpEyesRate;
+  const criticalBuff = bossSharpEyes(skillData);
+  if (includeBossCriticalBuffs) {
+    stats["크리티컬 확률"] = number(stats["크리티컬 확률"]) + criticalBuff.criticalRate;
+    stats["크리티컬 데미지"] = number(stats["크리티컬 데미지"]) + criticalBuff.criticalDamage;
+    stats["방어율 무시"] = 100 - (100 - number(stats["방어율 무시"])) *
+      (1 - criticalBuff.ignoreDefense / 100);
   }
   // 일반 크리티컬 확률은 100%에서 포화되지만 크리티컬 리인포스는
   // 초과분을 포함한다. 자동 선택에서는 스킬의 시간 가동률로 근사한다.
@@ -3365,9 +3423,9 @@ function selectJointBossPreset({
     ? skillAverageUptime(skillData, "크리티컬 리인포스", 30 / 120)
     : 0;
   const criticalReinforceExtraRate = criticalReinforceUptime > 0 &&
-    includedNativeSharpEyesDamage == null
+    !includeBossCriticalBuffs
     ? sharpEyesHyperCriticalRate(skillData) +
-      (includeUsefulSharpEyes ? 0 : usefulSharpEyesRate)
+      (criticalBuff.name === "쓸만한 샤프 아이즈" ? criticalBuff.criticalRate : 0)
     : 0;
   const activeSnapshot = applyPresetSelection(data, active, active.equipment);
   const activeVector = presetDependentVector(
@@ -3501,8 +3559,7 @@ export function resolveCharacterPresetSnapshot({
   characterClass = "",
   statData,
   presetPolicy,
-  includedNativeSharpEyesDamage = null,
-  includeUsefulSharpEyes = false,
+  includeBossCriticalBuffs = false,
 }) {
   const data = {
     equipmentData,
@@ -3548,8 +3605,7 @@ export function resolveCharacterPresetSnapshot({
       characterLevel,
       characterClass,
       skillData,
-      includedNativeSharpEyesDamage,
-      includeUsefulSharpEyes,
+      includeBossCriticalBuffs,
     });
     if (jointSelection) {
       selected = jointSelection;
@@ -3902,7 +3958,7 @@ function unreflectedStats({
 }
 
 const STAT_WINDOW_STAT_LEAD =
-  /^(?:(?:보스 몬스터 공격 시 |최종 )?데미지|크리티컬 (?:데미지|확률)|(?:몬스터 )?방어율 무시|공격력(?:\s*(?:과|및|\/|,)\s*마력)?|마력|올스탯|힘|민첩|지력|행운|STR|DEX|INT|LUK|모든 능력치|최대\s*HP|(?:건의 )?공격\s*속도|(?:최대 )?이동\s*속도|회피(?:율| 확률)|스탠스(?: 확률)?|방어력|공격 속성 내성|상태 이상 내성)(?:가|이)?\s*[:+]?\s*\d/u;
+  /^(?:(?:보스 몬스터 공격 시 |최종 )?데미지|크리티컬 (?:데미지|확률)|(?:몬스터 )?방어율 무시|버프\s*(?:스킬의?\s*)?지속\s*시간|공격력(?:\s*(?:과|및|\/|,)\s*마력)?|마력|올스탯|힘|민첩|지력|행운|STR|DEX|INT|LUK|모든 능력치|최대\s*HP|(?:건의 )?공격\s*속도|(?:최대 )?이동\s*속도|회피(?:율| 확률)|스탠스(?: 확률)?|방어력|공격 속성 내성|상태 이상 내성)(?:가|이)?\s*[:+]?\s*\d/u;
 const STAT_WINDOW_MASTERY_LEAD =
   /^[\p{L}\s,]{0,65}숙련도\s*(?:증가량\s*)?\d+(?:\.\d+)?%/u;
 const STAT_WINDOW_TRIGGER =
@@ -3959,7 +4015,7 @@ function statWindowSkillTexts(skillData, equipmentData, petEquipmentData, active
     // V 코어의 블레스는 본문 공격력·마력과 별도 패시브 올스탯이 모두 상시 효과다.
     const permanentBless = skill_name === "쓸만한 어드밴스드 블레스";
     if (!passive.length && !confirmedActive &&
-      /리인포스|보스\s*킬러|이그노어\s*가드|[ -]강화$/u.test(skill_name)) return [];
+      /리인포스|보스\s*킬러|이그노어\s*가드|[ -](?:강화|퍼시스트)$/u.test(skill_name)) return [];
     const needsPermanentMarker = !permanentBless && !passive.length &&
       (highGradeSkills.has(skill) || STAT_WINDOW_ATTACK_TEXT.test(text));
     const lines = passive.length ? passive.map((match) => match[1]) : [text];
@@ -4054,10 +4110,8 @@ export function reconstructCharacterStats({
   const unionMembers = (unionRaiderData?.union_raider_stat ?? [])
     .filter((text) => /^보스 몬스터 공격 시 데미지/u.test(text) || !/공격 시|확률로|마다|적 처치/u.test(text));
   const pet = resolvePetEquipmentBonuses(petEquipmentData, attackType, presetMode);
-  const options = parseEquipmentOptions(
-    equipmentOptionLines(equipmentData, character.character_class),
-    number(character.character_level),
-  );
+  const optionLines = equipmentOptionLines(equipmentData, character.character_class);
+  const options = parseEquipmentOptions(optionLines, number(character.character_level));
   const permanent = mergeBonuses(
     titleBonuses(equipmentData),
     parseSetEffects({ set_effect: activeSets }),
@@ -4099,6 +4153,9 @@ export function reconstructCharacterStats({
     "크리티컬 데미지": weapon.criticalDamage + combat.criticalDamage,
     "방어율 무시": 100 * (1 - ignoreSources.reduce((remaining, value) => remaining * (1 - value / 100), 1)),
     "최종 데미지": 100 * (damageMultipliers.reduce((total, value) => total * value, 1) - 1),
+    "버프 지속시간": combat.buffDuration + parseTextBonuses(optionLines).buffDuration +
+      Math.floor(Math.min(100, number(propensityData?.sensibility_level)) / 10),
+    "상태이상 추가 데미지": conditionalDamageFromAbility(abilityData) + conditionalDamageFromLink(linkSkillData),
     ...Object.fromEntries(Object.entries(attack).map(([name, { flat, percent }]) =>
       [name, Math.floor(flat * (1 + percent / 100) + 1e-8)])),
   };
@@ -4246,7 +4303,6 @@ export function calculateCharacterPotentialConversion({
   attackType,
   doping,
   includeLoadedDice = true,
-  includedNativeSharpEyesDamage = null,
   presetPolicy,
   resolvedPresetSnapshot = null,
   selectedStatSources = null,
@@ -4289,21 +4345,21 @@ export function calculateCharacterPotentialConversion({
       characterClass: character.character_class,
       statData,
       presetPolicy,
-      includedNativeSharpEyesDamage,
     });
   const selectedHyperStatData = resolvedPresets.selectedSnapshot.hyperStatData;
   const selectedUnionRaiderData =
     resolvedPresets.selectedSnapshot.unionRaiderData;
   const selectedLinkSkillData = resolvedPresets.selectedSnapshot.linkSkillData;
   const selectedAbilityData = resolvedPresets.selectedSnapshot.abilityData;
-  const buffDurationPercent = selectedBuffDurationPercent(
+  const buffDurationPercent = sourceValues?.["버프 지속시간"] ?? selectedBuffDurationPercent(
     stats["버프 지속시간"],
     resolvedPresets.activeSnapshot,
     resolvedPresets.selectedSnapshot,
   );
   const classDopingAdjustment = { ...doping?.classAdjustments?.[character.character_class] };
-  const nativeSharpEyesIncluded = includedNativeSharpEyesDamage !== null;
-  if (nativeSharpEyesIncluded) delete classDopingAdjustment.criticalRate;
+  const criticalBuffs = bossCriticalEffects(skillData, doping);
+  const { sharpEyes } = criticalBuffs;
+  if (selectedStatSources || sharpEyes.name === "샤프 아이즈") delete classDopingAdjustment.criticalRate;
   const classAlwaysOnCombat = resolveClassAlwaysOnCombatAdjustment(
     character.character_class,
     skillData,
@@ -4479,19 +4535,22 @@ export function calculateCharacterPotentialConversion({
       ? activeSupplemental.magicPercent
       : activeSupplemental.attackPercent);
 
-  const apiCurrentMain = ensurePositive(stats[mainStat], "최종 주스탯");
+  const apiCurrentMain = sourceAttributes?.[mainStat]
+    ? stats[mainStat] ?? null
+    : ensurePositive(stats[mainStat], "최종 주스탯");
   const apiCurrentSubs = Object.fromEntries(
     resolvedSubStats.map((stat) => [
       stat,
-      ensurePositive(stats[stat], `최종 부스탯(${stat})`),
+      sourceAttributes?.[stat] ? stats[stat] ?? null : ensurePositive(stats[stat], `최종 부스탯(${stat})`),
     ]),
   );
   const apiCurrentSub = apiCurrentSubs[primarySubStat];
-  const apiCurrentAttack = ensurePositive(
+  const apiCurrentAttack = sourceAttack ? stats[attackName] ?? null : ensurePositive(
     stats[attackName],
     attackType === "magic" ? "최종 마력" : "최종 공격력",
   );
-  const apiCurrentCriticalDamage = ensurePositive(
+  const apiCurrentCriticalDamage = sourceValues?.["크리티컬 데미지"] !== undefined
+    ? stats["크리티컬 데미지"] ?? null : ensurePositive(
     stats["크리티컬 데미지"],
     "크리티컬 데미지",
   );
@@ -4535,7 +4594,7 @@ export function calculateCharacterPotentialConversion({
   // 최종 스탯은 소수점 아래가 버려진 값이다. 따라서 % 미적용 수치를
   // 제거한 뒤 올림 역산하면 환산 계산기의 '기본수치'와 같은 정수가 된다.
   // 신규 API 자료가 없는 오래된 테스트/저장 자료에는 기존 합산값을 쓴다.
-  const activeBaseMain = ensurePositive(
+  const activeBaseMain = sourceAttributes?.[mainStat]?.base ?? ensurePositive(
     hasUnreflectedSnapshot
       ? Math.ceil(
           (apiCurrentMain - activeUnreflected.main) /
@@ -4547,7 +4606,7 @@ export function calculateCharacterPotentialConversion({
   const activeBaseSubs = Object.fromEntries(
     resolvedSubStats.map((stat) => [
       stat,
-      ensurePositive(
+      sourceAttributes?.[stat]?.base ?? ensurePositive(
         hasUnreflectedSnapshot
           ? Math.ceil(
               (apiCurrentSubs[stat] - activeUnreflected.subs[stat]) /
@@ -4676,9 +4735,9 @@ export function calculateCharacterPotentialConversion({
     selectedAbilityData,
     attackType,
   );
-  const activeRawAttack = hasUnreflectedSnapshot
+  const activeRawAttack = sourceAttack?.flat ?? (hasUnreflectedSnapshot
     ? Math.ceil(apiCurrentAttack / (1 + activeAttackPercent / 100))
-    : apiCurrentAttack / (1 + activeAttackPercent / 100);
+    : apiCurrentAttack / (1 + activeAttackPercent / 100));
   const rawAttack = sourceAttack?.flat ?? (presetChanged
     ? activeRawAttack +
       selectedCombat.flatAttack -
@@ -4816,14 +4875,14 @@ export function calculateCharacterPotentialConversion({
           number(guildBaseline.criticalDamage),
       }
     : { damage: 0, bossDamage: 0, criticalDamage: 0 };
+  const additiveDopingCriticalDamage = number(baseDopingTotals.criticalDamage) +
+    guildDifference.criticalDamage;
   const dopingTotals = {
     ...baseDopingTotals,
     damage: number(baseDopingTotals.damage) + guildDifference.damage,
     bossDamage:
       number(baseDopingTotals.bossDamage) + guildDifference.bossDamage,
-    criticalDamage:
-      number(baseDopingTotals.criticalDamage) + guildDifference.criticalDamage -
-      (doping?.sayramElixir ? Math.min(includedNativeSharpEyesDamage ?? 0, 16) : 0),
+    criticalDamage: additiveDopingCriticalDamage + criticalBuffs.criticalDamage,
     ignoreDefenseSources: [
       ...(Array.isArray(baseDopingTotals.ignoreDefenseSources)
         ? baseDopingTotals.ignoreDefenseSources
@@ -4900,28 +4959,14 @@ export function calculateCharacterPotentialConversion({
     : 0;
   const combatRingBossDamage =
     doping && includeEquippedRing ? combatRing.bossDamage : 0;
-  const learnedSkills = learnedSkillNames(skillData);
-  const combatOrdersSharpEyesBonus =
-    doping && !nativeSharpEyesIncluded &&
-    learnedSkills.has("쓸만한 컴뱃 오더스") &&
-    learnedSkills.has("샤프 아이즈")
-      ? 1
-      : 0;
-  // 검증된 직업 샤프 아이즈가 스탯에 남아 있으면 코어 스킬은 겹치지 않는다.
-  const usefulSharpEyesCriticalRateBonus =
-    doping && !nativeSharpEyesIncluded && learnedSkills.has("쓸만한 샤프 아이즈")
-    ? 10
-    : 0;
   const criticalDamageBeforeReinforce =
     currentCriticalDamage +
     number(dopingTotals.criticalDamage) +
     number(classDopingAdjustment.criticalDamage) +
     number(classAlwaysOnAdjustment.criticalDamage) +
-    (doping ? activeSkillCycle.criticalDamage : 0) +
-    (doping?.sayramElixir ? 0 : combatOrdersSharpEyesBonus);
-  const sharpEyesHyperCriticalRateBonus = nativeSharpEyesIncluded
-    ? 0
-    : sharpEyesHyperCriticalRate(skillData);
+    (doping ? activeSkillCycle.criticalDamage : 0);
+  const legacyHyperRate = doping && !selectedStatSources && !sharpEyes.name
+    ? sharpEyesHyperCriticalRate(skillData) : 0;
   // 크리티컬 확률은 세이람의 영약·이벤트 버프 같은 외부 도핑을
   // 의도적으로 배제한다. 선택한 보스 세팅과 직업 스킬 보정만 사용한다.
   // 기존 응답 필드명은 호환성을 위해 dopedCriticalRate로 유지한다.
@@ -4931,10 +4976,8 @@ export function calculateCharacterPotentialConversion({
         0,
         currentCriticalRate +
           number(classDopingAdjustment.criticalRate) +
-          usefulSharpEyesCriticalRateBonus +
-          sharpEyesHyperCriticalRateBonus +
-          (doping ? activeSkillCycle.criticalRate : 0) +
-          combatOrdersSharpEyesBonus,
+          sharpEyes.criticalRate + legacyHyperRate +
+          (doping ? activeSkillCycle.criticalRate : 0),
       );
   const baseCycleMain =
     currentMain +
@@ -4961,7 +5004,7 @@ export function calculateCharacterPotentialConversion({
   const baseCycleDamageTotal =
     currentDamage +
     currentBossDamage +
-    number(stats["상태이상 추가 데미지"]) +
+    number(sourceValues?.["상태이상 추가 데미지"] ?? stats["상태이상 추가 데미지"]) +
     number(dopingTotals.damage) +
     number(dopingTotals.bossDamage) +
     number(classDopingAdjustment.damage) +
@@ -5006,7 +5049,7 @@ export function calculateCharacterPotentialConversion({
   const conditionalBossCriticalRate = effectiveBossCriticalRate === null
     ? null
     : effectiveBossCriticalRate + conditionalBossCriticalRateBonus;
-  const currentConditionalDamage = selectedStatusAilmentDamage(
+  const currentConditionalDamage = sourceValues?.["상태이상 추가 데미지"] ?? selectedStatusAilmentDamage(
     stats["상태이상 추가 데미지"],
     { abilityData, linkSkillData },
     { abilityData: selectedAbilityData, linkSkillData: selectedLinkSkillData },
@@ -5026,14 +5069,14 @@ export function calculateCharacterPotentialConversion({
         attackPercent: dopingTotals.attackMagicPercent,
         damage: dopingTotals.damage,
         bossDamage: dopingTotals.bossDamage,
-        criticalRate: usefulSharpEyesCriticalRateBonus,
-        criticalDamage: dopingTotals.criticalDamage,
+        criticalDamage: additiveDopingCriticalDamage,
         ignoreDefenseSources: dopingTotals.ignoreDefenseSources,
       },
       metadata: {
         guildNoblesseResolved: guildNoblesse.available,
       },
     }));
+    combatEffects.push(...criticalBuffs.effects);
   }
   if (Object.keys(classDopingAdjustment).length > 0) {
     combatEffects.push(createCombatEffect({
@@ -5585,12 +5628,10 @@ export function calculateCharacterPotentialConversion({
       dopedCriticalDamage,
       criticalDamageBeforeReinforce,
       criticalReinforceAverageCriticalDamage,
-      combatOrdersSharpEyesBonus,
       dopedCriticalRate,
       criticalRateBasis: "non-external-doping",
-      sharpEyesHyperCriticalRateBonus,
-      includedNativeSharpEyesDamage,
-      usefulSharpEyesCriticalRateBonus,
+      sharpEyesHyperCriticalRateBonus: sharpEyes.hyperRate + legacyHyperRate,
+      usefulSharpEyesCriticalRateBonus: sharpEyes.name === "쓸만한 샤프 아이즈" ? sharpEyes.criticalRate : 0,
       effectiveBossCriticalRate,
       conditionalBossCriticalRateBonus,
       conditionalBossCriticalRate,

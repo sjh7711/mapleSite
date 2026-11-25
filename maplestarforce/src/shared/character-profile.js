@@ -662,9 +662,8 @@ function selectedPresetStatDetails(totals) {
 
 function statVerificationDetails(rows) {
   if (!Array.isArray(rows) || !rows.length) return null;
-  const values = rows.map(({ name, calculated, api, buff, matched }) => {
-    const status = buff ? `${buff} 중복 보정`
-      : calculated === null ? "자료 부족" : matched ? "일치"
+  const values = rows.map(({ name, calculated, api, matched }) => {
+    const status = calculated === null ? "자료 부족" : matched ? "일치"
         : `차이 ${formatCharacterStat(name, api - calculated, true)}`;
     return [
       name,
@@ -674,11 +673,11 @@ function statVerificationDetails(rows) {
     ];
   });
   const panel = element("details", "profile-stat-verification");
-  const verified = rows.filter(({ matched, buff }) => matched || buff).length;
+  const verified = rows.filter(({ matched }) => matched).length;
   panel.append(
     element("summary", "", `API 스탯 검증 · ${verified}/${rows.length}개 확인`),
     element("p", "profile-doping__class",
-      "현재 활성 프리셋의 출처 합산과 넥슨 API를 비교합니다."),
+      "활성 프리셋의 기본 출처 합산과 넥슨 API 수치를 비교합니다. 일시 효과에 따라 차이가 날 수 있습니다."),
     characterStatTable(["스탯", "출처 합산", "API", "확인 결과"], values),
   );
   return panel;
@@ -706,9 +705,9 @@ function fullBossDopingDetails(profile, conventionalAddOption, collapsed = false
   if (selectedStats) content.append(selectedStats);
   const verification = statVerificationDetails(profile.details?.statVerification);
   if (verification) content.append(verification);
-  if (profile.details?.loadedDiceSnapshotState === "unresolved") {
+  if (profile.details?.statCalculationBasis === "api-fallback") {
     content.append(element("p", "profile-doping__class",
-      "럭키 다이스 · API에 반영된 효과를 확인하지 못해 추가 효과를 보류했습니다."));
+      "공개 출처가 부족해 API 스냅샷을 기준으로 추정합니다."));
   }
   const baselineSkills = Array.isArray(profile.details?.baselineSkills)
     ? profile.details.baselineSkills : [];

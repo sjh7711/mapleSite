@@ -35,6 +35,10 @@ declare module "maple-core/stat-efficiency" {
   export function linkSkillBonuses(data: Record<string, unknown>): Record<string, unknown>;
   export function unionAllocatedStat(data: Record<string, unknown>, stat: string): number;
   export function unionUnreflectedStat(data: Record<string, unknown>, stat: string): number;
+  export function bossCriticalEffects(
+    skillData: Array<Record<string, unknown>>,
+    doping: Record<string, unknown> | null,
+  ): { criticalDamage: number; effects: Array<Record<string, unknown>> };
   export type CharacterStatSources = {
     computed: Record<string, number>;
     attack: Record<"공격력" | "마력", { flat: number; percent: number }>;

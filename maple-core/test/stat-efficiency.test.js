@@ -54,6 +54,9 @@ test("스탯 출처 합산은 숙련도·공속 패시브와 전역 방무를 �
         skill("보우 엑스퍼트", "활 숙련도 증가량 71%로 증가, 공격력 31, 크리티컬 데미지 16% 증가"),
         skill("마크맨쉽", "공격 시 몬스터의 물리 방어율 25% 무시, 공격력 25% 증가"),
       ] },
+      { character_skill_grade: "hyperpassive", character_skill: [
+        skill("탤런트 오브 팬텀시프-퍼시스트", "버프 지속시간 10% 증가", 1),
+      ] },
       { character_skill_grade: "5", character_skill: [
         skill("블링크", "[패시브 효과 : 공격력, 마력 30 증가]"),
         skill("개별 공격기", "[패시브 효과 : 적중 시 100%의 데미지로 공격, 크리티컬 확률 100% 증가]"),
@@ -73,6 +76,7 @@ test("스탯 출처 합산은 숙련도·공속 패시브와 전역 방무를 �
   assert.equal(computed["크리티컬 확률"], 5);
   assert.equal(computed["보스 몬스터 데미지"], 0);
   assert.equal(computed["최종 데미지"], 0);
+  assert.equal(computed["버프 지속시간"], 0);
   const active = reconstructCharacterStats({ ...input, activeSkillNames: ["익스트림 아쳐리 : 활"] });
   assert.equal(active.attack.공격력.flat, 160);
   assert.ok(Math.abs(active.computed["최종 데미지"] - 30) < 1e-9);
@@ -2872,7 +2876,7 @@ test("레테는 기존 참조 도핑으로 기존 효율 표를 재현한다", (
         hp: 1_500,
         bossDamage: 95,
         damage: 111,
-        criticalDamage: 43,
+        criticalDamage: 27,
         ignoreDefenseSources: [15, 24],
       },
     },
