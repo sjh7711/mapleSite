@@ -14,6 +14,7 @@ declare module "maple-core/stat-profile" {
     reason: string;
   };
 
+  export const CHARACTER_CONVERSION_CACHE_VERSION: string;
   export const FULL_BOSS_DOPING: Record<string, unknown>;
   export function inferPotentialStatProfile(
     characterClass: string,

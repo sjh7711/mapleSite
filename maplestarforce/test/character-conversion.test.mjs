@@ -438,7 +438,7 @@ test("환산 계약 버전으로 이전 단일 부스탯 캐시와 키를 분리
     versionedUrl.searchParams.get("conversionVersion"),
     characterConversionCacheVersion,
   );
-  assert.equal(characterConversionCacheVersion, "combat-profile-v73-winter-powerup");
+  assert.equal(characterConversionCacheVersion, "combat-profile-v74-champion-blessing");
   const freshSnapshotKey = createSnapshotCacheKey(request, "테스트", "fresh");
   const staleSnapshotKey = createSnapshotCacheKey(request, "테스트", "stale");
   assert.equal(characterSnapshotCacheVersion, "character-snapshot-v2");
@@ -1384,6 +1384,8 @@ async function conversionWithCriticalRate(className, criticalRate) {
 
 test("크확 100% 미만은 100% 환산 경고를 내고 바이퍼 조건부 보정을 구분한다", async () => {
   const hero = await conversionWithCriticalRate("히어로", 85);
+  assert.equal(hero.profiles.fullBoss.details.championBlessingLevel, 5);
+  assert.equal(hero.profiles.base.details.championBlessingLevel, undefined);
   assert.equal(hero.profiles.fullBoss.details.dopedCriticalRate, 85);
   assert.equal(hero.profiles.fullBoss.details.effectiveBossCriticalRate, 85);
   assert.equal(hero.profiles.fullBoss.details.criticalRateAssumedForConversion, 100);

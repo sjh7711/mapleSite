@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { CHARACTER_BASELINE_SKILL_SUMMARY_VERSION } from "maple-core/stat-efficiency";
+import { CHARACTER_CONVERSION_CACHE_VERSION } from "maple-core/stat-profile";
 
 function memoryStorage() {
   const values = new Map();
@@ -24,6 +25,7 @@ const {
   combatRingSummary,
   baselineSkillSummary,
   needsBaselineSkillRefresh,
+  needsCharacterConversionRefresh,
   hasCurrentEquipmentTooltipData,
   needsEquipmentTooltipRefresh,
   shouldShowCharacterProfileWarning,
@@ -340,4 +342,16 @@ test("현재 이벤트 스킬은 실제 보너스를 표시하고 빈 내역도 
     },
   }), false);
   assert.equal(needsBaselineSkillRefresh(null), false);
+});
+
+test("이전 환산 결과는 갱신하고 현재 버전의 저장 결과는 재사용한다", () => {
+  const saved = { profiles: { fullBoss: {} } };
+  assert.equal(needsCharacterConversionRefresh(saved), true);
+  assert.equal(needsCharacterConversionRefresh({
+    ...saved, conversionVersion: "combat-profile-v73-winter-powerup",
+  }), true);
+  assert.equal(needsCharacterConversionRefresh({
+    ...saved, conversionVersion: CHARACTER_CONVERSION_CACHE_VERSION,
+  }), false);
+  assert.equal(needsCharacterConversionRefresh(null), false);
 });

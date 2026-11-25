@@ -240,12 +240,12 @@ test("API 장비와 최종 스탯에서 풀도핑 개인 효율을 계산한다"
 
   const equivalence = result.statEquivalence;
   assert.ok(
-    Math.abs(equivalence.flatMainStatToPercent - 200 / (2160 + 75)) < 1e-12,
+    Math.abs(equivalence.flatMainStatToPercent - 200 / (2160 + 125)) < 1e-12,
   );
   assert.ok(
     Math.abs(
       equivalence.allStatPercentToMainPercent -
-        (1 + (509.6 + 75) / (4 * (2160 + 75))),
+        (1 + (509.6 + 125) / (4 * (2160 + 125))),
     ) < 1e-12,
   );
   assert.ok(equivalence.attackToMainStat > 3);
@@ -303,8 +303,8 @@ test("이중 부스탯을 각각 역산하고 4×LUK + DEX + STR로 환산한다
   assert.deepEqual(result.details.subStats, ["DEX", "STR"]);
   assert.deepEqual(result.details.unreflectedSubs, { DEX: 67, STR: 129 });
   assert.deepEqual(result.details.baseSubs, { DEX: 1289, STR: 726 });
-  assert.deepEqual(result.details.dopedBaseSubs, { DEX: 1364, STR: 801 });
-  assert.deepEqual(result.details.dopedSubs, { DEX: 2112, STR: 1090 });
+  assert.deepEqual(result.details.dopedBaseSubs, { DEX: 1414, STR: 851 });
+  assert.deepEqual(result.details.dopedSubs, { DEX: 2187, STR: 1150 });
 
   const equivalence = result.statEquivalence;
   assert.deepEqual(equivalence.flatStatToFlatMainStatByStat, {
@@ -319,19 +319,19 @@ test("이중 부스탯을 각각 역산하고 4×LUK + DEX + STR로 환산한다
   assert.ok(
     Math.abs(
       equivalence.statPercentToMainPercentByStat.DEX -
-        1364 / (4 * 4955),
+        1414 / (4 * 5005),
     ) < 1e-15,
   );
   assert.ok(
     Math.abs(
       equivalence.statPercentToMainPercentByStat.STR -
-        801 / (4 * 4955),
+        851 / (4 * 5005),
     ) < 1e-15,
   );
   assert.ok(
     Math.abs(
       equivalence.allStatPercentToMainPercent -
-        (1 + 1364 / (4 * 4955) + 801 / (4 * 4955)),
+        (1 + 1414 / (4 * 5005) + 851 / (4 * 5005)),
     ) < 1e-15,
   );
   assert.equal(
@@ -339,9 +339,9 @@ test("이중 부스탯을 각각 역산하고 4×LUK + DEX + STR로 환산한다
     equivalence.statPercentToMainPercentByStat.DEX,
   );
   assert.deepEqual(equivalence.unreflectedStatToPercentByStat, {
-    LUK: 100 / 4955,
-    DEX: 25 / 4955,
-    STR: 25 / 4955,
+    LUK: 100 / 5005,
+    DEX: 25 / 5005,
+    STR: 25 / 5005,
   });
 });
 
@@ -2142,8 +2142,8 @@ test("렌은 캐릭터별 상수를 끼워 넣지 않고 공개 스탯을 기준
   assert.equal(result.details.baseMain, 10_000);
   assert.equal(result.details.currentMain, 10_000);
   assert.equal(result.details.currentSub, 2_500);
-  assert.equal(result.details.dopedMain, 10_075);
-  assert.equal(result.details.dopedSub, 2_575);
+  assert.equal(result.details.dopedMain, 10_125);
+  assert.equal(result.details.dopedSub, 2_625);
 });
 
 test("유지되는 표식의 중첩 방무를 모든 연무장 공격군에 적용한다", () => {
@@ -2219,6 +2219,20 @@ function criticalRateConversion(
   });
 }
 
+test("챔피언의 가호 5레벨은 공통 풀도핑 능력치에 한 번씩 합산된다", () => {
+  const base = criticalRateConversion("히어로", 80, undefined, null).details;
+  const full = criticalRateConversion("히어로", 80).details;
+
+  assert.equal(full.dopedBaseMain - base.dopedBaseMain, 125);
+  assert.equal(full.dopedBaseSub - base.dopedBaseSub, 125);
+  assert.equal(full.combatModel.totals.flatAttack - base.combatModel.totals.flatAttack, 400);
+  assert.equal(full.combatModel.totals.attackPercent - base.combatModel.totals.attackPercent, 50);
+  assert.equal(full.combatModel.totals.bossDamage - base.combatModel.totals.bossDamage, 105);
+  assert.equal(full.dopedCriticalDamage - base.dopedCriticalDamage, 45.5);
+  assert.deepEqual(full.effectiveDopingTotals.ignoreDefenseSources, [15, 24, 10]);
+  assert.ok(Math.abs(full.dopedIgnoreDefense - 41.86) < 1e-9);
+});
+
 test("풀보스 크확은 공용·보스·조건부 보정을 구분하고 100%를 가정한다", () => {
   const hero = criticalRateConversion("히어로", 80);
   assert.equal(hero.details.apiCurrentCriticalRate, 80);
@@ -2274,7 +2288,7 @@ test("풀보스 크확은 공용·보스·조건부 보정을 구분하고 100%�
   assert.equal(bowmaster.details.dopedCriticalRate, 105);
   assert.equal(bowmaster.details.sharpEyesHyperCriticalRateBonus, 5);
   assert.equal(bowmaster.details.criticalReinforceAverageCriticalDamage, 13.125);
-  assert.equal(bowmaster.details.dopedCriticalDamage, 143.125);
+  assert.equal(bowmaster.details.dopedCriticalDamage, 145.625);
   assert.equal(hero.statEquivalence.criticalRateToMainPercent, undefined);
   assert.equal(
     bowmaster.statEquivalence.criticalRateToMainPercent,
@@ -2403,8 +2417,8 @@ test("배틀메이지는 배틀 레이지와 다크 오라를 기본 전투 상�
       ],
     },
   ]);
-  assert.equal(fullBoss.details.dopedCriticalDamage, 133);
-  assert.equal(fullBoss.details.dopedDamageTotal, 646);
+  assert.equal(fullBoss.details.dopedCriticalDamage, 135.5);
+  assert.equal(fullBoss.details.dopedDamageTotal, 656);
 });
 
 test("심볼·하이퍼·HEXA를 제외한 기본 스탯을 최종 스탯에서 역산한다", () => {
@@ -2492,13 +2506,25 @@ test("심볼·하이퍼·HEXA를 제외한 기본 스탯을 최종 스탯에서 
   assert.equal(result.details.currentAttack, 5_102);
 });
 
-test("레테 기준 환산 풀도핑 표와 같은 효율 범위를 계산한다", () => {
+test("레테는 가호 추가 전 참조 도핑으로 기존 효율 표를 재현한다", () => {
   const result = calculateCharacterPotentialConversion({
     character: { character_level: 286 },
     mainStat: "INT",
     subStat: "LUK",
     attackType: "magic",
-    doping: FULL_BOSS_DOPING,
+    doping: {
+      ...FULL_BOSS_DOPING,
+      totals: {
+        ...FULL_BOSS_DOPING.totals,
+        attackMagic: 375,
+        mainStat: 75,
+        subStat: 75,
+        hp: 1_500,
+        bossDamage: 95,
+        criticalDamage: 43,
+        ignoreDefenseSources: [15, 24],
+      },
+    },
     statData: statData({
       INT: 60_868,
       LUK: 9_490,
