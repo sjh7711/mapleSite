@@ -784,14 +784,13 @@ function fullBossDopingDetails(profile, conventionalAddOption, collapsed = false
   return panel;
 }
 
-export function toBossDamagePercentEquivalent(
+export function mainPercentEquivalentToFinalDamagePercent(
   mainPercentEquivalent,
-  bossDamageToMainPercent,
+  oneMainPercentRelative,
 ) {
-  const value = Number(mainPercentEquivalent);
-  const ratio = Number(bossDamageToMainPercent);
-  return Number.isFinite(value) && Number.isFinite(ratio) && ratio > 0
-    ? value / ratio
+  return Number.isFinite(mainPercentEquivalent) &&
+      Number.isFinite(oneMainPercentRelative) && oneMainPercentRelative > 0
+    ? mainPercentEquivalent * oneMainPercentRelative * 100
     : null;
 }
 
@@ -846,7 +845,7 @@ function profileCoefficient(
   const primaryValue = element("strong", "profile-coefficient__value");
   equivalents.append(primaryValue);
   let comparisonValue = null;
-  if (Number.isFinite(secondary?.value)) {
+  if (secondary) {
     comparisonValue = element("span", "profile-coefficient__comparison");
     equivalents.append(comparisonValue);
   }
@@ -855,18 +854,15 @@ function profileCoefficient(
   const resolvePrimary = (amount) => typeof valueForAmount === "function"
     ? valueForAmount(amount)
     : value * amount / baseAmount;
-  const resolveSecondary = (amount) => typeof secondary?.valueForAmount === "function"
-    ? secondary.valueForAmount(amount)
-    : secondary?.value * amount / baseAmount;
   const paint = (amount) => {
     const primary = match ? resolvePrimary(amount) : value;
     primaryValue.textContent = `${basis ? `${basis} ` : ""}${coefficient(primary, digits)}${suffix}`;
     if (comparisonValue) {
-      const comparison = match ? resolveSecondary(amount) : secondary.value;
+      const comparison = secondary.fromMainPercent(primary);
       comparisonValue.textContent = `${secondary.basis ? `${secondary.basis} ` : ""}${coefficient(
         comparison,
         secondary.digits ?? digits,
-      )}${secondary.suffix ?? suffix}`;
+      )}${suffix}`;
     }
   };
   const labelNode = element("span", "profile-coefficient__label");
@@ -1541,26 +1537,20 @@ export function characterProfileCard({
     } else {
       const flatMain = Number(eq.flatMainStatToPercent);
       const flatAttack = flatMain * Number(eq.attackToMainStat);
-      const bossDamageToMainPercent = Number(eq.bossDamageToMainPercent);
+      const toFinalDamagePercent = (mainPercentEquivalent) =>
+        mainPercentEquivalentToFinalDamagePercent(mainPercentEquivalent, eq.oneMainPercentRelative);
+      const finalDamageAvailable = toFinalDamagePercent(1) !== null;
+      const finalDamageComparison = finalDamageAvailable ? {
+        basis: "최종뎀",
+        fromMainPercent: toFinalDamagePercent,
+        digits: 3,
+      } : null;
       const standardCoefficient = (label, value, options = {}) =>
         profileCoefficient(label, value, {
           ...options,
           basis: "주스탯",
-          secondary: {
-            basis: "데미지",
-            value: toBossDamagePercentEquivalent(
-              value,
-              bossDamageToMainPercent,
-            ),
-            valueForAmount: typeof options.valueForAmount === "function"
-              ? (amount) => toBossDamagePercentEquivalent(
-                  options.valueForAmount(amount),
-                  bossDamageToMainPercent,
-                )
-              : null,
-            digits: 2,
-            suffix: "% 급",
-          },
+          suffix: "%",
+          secondary: finalDamageComparison,
         });
       const subStatCoefficients = subStats.flatMap((stat) => [
         standardCoefficient(
@@ -1579,7 +1569,7 @@ export function characterProfileCard({
         element(
           "p",
           "profile-coefficients__caption",
-          "주스탯%급(윗줄) · 데미지%급(아랫줄)",
+          finalDamageAvailable ? "주스탯% (윗줄) · 최종뎀% (아랫줄)" : "주스탯%",
         ),
         ...[
           standardCoefficient("보공 +1%", eq.bossDamageToMainPercent),

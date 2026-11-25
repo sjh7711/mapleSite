@@ -30,7 +30,7 @@ const {
   needsEquipmentTooltipRefresh,
   shouldShowCharacterProfileWarning,
   shouldKeepNewerSavedCharacterData,
-  toBossDamagePercentEquivalent,
+  mainPercentEquivalentToFinalDamagePercent,
   xenonMainPercentToDamagePercent,
   levelTwoStatBonus,
 } = await import(
@@ -58,13 +58,13 @@ test.after(() => {
   else globalThis.localStorage = originalStorage;
 });
 
-test("주스탯%급을 데미지%급으로 같은 기준에서 환산한다", () => {
-  assert.equal(toBossDamagePercentEquivalent(1.19, 1.19), 1);
-  assert.ok(
-    Math.abs(toBossDamagePercentEquivalent(0.301, 1.19) - 0.2529411765) < 1e-9,
-  );
-  assert.equal(toBossDamagePercentEquivalent(10, 0), null);
-  assert.equal(toBossDamagePercentEquivalent(Number.NaN, 1), null);
+test("주스탯 등가치를 최종 데미지 증가율 %로 표시한다", () => {
+  const unit = 0.0008679088714544358;
+  assert.equal(mainPercentEquivalentToFinalDamagePercent(0, unit), 0);
+  assert.ok(Math.abs(mainPercentEquivalentToFinalDamagePercent(47.196915, unit) - 4.096262) < 1e-6);
+  assert.equal(mainPercentEquivalentToFinalDamagePercent(10, 0), null);
+  assert.equal(mainPercentEquivalentToFinalDamagePercent(null, unit), null);
+  assert.equal(mainPercentEquivalentToFinalDamagePercent(Number.NaN, unit), null);
 });
 
 test("렙당2는 캐릭터 레벨의 9레벨 경계를 적용하고 정보가 없으면 환산하지 않는다", () => {
@@ -210,15 +210,15 @@ test("일반 직업 환산 카드는 옵션 단위와 380% 방무 기준을 직�
 
   assert.match(
     source,
-    /"주스탯%급\(윗줄\) · 데미지%급\(아랫줄\)"/,
+    /"주스탯% \(윗줄\) · 최종뎀% \(아랫줄\)"/,
   );
   assert.match(source, /"각 옵션의 가치"/);
   assert.match(source, /profile-coefficient__amount/);
   assert.match(source, /amount\.value = "10"/);
   assert.match(source, /basis: "주스탯"/);
-  assert.match(source, /basis: "데미지"/);
-  assert.match(source, /digits: 2,/);
-  assert.match(source, /suffix: "% 급"/);
+  assert.match(source, /basis: "최종뎀"/);
+  assert.match(source, /secondary\.fromMainPercent\(primary\)/);
+  assert.match(source, /suffix: "%"/);
   assert.match(source, /profile-coefficient__comparison/);
   assert.doesNotMatch(source, /풀도핑 방어율 무시/);
   assert.match(source, /`전투복 · \$\{combatOutfitSummary\}`/);
