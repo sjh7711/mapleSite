@@ -6,6 +6,7 @@ import test, { after, before } from "node:test";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { build } from "esbuild";
+import { FULL_BOSS_DOPING } from "maple-core/stat-profile";
 
 const PROJECT_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 let temporaryDirectory;
@@ -67,7 +68,7 @@ function emptySnapshot(finalStats) {
 }
 
 test("제논은 STR·DEX·LUK를 모두 쓰고 INT·HP·마력은 제외한다", () => {
-  const result = calculateSpecialAddOptionConversion({
+  const input = {
     character: { character_class: "제논" },
     snapshot: emptySnapshot({
       STR: 1_000,
@@ -78,8 +79,8 @@ test("제논은 STR·DEX·LUK를 모두 쓰고 INT·HP·마력은 제외한다",
       "보스 몬스터 데미지": 200,
     }),
     statModel: "xenon",
-    doping: null,
-  });
+  };
+  const result = calculateSpecialAddOptionConversion(input);
 
   assert.equal(result.details.mode, "character-dynamic");
   assert.ok(result.flatStatToDamagePercent.STR > 0);
@@ -92,6 +93,16 @@ test("제논은 STR·DEX·LUK를 모두 쓰고 INT·HP·마력은 제외한다",
   assert.ok(Math.abs(
     result.targetToDamagePercent - result.flatStatToDamagePercent.STR
   ) < 1e-12);
+
+  const full = calculateSpecialAddOptionConversion({
+    ...input, doping: FULL_BOSS_DOPING,
+  }).details;
+  for (const stat of ["STR", "DEX", "LUK"]) {
+    assert.equal(full.dopedBase[stat] - result.details.dopedBase[stat], 125);
+  }
+  assert.equal(full.combatModel.totals.flatAttack - result.details.combatModel.totals.flatAttack, 400);
+  assert.equal(full.dopedCriticalDamage - result.details.dopedCriticalDamage, 45.5);
+  assert.ok(Math.abs(full.dopedIgnoreDefense - 0.4186) < 1e-12);
 });
 
 test("제논도 공통 기준·공용 스킬·직업 스킬·대상 효과 파이프라인을 쓴다", () => {

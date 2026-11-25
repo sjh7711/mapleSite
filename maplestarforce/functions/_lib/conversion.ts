@@ -1221,6 +1221,12 @@ export function buildCharacterConversionFromData(
       baselineSkillSummaryVersion: CHARACTER_BASELINE_SKILL_SUMMARY_VERSION,
     };
   }
+  if (model !== "demon-avenger") {
+    profiles.fullBoss.details = {
+      ...profiles.fullBoss.details,
+      championBlessingLevel: FULL_BOSS_DOPING.championBlessingLevel,
+    };
+  }
   const cashEquipmentSummary = cashEquipmentDisplaySummary(
     snapshot.cashEquipmentData,
   );

@@ -3,8 +3,23 @@
  * Node, Discord, DOM에 의존하지 않아 브라우저와 Worker에서도 그대로 쓴다.
  */
 
+export const CHARACTER_CONVERSION_CACHE_VERSION = "combat-profile-v74-champion-blessing";
+
+// 넥슨 유니온 챔피언 가이드의 전투 능력치 5레벨 기준.
+// https://maplestory.nexon.com/Guide/N23GameInformation/Articles/409
+const CHAMPION_BLESSING_LEVEL_5 = {
+  level: 5,
+  attackMagic: 25,
+  allStat: 50,
+  hp: 2_500,
+  bossDamage: 10,
+  criticalDamage: 2.5,
+  ignoreDefense: 10,
+};
+
 export const FULL_BOSS_DOPING = {
   label: "풀도핑 (고급 무기 제련·이벤트 버프 포함)",
+  championBlessingLevel: CHAMPION_BLESSING_LEVEL_5.level,
   items: [
     "익스트림 레드/블루",
     "길드의 더 큰 축복",
@@ -20,17 +35,16 @@ export const FULL_BOSS_DOPING = {
     "쓸만한 샤프 아이즈·어드밴스드 블레스",
   ],
   totals: {
-    // 환산 주스탯의 기본 풀도핑 선택값과 같은 합산 기준이다.
-    attackMagic: 375,
+    attackMagic: 375 + CHAMPION_BLESSING_LEVEL_5.attackMagic,
     attackMagicPercent: 50,
-    mainStat: 75,
-    subStat: 75,
-    hp: 1_500,
-    bossDamage: 95,
+    mainStat: 75 + CHAMPION_BLESSING_LEVEL_5.allStat,
+    subStat: 75 + CHAMPION_BLESSING_LEVEL_5.allStat,
+    hp: 1_500 + CHAMPION_BLESSING_LEVEL_5.hp,
+    bossDamage: 95 + CHAMPION_BLESSING_LEVEL_5.bossDamage,
     damage: 111,
-    criticalDamage: 43,
+    criticalDamage: 43 + CHAMPION_BLESSING_LEVEL_5.criticalDamage,
     ignoreDefense: 15,
-    ignoreDefenseSources: [15, 24],
+    ignoreDefenseSources: [15, 24, CHAMPION_BLESSING_LEVEL_5.ignoreDefense],
     // 보스 효율은 짧은 극딜 한 번이 아니라 6분 전투로 비교한다.
     // 패시브 특수 반지는 상시 적용하고, 액티브 특수 반지는 직업별
     // 연무장 타임라인에서 측정한 극딜 구간 피해 비중으로 환산한다.

@@ -1,6 +1,9 @@
 import { calculatorStorage, isSharedResult, registerResultShareProfile } from "./result-share-state.js";
 import { STAT_EQUIVALENCE } from "maple-core/potential";
-import { FULL_BOSS_DOPING } from "maple-core/stat-profile";
+import {
+  CHARACTER_CONVERSION_CACHE_VERSION,
+  FULL_BOSS_DOPING,
+} from "maple-core/stat-profile";
 import {
   CHARACTER_BASELINE_SKILL_SUMMARY_VERSION,
   calculateIgnoreDefenseEquivalent,
@@ -126,6 +129,13 @@ export function needsBaselineSkillRefresh(profile) {
     !Array.isArray(profile.details?.baselineSkills) ||
     profile.details.baselineSkillSummaryVersion !== CHARACTER_BASELINE_SKILL_SUMMARY_VERSION
   ));
+}
+
+export function needsCharacterConversionRefresh(savedProfile) {
+  return Boolean(
+    savedProfile?.profiles?.fullBoss &&
+    savedProfile.conversionVersion !== CHARACTER_CONVERSION_CACHE_VERSION,
+  );
 }
 
 export function shouldShowCharacterProfileWarning(warning) {
@@ -680,6 +690,9 @@ function fullBossDopingDetails(profile, conventionalAddOption, collapsed = false
   ).trim();
   const appliedItems = [
     ...FULL_BOSS_DOPING.items,
+    ...(profile.details?.championBlessingLevel
+      ? [`챔피언의 가호 ${profile.details.championBlessingLevel}레벨`]
+      : []),
     ...combatOutfitItems,
     ...(masterLabelPlus
       ? [`마스터라벨 플러스 · ${masterLabelPlus}`]
@@ -864,6 +877,10 @@ async function searchCharacter(
       throw new Error(payload?.error?.message ?? payload?.message ?? `조회 실패 (${response.status})`);
     }
     const dataFreshness = normalizeDataFreshness(payload.dataFreshness);
+    const conversionVersion = response.headers.get("X-Conversion-Version");
+    const upgradesConversion =
+      needsCharacterConversionRefresh(saved) &&
+      conversionVersion === CHARACTER_CONVERSION_CACHE_VERSION;
     const upgradesEquipmentTooltip =
       needsEquipmentTooltipRefresh(saved?.equipmentSummary) &&
       hasCurrentEquipmentTooltipData(payload.equipmentSummary);
@@ -876,11 +893,11 @@ async function searchCharacter(
         "원본 장비 정보를 불러오지 못했습니다. 잠시 후 정보 갱신을 눌러 주세요.",
       );
     }
-    if (!upgradesEquipmentTooltip && shouldKeepNewerSavedCharacterData(
-      saved,
-      payload?.character?.name,
-      dataFreshness,
-    )) {
+    if (
+      !upgradesEquipmentTooltip &&
+      !upgradesConversion &&
+      shouldKeepNewerSavedCharacterData(saved, payload?.character?.name, dataFreshness)
+    ) {
       message = "브라우저에 저장된 더 최신 캐릭터 정보를 유지했습니다.";
       messageTone = "";
       return;
@@ -896,6 +913,7 @@ async function searchCharacter(
       warnings: Array.isArray(payload.warnings) ? payload.warnings : [],
       attribution: payload.attribution,
       equipmentSummary: payload.equipmentSummary ?? null,
+      conversionVersion,
       ...(dataFreshness ? { dataFreshness } : {}),
       presetRequest,
       ...(presetSelection ? { presetSelection } : {}),
@@ -920,7 +938,8 @@ function scheduleEquipmentTooltipRefresh(characterName) {
   const needsTooltip = needsEquipmentTooltipRefresh(summary);
   const needsCashEquipment = needsCashEquipmentDisplayRefresh(profile);
   const needsSkills = needsBaselineSkillRefresh(profile);
-  if (!needsTooltip && !needsCashEquipment && !needsSkills) return;
+  const needsConversion = needsCharacterConversionRefresh(saved);
+  if (!needsTooltip && !needsCashEquipment && !needsSkills && !needsConversion) return;
   const attemptKey = [
     characterName,
     summary?.version ?? "legacy",
@@ -928,6 +947,7 @@ function scheduleEquipmentTooltipRefresh(characterName) {
     saved?.dataFreshness?.fetchedAt ?? "unknown",
     needsCashEquipment ? "cash-equipment-display" : "tooltip-only",
     needsSkills ? "baseline-skills" : "current-skills",
+    saved?.conversionVersion ?? "legacy-conversion",
   ].join(":");
   if (equipmentTooltipRefreshAttempts.has(attemptKey)) return;
   equipmentTooltipRefreshAttempts.add(attemptKey);
@@ -938,7 +958,8 @@ function scheduleEquipmentTooltipRefresh(characterName) {
       (
         !needsEquipmentTooltipRefresh(saved?.equipmentSummary) &&
         !needsCashEquipmentDisplayRefresh(saved?.profiles?.fullBoss) &&
-        !needsBaselineSkillRefresh(saved?.profiles?.fullBoss)
+        !needsBaselineSkillRefresh(saved?.profiles?.fullBoss) &&
+        !needsCharacterConversionRefresh(saved)
       )
     ) {
       return;
