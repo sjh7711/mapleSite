@@ -438,7 +438,7 @@ test("환산 계약 버전으로 이전 단일 부스탯 캐시와 키를 분리
     versionedUrl.searchParams.get("conversionVersion"),
     characterConversionCacheVersion,
   );
-  assert.equal(characterConversionCacheVersion, "combat-profile-v84-source-verification");
+  assert.equal(characterConversionCacheVersion, "combat-profile-v85-class-stat-sources");
   const freshSnapshotKey = createSnapshotCacheKey(request, "테스트", "fresh");
   const staleSnapshotKey = createSnapshotCacheKey(request, "테스트", "stale");
   assert.equal(characterSnapshotCacheVersion, "character-snapshot-v3");
@@ -557,6 +557,23 @@ test("출처 합산과 API로 오라 웨폰·쓸만한 샤프 아이즈·컨티 
           });
         }
         if (apiPath.endsWith("/propensity")) return Response.json({ charisma_level: 100 });
+        if (apiPath.endsWith("/skill") && className === "보우마스터") {
+          const grade = request.searchParams.get("character_skill_grade");
+          if (grade === "3") payload.character_skill = [
+            { skill_name: "익스트림 아쳐리 : 활", skill_level: 10,
+              skill_effect: "방어력 25% 감소, 공격력 30 증가, 최종 데미지 30% 증가" },
+          ];
+          if (grade === "4") payload.character_skill = [
+            { skill_name: "샤프 아이즈", skill_level: 30,
+              skill_effect: "300초 동안 크리티컬 확률 20%, 크리티컬 데미지 15% 증가" },
+          ];
+          if (grade === "hyperpassive") payload.character_skill = [
+            { skill_name: "샤프 아이즈-크리티컬 레이트", skill_level: 1,
+              skill_effect: "크리티컬 확률 5% 증가" },
+            { skill_name: "샤프 아이즈-이그노어 가드", skill_level: 1,
+              skill_effect: "방어율 무시 효과 5% 추가" },
+          ];
+        }
         if (apiPath.endsWith("/skill") && request.searchParams.get("character_skill_grade") === "5") {
           payload.character_skill = [
             {
@@ -576,7 +593,7 @@ test("출처 합산과 API로 오라 웨폰·쓸만한 샤프 아이즈·컨티 
               skill_effect: "270초 동안 크리티컬 확률 10%, 크리티컬 데미지 8% 증가",
             },
           ];
-          if (className !== "렌") {
+          if (className === "제논" || className === "바이퍼") {
             const faces = "3 : 공격력 15 증가\n4 : 크리티컬 확률 15% 증가\n5 : 데미지 20% 증가";
             payload.character_skill.push(
               { skill_name: "로디드 다이스", skill_level: 30,
@@ -634,6 +651,20 @@ test("출처 합산과 API로 오라 웨폰·쓸만한 샤프 아이즈·컨티 
   assert.equal(different.fullBoss.details.currentBossDamage, 175);
   assert.equal(different.fullBoss.details.currentCriticalRate, 106);
   assert.equal(different.fullBoss.details.currentIgnoreDefense, 77.32);
+
+  const bow = await fetchConversion({
+    ...buffsOff,
+    "최종 데미지": 56,
+    "방어율 무시": 74.35,
+    "크리티컬 확률": 120,
+    "크리티컬 데미지": 121.6,
+  }, "보우마스터");
+  for (const name of ["최종 데미지", "방어율 무시", "크리티컬 확률", "크리티컬 데미지"]) {
+    assert.equal(bow.fullBoss.details.statVerification.find((row) => row.name === name).matched, true, name);
+  }
+  assert.equal(bow.fullBoss.details.includedNativeSharpEyesDamage, 15);
+  assert.equal(bow.fullBoss.details.dopedCriticalRate, 120);
+  assert.equal(bow.fullBoss.details.usefulSharpEyesCriticalRateBonus, 0);
 
   const diceEffect = (profile) => profile.details.activeSkillCycles
     .find(({ name }) => name === "로디드 다이스");

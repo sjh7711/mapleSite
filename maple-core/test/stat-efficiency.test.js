@@ -15,6 +15,7 @@ import {
   calculateCombatRingBonuses,
   calculateCharacterPotentialConversion,
   calculateIgnoreDefenseEquivalent,
+  reconstructCharacterStats,
   resolveClassDamageChannels,
   resolveCharacterExternalBonuses,
   resolveCharacterPresetSnapshot,
@@ -29,6 +30,52 @@ function statData(values) {
     })),
   };
 }
+
+test("스탯 출처 합산은 숙련도·공속 패시브와 전역 방무를 읽고 공격기 자체 효과를 제외한다", () => {
+  const skill = (skill_name, skill_effect, skill_level = 30) =>
+    ({ skill_name, skill_effect, skill_level });
+  const character = { character_class: "보우마스터", character_level: 290 };
+  const snapshot = {
+    statData: statData({ "AP 배분 DEX": 1000 }),
+    equipmentData: { item_equipment: [{ item_equipment_slot: "무기", item_equipment_part: "활" }] },
+    skillData: [
+      { character_skill_grade: "0", character_skill: [
+        skill("정령의 축복", "공격력 20, 마력 20 증가", 20),
+        skill("여제의 축복", "공격력 30, 마력 30 증가"),
+      ] },
+      { character_skill_grade: "2", character_skill: [
+        skill("보우 액셀레이션", "공격 속도 2단계, 민첩성 20 증가"),
+      ] },
+      { character_skill_grade: "3", character_skill: [
+        skill("익스트림 아쳐리 : 활", "방어력 25% 감소, 공격력 30 증가, 최종 데미지 30% 증가"),
+      ] },
+      { character_skill_grade: "4", character_skill: [
+        skill("보우 엑스퍼트", "활 숙련도 증가량 71%로 증가, 공격력 31, 크리티컬 데미지 16% 증가"),
+        skill("마크맨쉽", "공격 시 몬스터의 물리 방어율 25% 무시, 공격력 25% 증가"),
+      ] },
+      { character_skill_grade: "5", character_skill: [
+        skill("블링크", "[패시브 효과 : 공격력, 마력 30 증가]"),
+        skill("개별 공격기", "[패시브 효과 : 적중 시 100%의 데미지로 공격, 크리티컬 확률 100% 증가]"),
+      ] },
+      { character_skill_grade: "6", character_skill: [
+        skill("오리진", "HP 100 소비, 최대 15명의 적을 100%의 데미지로 공격\n보스 몬스터 공격 시 데미지 40% 증가, 크리티컬 확률 100%"),
+      ] },
+    ],
+  };
+  const input = { character, snapshot, mainStat: "DEX" };
+  const { computed, attack } = reconstructCharacterStats(input);
+  assert.deepEqual(attack.공격력, { flat: 91, percent: 25 });
+  assert.equal(computed.DEX, 1020);
+  assert.equal(computed.마력, 60);
+  assert.equal(computed["방어율 무시"], 25);
+  assert.equal(computed["크리티컬 데미지"], 16);
+  assert.equal(computed["크리티컬 확률"], 5);
+  assert.equal(computed["보스 몬스터 데미지"], 0);
+  assert.equal(computed["최종 데미지"], 0);
+  const active = reconstructCharacterStats({ ...input, activeSkillNames: ["익스트림 아쳐리 : 활"] });
+  assert.equal(active.attack.공격력.flat, 121);
+  assert.ok(Math.abs(active.computed["최종 데미지"] - 30) < 1e-9);
+});
 
 test("직접 방무와 설명에 표시된 오리진 강화 방무를 해당 스킬에만 적용한다", () => {
   const channels = skillLocalIgnoreDefenseChannelsFromSkills([{

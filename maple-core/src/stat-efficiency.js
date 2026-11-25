@@ -3341,6 +3341,7 @@ function selectJointBossPreset({
   characterLevel,
   characterClass,
   skillData,
+  includedNativeSharpEyesDamage,
 }) {
   if (!Array.isArray(statData?.final_stat) || !statData.final_stat.length) {
     return null;
@@ -3351,7 +3352,8 @@ function selectJointBossPreset({
   const criticalReinforceUptime = CRITICAL_REINFORCE_CLASSES.has(characterClass)
     ? skillAverageUptime(skillData, "크리티컬 리인포스", 30 / 120)
     : 0;
-  const criticalReinforceExtraRate = criticalReinforceUptime > 0
+  const criticalReinforceExtraRate = criticalReinforceUptime > 0 &&
+    includedNativeSharpEyesDamage == null
     ? sharpEyesHyperCriticalRate(skillData) +
       (learnedSkill(skillData, "쓸만한 샤프 아이즈") ? 10 : 0)
     : 0;
@@ -3487,6 +3489,7 @@ export function resolveCharacterPresetSnapshot({
   characterClass = "",
   statData,
   presetPolicy,
+  includedNativeSharpEyesDamage = null,
 }) {
   const data = {
     equipmentData,
@@ -3532,6 +3535,7 @@ export function resolveCharacterPresetSnapshot({
       characterLevel,
       characterClass,
       skillData,
+      includedNativeSharpEyesDamage,
     });
     if (jointSelection) {
       selected = jointSelection;
@@ -3883,18 +3887,81 @@ function unreflectedStats({
   };
 }
 
-// Buffs with an activation condition and effects on individual attacks do not
-// contribute to the character's always-on stat total.
-function statWindowSkillTexts(skillData) {
-  return allCharacterSkills(skillData).flatMap(({ skill_name, skill_effect }) => {
+const STAT_WINDOW_STAT_LEAD =
+  /^(?:(?:보스 몬스터 공격 시 |최종 )?데미지|크리티컬 (?:데미지|확률)|(?:몬스터 )?방어율 무시|공격력(?:\s*(?:과|및|\/|,)\s*마력)?|마력|올스탯|힘|민첩|지력|행운|STR|DEX|INT|LUK|모든 능력치|최대\s*HP|(?:건의 )?공격\s*속도|(?:최대 )?이동\s*속도|회피(?:율| 확률)|스탠스(?: 확률)?|방어력|공격 속성 내성|상태 이상 내성)(?:가|이)?\s*[:+]?\s*\d/u;
+const STAT_WINDOW_MASTERY_LEAD =
+  /^[\p{L}\s,]{0,65}숙련도\s*(?:증가량\s*)?\d+(?:\.\d+)?%/u;
+const STAT_WINDOW_TRIGGER =
+  /\d+\s*초|재사용|적중|타격|중첩|소환 시|공격할 때|공격을 받을|발동 시|스킬 사용 시|받는 대상|상태 이상에|(?:크리티컬|공격|적 처치|회피 성공|피격|획득|레벨업|전투 상태)\s*시|\d+%p|감소되는|소비/u;
+const STAT_WINDOW_PERMANENT_LEAD = /^(?:추가로\s*)?영구(?:적으로|히)\s*/u;
+const STAT_WINDOW_ATTACK_TEXT = /\d+(?:\.\d+)?%\s*(?:의\s*)?데미지로/u;
+const STAT_WINDOW_CONDITIONAL_SKILLS = new Set([
+  "익스트림 아쳐리 : 활", "익스트림 아쳐리 : 석궁",
+  "태도 마스터리", "대검 마스터리", "디바인 포스", "디바인 스위프트",
+  "샤프 아이즈-크리티컬 레이트", "샤프 아이즈-이그노어 가드",
+]);
+const MUTUALLY_EXCLUSIVE_BLESSINGS = new Set(["정령의 축복", "여제의 축복"]);
+const GLOBAL_REVERSE_DEFENSE_SKILLS = new Set([
+  "마크맨쉽", "컴뱃 마스터리", "어드밴스드 차지 마스터리",
+  "디펜스 브레이크", "가드 크러쉬", "언포시어블", "언플리칭 커리지",
+  "오버버닝 캐논", "풀메탈 자켓",
+]);
+
+function normalizeStatWindowText(value) {
+  return value.trim()
+    .replace(STAT_WINDOW_PERMANENT_LEAD, "")
+    .replace(/민첩성/g, "민첩")
+    .replace(/지능/g, "지력");
+}
+
+function statWindowSkillTexts(skillData, equipmentData, activeSkillNames) {
+  const highGradeSkills = new Set((skillData ?? []).filter(({ character_skill_grade }) =>
+    /^(?:5|6|ascent)$/iu.test(String(character_skill_grade))).flatMap(({ character_skill }) =>
+    character_skill ?? []));
+  const unique = new Map();
+  for (const skill of allCharacterSkills(skillData)) {
+    const previous = unique.get(skill.skill_name);
+    if (!previous || number(skill.skill_level) > number(previous.skill_level)) {
+      unique.set(skill.skill_name, skill);
+    }
+  }
+  const blessing = [...unique.values()]
+    .filter(({ skill_name }) => MUTUALLY_EXCLUSIVE_BLESSINGS.has(skill_name))
+    .sort((left, right) => number(right.skill_level) - number(left.skill_level))[0];
+  const weaponType = activeEquipment(equipmentData).find((item) =>
+    item.item_equipment_slot === "무기")?.item_equipment_part;
+  return [...unique.values()].flatMap((skill) => {
+    const { skill_name, skill_effect } = skill;
+    if (MUTUALLY_EXCLUSIVE_BLESSINGS.has(skill_name) && skill_name !== blessing?.skill_name) return [];
+    const confirmedActive = activeSkillNames.includes(skill_name);
+    if (STAT_WINDOW_CONDITIONAL_SKILLS.has(skill_name) && !confirmedActive) return [];
     const text = String(skill_effect ?? "");
     const passive = [...text.matchAll(/\[패시브 효과\s*:\s*([^\]]+)\]/gu)];
-    if (passive.length) return passive.map((match) => match[1]);
-    if (/리인포스|보스\s*킬러|이그노어\s*가드|[ -]강화$/u.test(skill_name)) return [];
-    return text.split(/\r?\n/u).map((line) => line.trim().replace(/^영구적으로\s*/u, ""))
-      .filter((line) =>
-        /^(?:데미지|보스 몬스터 공격 시 데미지|최종 데미지|크리티컬 (?:데미지|확률)|(?:몬스터 )?방어율 무시|공격력|마력|올스탯|힘|민첩|지력|행운|모든 능력치)/u.test(line) &&
-        !/\d+\s*초|재사용|적중|타격|중첩|소환|공격할 때|스킬 사용 시|일정 확률|상태 이상/u.test(line));
+    if (!passive.length && !confirmedActive &&
+      /리인포스|보스\s*킬러|이그노어\s*가드|[ -]강화$/u.test(skill_name)) return [];
+    const needsPermanentMarker = !passive.length &&
+      (highGradeSkills.has(skill) || STAT_WINDOW_ATTACK_TEXT.test(text));
+    const lines = passive.length ? passive.map((match) => match[1]) : [text];
+    return lines.flatMap((part) => part.split(/\r?\n|\.\s+(?=\p{L})/u)).flatMap((raw) => {
+      if (needsPermanentMarker && !STAT_WINDOW_PERMANENT_LEAD.test(raw.trim())) return [];
+      let line = normalizeStatWindowText(raw);
+      if (GLOBAL_REVERSE_DEFENSE_SKILLS.has(skill_name)) {
+        line = line.replace(
+          /(^|,\s*)(?:공격 시\s*)?(?:몬스터의?\s*|적의\s*)?(?:물리\s*)?방어율(?:을)?\s*(\d+(?:\.\d+)?)%\s*무시/gu,
+          "$1방어율 무시 $2%",
+        );
+      }
+      const parts = line.split(/,\s*(?=\S+ 착용 시 )/u);
+      const unconditional = /^\S+ 착용 시 /u.test(parts[0]) ? "" : parts.shift();
+      const weaponConditions = parts;
+      const matchingWeaponEffects = weaponConditions.flatMap((condition) => {
+        const match = condition.match(/^(\S+) 착용 시 (.+)$/u);
+        return match?.[1] === weaponType ? [match[2]] : [];
+      });
+      return [unconditional, ...matchingWeaponEffects].filter((clause) =>
+        (STAT_WINDOW_STAT_LEAD.test(clause) || STAT_WINDOW_MASTERY_LEAD.test(clause)) &&
+        !STAT_WINDOW_TRIGGER.test(clause.replace(/보스 몬스터 공격 시 데미지/g, "보공")));
+    });
   });
 }
 
@@ -3919,7 +3986,7 @@ function hexaStatCombatBonuses(hexaStatData) {
  * available sources. The only aggregate API inputs used here are allocated AP
  * (a component of STR/DEX/INT/LUK) and never the totals being checked.
  */
-export function reconstructCharacterStats({ character, snapshot, mainStat }) {
+export function reconstructCharacterStats({ character, snapshot, mainStat, activeSkillNames = [] }) {
   const {
     statData, equipmentData, setEffectData, otherStatData, cashEquipmentData,
     petEquipmentData, skillData, linkSkillData, hyperStatData, unionRaiderData,
@@ -3933,7 +4000,7 @@ export function reconstructCharacterStats({ character, snapshot, mainStat }) {
     set_effect_info: (set.set_effect_info ?? []).filter((entry) =>
       set.total_set_count == null || number(entry.set_count) <= number(set.total_set_count)),
   }));
-  const skillTexts = statWindowSkillTexts(skillData);
+  const skillTexts = statWindowSkillTexts(skillData, equipmentData, activeSkillNames);
   const linkTexts = linkSkills(linkSkillData).map(({ skill_effect }) => skill_effect)
     .filter((text) => text &&
       !/\d+\s*초|공격하면|상태 이상|파티원|적에게|약점|재발동|재사용|공격할 때|소환 시|전투 상태/u.test(text));
@@ -4133,6 +4200,7 @@ export function calculateCharacterPotentialConversion({
   attackType,
   doping,
   includeLoadedDice = true,
+  includedNativeSharpEyesDamage = null,
   presetPolicy,
   resolvedPresetSnapshot = null,
 }) {
@@ -4169,6 +4237,7 @@ export function calculateCharacterPotentialConversion({
       characterClass: character.character_class,
       statData,
       presetPolicy,
+      includedNativeSharpEyesDamage,
     });
   const selectedHyperStatData = resolvedPresets.selectedSnapshot.hyperStatData;
   const selectedUnionRaiderData =
@@ -4180,8 +4249,9 @@ export function calculateCharacterPotentialConversion({
     resolvedPresets.activeSnapshot,
     resolvedPresets.selectedSnapshot,
   );
-  const classDopingAdjustment =
-    doping?.classAdjustments?.[character.character_class] ?? {};
+  const classDopingAdjustment = { ...doping?.classAdjustments?.[character.character_class] };
+  const nativeSharpEyesIncluded = includedNativeSharpEyesDamage !== null;
+  if (nativeSharpEyesIncluded) delete classDopingAdjustment.criticalRate;
   const classAlwaysOnCombat = resolveClassAlwaysOnCombatAdjustment(
     character.character_class,
     skillData,
@@ -4736,7 +4806,8 @@ export function calculateCharacterPotentialConversion({
     bossDamage:
       number(baseDopingTotals.bossDamage) + guildDifference.bossDamage,
     criticalDamage:
-      number(baseDopingTotals.criticalDamage) + guildDifference.criticalDamage,
+      number(baseDopingTotals.criticalDamage) + guildDifference.criticalDamage -
+      (doping?.sayramElixir ? Math.min(includedNativeSharpEyesDamage ?? 0, 16) : 0),
     ignoreDefenseSources: [
       ...(Array.isArray(baseDopingTotals.ignoreDefenseSources)
         ? baseDopingTotals.ignoreDefenseSources
@@ -4815,16 +4886,14 @@ export function calculateCharacterPotentialConversion({
     doping && includeEquippedRing ? combatRing.bossDamage : 0;
   const learnedSkills = learnedSkillNames(skillData);
   const combatOrdersSharpEyesBonus =
-    doping &&
+    doping && !nativeSharpEyesIncluded &&
     learnedSkills.has("쓸만한 컴뱃 오더스") &&
     learnedSkills.has("샤프 아이즈")
       ? 1
       : 0;
-  // Nexon 최종 스탯 API는 코어에 장착한 쓸만한 샤프 아이즈가 꺼진
-  // 상태의 크확을 반환한다. 외부 소비 도핑과 섞지 않고 실제 스킬을
-  // 보유한 캐릭터에만 +10%를 적용한다.
+  // 검증된 직업 샤프 아이즈가 스탯에 남아 있으면 코어 스킬은 겹치지 않는다.
   const usefulSharpEyesCriticalRateBonus =
-    doping && learnedSkills.has("쓸만한 샤프 아이즈")
+    doping && !nativeSharpEyesIncluded && learnedSkills.has("쓸만한 샤프 아이즈")
     ? 10
     : 0;
   const criticalDamageBeforeReinforce =
@@ -4834,7 +4903,9 @@ export function calculateCharacterPotentialConversion({
     number(classAlwaysOnAdjustment.criticalDamage) +
     (doping ? activeSkillCycle.criticalDamage : 0) +
     (doping?.sayramElixir ? 0 : combatOrdersSharpEyesBonus);
-  const sharpEyesHyperCriticalRateBonus = sharpEyesHyperCriticalRate(skillData);
+  const sharpEyesHyperCriticalRateBonus = nativeSharpEyesIncluded
+    ? 0
+    : sharpEyesHyperCriticalRate(skillData);
   // 크리티컬 확률은 세이람의 영약·이벤트 버프 같은 외부 도핑을
   // 의도적으로 배제한다. 선택한 보스 세팅과 직업 스킬 보정만 사용한다.
   // 기존 응답 필드명은 호환성을 위해 dopedCriticalRate로 유지한다.
@@ -5502,6 +5573,7 @@ export function calculateCharacterPotentialConversion({
       dopedCriticalRate,
       criticalRateBasis: "non-external-doping",
       sharpEyesHyperCriticalRateBonus,
+      includedNativeSharpEyesDamage,
       usefulSharpEyesCriticalRateBonus,
       effectiveBossCriticalRate,
       conditionalBossCriticalRateBonus,
