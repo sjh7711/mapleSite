@@ -2506,7 +2506,7 @@ test("심볼·하이퍼·HEXA를 제외한 기본 스탯을 최종 스탯에서 
   assert.equal(result.details.currentAttack, 5_102);
 });
 
-test("레테는 가호 추가 전 참조 도핑으로 기존 효율 표를 재현한다", () => {
+test("레테는 기존 참조 도핑으로 기존 효율 표를 재현한다", () => {
   const result = calculateCharacterPotentialConversion({
     character: { character_level: 286 },
     mainStat: "INT",
@@ -2517,6 +2517,7 @@ test("레테는 가호 추가 전 참조 도핑으로 기존 효율 표를 재�
       totals: {
         ...FULL_BOSS_DOPING.totals,
         attackMagic: 375,
+        attackMagicPercent: 50,
         mainStat: 75,
         subStat: 75,
         hp: 1_500,
