@@ -554,6 +554,91 @@ test("자동 보스 프리셋은 380 방어율 대상의 전체 피해로 조합
   assert.equal(result.selection.source.union, "auto-joint-damage");
 });
 
+test("자동 보스 링크는 후보 유니온 벞지로 소울 컨트랙트 가치를 평가한다", () => {
+  const soulContract = [{
+    skill_name: "소울 컨트랙트",
+    skill_effect: "10초 동안 데미지 60% 증가, 재사용 대기시간 60초",
+  }];
+  const steadyDamage = [{
+    skill_name: "상시 데미지",
+    skill_effect: "데미지 15% 증가",
+  }];
+  const input = {
+    mainStat: "STR",
+    subStats: ["DEX"],
+    attackType: "attack",
+    statData: statData({
+      STR: 50_000, DEX: 5_000, 공격력: 5_000,
+      데미지: 100, "보스 몬스터 데미지": 500, "방어율 무시": 98,
+      "버프 지속시간": 0,
+    }),
+    linkSkillData: {
+      character_link_skill: steadyDamage,
+      character_link_skill_preset_1: soulContract,
+      character_link_skill_preset_2: steadyDamage,
+    },
+  };
+  const steady = resolveCharacterPresetSnapshot(input);
+  assert.equal(steady.selection.selected.link, 2);
+
+  const withDuration = resolveCharacterPresetSnapshot({
+    ...input,
+    unionRaiderData: {
+      use_preset_no: 1,
+      union_state_stat: ["STR 1 증가"],
+      union_state_stat_preset: [
+        { preset_no: 1, union_state_stat: ["STR 1 증가"] },
+        {
+          preset_no: 2,
+          union_state_stat: [
+            "보스 몬스터 공격 시 데미지 1% 증가", "버프 지속시간 86% 증가",
+          ],
+        },
+      ],
+    },
+  });
+  assert.equal(withDuration.selection.selected.union, 2);
+  assert.equal(withDuration.selection.selected.link, 1);
+});
+
+test("자동 보스는 조건부 링크 방무 및 상태이상 데미지를 프리셋별로 적용한다", () => {
+  const conditionalIgnore = {
+    skill_name: "임피리컬 널리지",
+    skill_effect: "중첩 당 데미지 3%, 방어율 무시 3% 증가, 최대 3회까지 중첩",
+  };
+  const abnormalDamage = {
+    skill_name: "인텐시브 인썰트",
+    skill_effect: "상태 이상에 걸린 몬스터 공격 시 데미지 9% 증가, 캐릭터보다 레벨이 낮은 몬스터 공격 시 데미지 9% 증가",
+  };
+  for (const { conditional, steady, ignore, status, expected } of [
+    { conditional: conditionalIgnore, steady: 12, ignore: 95, status: 0, expected: 1 },
+    { conditional: conditionalIgnore, steady: 12, ignore: 99.9, status: 0, expected: 2 },
+    { conditional: abnormalDamage, steady: 15, ignore: 98, status: 9, expected: 1 },
+    { conditional: abnormalDamage, steady: 20, ignore: 98, status: 9, expected: 2 },
+  ]) {
+    const link1 = [conditional];
+    const result = resolveCharacterPresetSnapshot({
+      mainStat: "STR",
+      subStats: ["DEX"],
+      attackType: "attack",
+      statData: statData({
+        STR: 50_000, DEX: 5_000, 공격력: 5_000,
+        데미지: 100, "보스 몬스터 데미지": 500,
+        "방어율 무시": ignore, "상태이상 추가 데미지": status,
+      }),
+      linkSkillData: {
+        character_link_skill: link1,
+        character_link_skill_preset_1: link1,
+        character_link_skill_preset_2: [{
+          skill_name: "상시 데미지",
+          skill_effect: `데미지 ${steady}% 증가`,
+        }],
+      },
+    });
+    assert.equal(result.selection.selected.link, expected);
+  }
+});
+
 test("어빌리티 프리셋 변경 시 상태이상 데미지를 active 기준 delta로 바꾼다", () => {
   const equipment = [
     {

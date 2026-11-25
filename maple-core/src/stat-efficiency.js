@@ -2885,7 +2885,7 @@ function applyPresetSelection(data, selected) {
   };
 }
 
-function presetCombatScore(texts, mainStat, subStats, attackType) {
+function presetCombatScore(texts, mainStat, subStats, attackType, conditional = {}) {
   const bonuses = parseTextBonuses(texts);
   const combat = combatBonusesFromTexts(texts, attackType);
   const primaryStats =
@@ -2927,10 +2927,11 @@ function presetCombatScore(texts, mainStat, subStats, attackType) {
     subFlat * 0.25 +
     attackPercent * 100 +
     combat.flatAttack * 4 +
-    combat.bossDamage * 100 +
-    combat.damage * 20 +
+    (combat.bossDamage + number(conditional.bossDamage)) * 100 +
+    (combat.damage + number(conditional.damage)) * 20 +
     combat.criticalDamage * 50 +
-    combat.ignoreDefenseSources.reduce((sum, value) => sum + value * 80, 0) +
+    [...combat.ignoreDefenseSources, ...(conditional.ignoreDefenseSources ?? [])]
+      .reduce((sum, value) => sum + value * 80, 0) +
     criticalRate * 5 -
     farmingPenalty * 100_000
   );
@@ -2955,19 +2956,23 @@ function selectBossLinkPreset(
   mainStat,
   subStats,
   attackType,
+  buffDurationPercent,
 ) {
   return selectScoredPreset(candidates, activePreset, (candidate) => {
     const preset = linkPresetData(linkSkillData, candidate);
+    const conditional = calculateConditionalLinkCycleBonuses(
+      preset,
+      buffDurationPercent,
+    );
     return presetCombatScore(
-      [
-        ...(preset.character_link_skill ?? []),
-        preset.character_owned_link_skill,
-      ]
-        .filter(Boolean)
-        .map((skill) => skill.skill_effect),
+      linkSkills(preset).map((skill) => skill.skill_effect),
       mainStat,
       subStats,
       attackType,
+      {
+        ...conditional,
+        damage: conditional.damage + conditionalDamageFromLink(preset),
+      },
     );
   });
 }
@@ -3148,14 +3153,15 @@ function changedFinalStat(
 }
 
 function jointBossPresetScore({
-  statData,
+  stats,
   activeVector,
   selectedVector,
   mainStat,
   subStats,
   attackType,
+  conditionalLinks,
+  statusAilmentDamage,
 }) {
-  const stats = finalStats(statData);
   const statValue = (stat) => changedFinalStat(
     number(stats[stat]),
     number(activeVector.flatStats[stat]),
@@ -3188,7 +3194,8 @@ function jointBossPresetScore({
   const damageTotal =
     number(stats["데미지"]) + number(stats["보스 몬스터 데미지"]) +
     selectedVector.damage + selectedVector.bossDamage -
-    activeVector.damage - activeVector.bossDamage;
+    activeVector.damage - activeVector.bossDamage +
+    conditionalLinks.damage + conditionalLinks.bossDamage + statusAilmentDamage;
   const criticalRate = Math.max(
     0,
     Math.min(
@@ -3206,12 +3213,17 @@ function jointBossPresetScore({
     Number.EPSILON,
     number(activeVector.ignoreDefenseRemaining),
   );
+  const conditionalRemaining = conditionalLinks.ignoreDefenseSources.reduce(
+    (remaining, value) => remaining * (1 - value / 100),
+    1,
+  );
   const ignoreDefense = Math.max(
     0,
     Math.min(
       1,
       1 - (1 - number(stats["방어율 무시"]) / 100) *
-        number(selectedVector.ignoreDefenseRemaining) / activeRemaining,
+        number(selectedVector.ignoreDefenseRemaining) / activeRemaining *
+        conditionalRemaining,
     ),
   );
   const defenseMultiplier = Math.max(0.0001, 1 - 3.8 * (1 - ignoreDefense));
@@ -3236,6 +3248,7 @@ function selectJointBossPreset({
   if (!Array.isArray(statData?.final_stat) || !statData.final_stat.length) {
     return null;
   }
+  const stats = finalStats(statData);
   const activeSnapshot = applyPresetSelection(data, active);
   const activeVector = presetDependentVector(
     { ...data, ...activeSnapshot },
@@ -3287,13 +3300,33 @@ function selectJointBossPreset({
             componentVectors[key].get(trial[key])
           ),
         );
+        // 링크의 가동률은 같은 후보 조합의 어빌리티·유니온 벞지를 사용한다.
+        const trialSnapshot = {
+          abilityData: abilityPresetData(data.abilityData, trial.ability),
+          unionRaiderData: unionPresetData(data.unionRaiderData, trial.union),
+          linkSkillData: linkPresetData(data.linkSkillData, trial.link),
+        };
+        const buffDuration = selectedBuffDurationPercent(
+          stats["버프 지속시간"],
+          data,
+          trialSnapshot,
+        );
         const score = jointBossPresetScore({
-          statData,
+          stats,
           activeVector,
           selectedVector,
           mainStat,
           subStats,
           attackType,
+          conditionalLinks: calculateConditionalLinkCycleBonuses(
+            trialSnapshot.linkSkillData,
+            buffDuration,
+          ),
+          statusAilmentDamage: selectedStatusAilmentDamage(
+            stats["상태이상 추가 데미지"],
+            data,
+            trialSnapshot,
+          ),
         });
         if (!best || score > best.score) best = { candidate, score };
       }
@@ -3377,40 +3410,6 @@ export function resolveCharacterPresetSnapshot({
       PRESET_COMPONENTS.map((component) => [component, "manual"]),
     );
   } else {
-    const equipmentChoice = selectBossEquipmentPreset(
-      equipmentData,
-      mainStat,
-      subStats,
-      attackType,
-      characterLevel,
-      characterClass,
-    ).presetNumber;
-    const hyperChoice = selectBossHyperStatPreset(
-      hyperStatData,
-      attackType,
-    ).presetNumber;
-    const unionChoice = selectBossUnionPreset(unionRaiderData, mainStat).presetNumber;
-    const independentSelection = {
-      equipment: equipmentChoice ?? active.equipment,
-      hyper: hyperChoice ?? active.hyper,
-      union: presetNumber(unionChoice) ?? active.union,
-      link: selectBossLinkPreset(
-        linkSkillData,
-        available.link,
-        active.link,
-        mainStat,
-        subStats,
-        attackType,
-      ),
-      ability: selectBossAbilityPreset(
-        abilityData,
-        available.ability,
-        active.ability,
-        mainStat,
-        subStats,
-        attackType,
-      ),
-    };
     const jointSelection = selectJointBossPreset({
       data,
       available,
@@ -3422,7 +3421,35 @@ export function resolveCharacterPresetSnapshot({
       characterLevel,
       characterClass,
     });
-    selected = jointSelection ?? independentSelection;
+    if (jointSelection) {
+      selected = jointSelection;
+    } else {
+      const equipment = selectBossEquipmentPreset(
+        equipmentData, mainStat, subStats, attackType, characterLevel, characterClass,
+      ).presetNumber ?? active.equipment;
+      const hyper = selectBossHyperStatPreset(hyperStatData, attackType)
+        .presetNumber ?? active.hyper;
+      const union = presetNumber(
+        selectBossUnionPreset(unionRaiderData, mainStat).presetNumber,
+      ) ?? active.union;
+      const ability = selectBossAbilityPreset(
+        abilityData, available.ability, active.ability, mainStat, subStats, attackType,
+      );
+      const buffDuration = selectedBuffDurationPercent(0, undefined, {
+        abilityData: abilityPresetData(abilityData, ability),
+        unionRaiderData: unionPresetData(unionRaiderData, union),
+      });
+      selected = {
+        equipment,
+        hyper,
+        union,
+        link: selectBossLinkPreset(
+          linkSkillData, available.link, active.link, mainStat, subStats, attackType,
+          buffDuration,
+        ),
+        ability,
+      };
+    }
     source = Object.fromEntries(
       PRESET_COMPONENTS.map((component) => [
         component,
@@ -3636,6 +3663,18 @@ function conditionalDamageFromAbility(abilityData) {
     );
     return sum + (match ? number(match[1]) : 0);
   }, 0);
+}
+
+function selectedStatusAilmentDamage(basePercent, active, selected) {
+  const base = number(basePercent);
+  const activeBonus = conditionalDamageFromAbility(active.abilityData) +
+    conditionalDamageFromLink(active.linkSkillData);
+  const selectedBonus = conditionalDamageFromAbility(selected.abilityData) +
+    conditionalDamageFromLink(selected.linkSkillData);
+  // Open API가 이미 포함한 효과는 프리셋 차이만 적용한다.
+  return activeBonus === 0 || base >= activeBonus
+    ? Math.max(0, base + selectedBonus - activeBonus)
+    : Math.max(base, selectedBonus);
 }
 
 /** 최종 스탯의 벞지에 선택 프리셋에서 바뀐 가변 출처만 반영한다. */
@@ -4601,35 +4640,11 @@ export function calculateCharacterPotentialConversion({
   const conditionalBossCriticalRate = effectiveBossCriticalRate === null
     ? null
     : effectiveBossCriticalRate + conditionalBossCriticalRateBonus;
-  const apiConditionalDamage = number(stats["상태이상 추가 데미지"]);
-  const activeAbilityConditionalDamage = conditionalDamageFromAbility(abilityData);
-  const selectedAbilityConditionalDamage = conditionalDamageFromAbility(
-    selectedAbilityData,
+  const currentConditionalDamage = selectedStatusAilmentDamage(
+    stats["상태이상 추가 데미지"],
+    { abilityData, linkSkillData },
+    { abilityData: selectedAbilityData, linkSkillData: selectedLinkSkillData },
   );
-  const activeLinkConditionalDamage = conditionalDamageFromLink(linkSkillData);
-  const selectedLinkConditionalDamage = conditionalDamageFromLink(
-    selectedLinkSkillData,
-  );
-  // 일부 공개 스냅샷은 어빌리티의 상태이상 데미지를 최종 스탯에
-  // 포함하고, 오래된/축약 스냅샷은 필드를 생략한다. 포함 여부를 판별해
-  // 전자는 selected-active delta, 후자는 선택 프리셋 값을 사용한다.
-  const abilityConditionalIsReflected =
-    activeAbilityConditionalDamage + activeLinkConditionalDamage === 0 ||
-    apiConditionalDamage >=
-      activeAbilityConditionalDamage + activeLinkConditionalDamage;
-  const currentConditionalDamage = abilityConditionalIsReflected
-    ? Math.max(
-        0,
-          apiConditionalDamage +
-          selectedAbilityConditionalDamage -
-          activeAbilityConditionalDamage +
-          selectedLinkConditionalDamage -
-          activeLinkConditionalDamage,
-      )
-    : Math.max(
-        apiConditionalDamage,
-        selectedAbilityConditionalDamage + selectedLinkConditionalDamage,
-      );
   const combatEffects = [];
   if (doping) {
     combatEffects.push(createCombatEffect({
