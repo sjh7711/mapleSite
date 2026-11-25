@@ -3,7 +3,7 @@
  * Node, Discord, DOM에 의존하지 않아 브라우저와 Worker에서도 그대로 쓴다.
  */
 
-export const CHARACTER_CONVERSION_CACHE_VERSION = "combat-profile-v79-stat-sources";
+export const CHARACTER_CONVERSION_CACHE_VERSION = "combat-profile-v80-boss-ied";
 
 // 넥슨 유니온 챔피언 가이드의 전투 능력치 5레벨 기준.
 // https://maplestory.nexon.com/Guide/N23GameInformation/Articles/409
@@ -54,7 +54,7 @@ export const FULL_BOSS_DOPING = {
     damage: 111,
     criticalDamage: 43 + CHAMPION_BLESSING_LEVEL_5.criticalDamage,
     ignoreDefense: 15,
-    ignoreDefenseSources: [15, 24, CHAMPION_BLESSING_LEVEL_5.ignoreDefense],
+    ignoreDefenseSources: [15, CHAMPION_BLESSING_LEVEL_5.ignoreDefense],
     // 보스 효율은 짧은 극딜 한 번이 아니라 6분 전투로 비교한다.
     // 패시브 특수 반지는 상시 적용하고, 액티브 특수 반지는 직업별
     // 연무장 타임라인에서 측정한 극딜 구간 피해 비중으로 환산한다.

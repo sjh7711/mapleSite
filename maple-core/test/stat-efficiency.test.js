@@ -2362,8 +2362,8 @@ test("챔피언의 가호 5레벨은 공통 풀도핑 능력치에 한 번씩 �
   assert.equal(full.combatModel.totals.attackPercent - base.combatModel.totals.attackPercent, 14);
   assert.equal(full.combatModel.totals.bossDamage - base.combatModel.totals.bossDamage, 105);
   assert.equal(full.dopedCriticalDamage - base.dopedCriticalDamage, 45.5);
-  assert.deepEqual(full.effectiveDopingTotals.ignoreDefenseSources, [15, 24, 10]);
-  assert.ok(Math.abs(full.dopedIgnoreDefense - 41.86) < 1e-9);
+  assert.deepEqual(full.effectiveDopingTotals.ignoreDefenseSources, [15, 10]);
+  assert.ok(Math.abs(full.dopedIgnoreDefense - 23.5) < 1e-9);
 });
 
 test("풀보스 크확은 공용·보스·조건부 보정을 구분하고 100%를 가정한다", () => {
