@@ -1898,7 +1898,7 @@ export function characterBaselineSkillSummary(skillData) {
     "스파이더 인 미러", "크레스트 오브 더 솔라",
     "에르다 퍼미에이션", "쓸만한 홀리 파운틴",
   ]);
-  const eventSkills = new Set(["훈련 일지", "아르고 호의 가호"]);
+  const eventSkills = new Set(["훈련 일지", "아르고 호의 가호", "윈터 파워업"]);
   return allCharacterSkills(skillData).flatMap((skill) => {
     const name = String(skill?.skill_name ?? "").trim();
     const event = eventSkills.has(name);
