@@ -19,6 +19,7 @@ import {
   type CharacterPotentialData,
   type NexonRequestDependencies,
 } from "../_lib/nexon";
+import { characterTemporaryBuffs } from "../_lib/temporary-buffs";
 
 export type Bindings = {
   NEXON_API_KEY: string;
@@ -517,6 +518,10 @@ export async function handleCharacterConversion(
       envelope.data,
       presetPolicy,
     );
+    result.profiles.fullBoss.details = {
+      ...result.profiles.fullBoss.details,
+      temporaryBuffs: await characterTemporaryBuffs(envelope.data),
+    };
     result.dataFreshness = {
       source: usedStaleSnapshot
         ? "stale-cache"

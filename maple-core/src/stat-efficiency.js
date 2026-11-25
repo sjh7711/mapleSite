@@ -3832,6 +3832,94 @@ export function calculateCharacterIgnoreDefenseEquivalent({
     : general;
 }
 
+function ignoreDefenseGainComponents(currentIgnoreDefense, enemyDefense, channels, confidence) {
+  const input = { currentIgnoreDefense, addedIgnoreDefense: 0.4, enemyDefense };
+  const unprofiled = calculateDamageChannelIgnoreDefenseGain(input);
+  const profiled = calculateDamageChannelIgnoreDefenseGain({ ...input, channels });
+  return {
+    unprofiled,
+    profiled,
+    blended: unprofiled + (profiled - unprofiled) * confidence,
+  };
+}
+
+export function auraWeaponSnapshotState(current, reference) {
+  if (!current?.basis || current.basis !== reference?.basis) return "unknown";
+  const { ignoreDefense, finalDamage, effect } = current;
+  const { ignoreDefense: offIgnore, finalDamage: offDamage } = reference;
+  if (
+    ![ignoreDefense, finalDamage, offIgnore, offDamage,
+      effect?.ignoreDefense, effect?.finalDamage].every(Number.isFinite) ||
+    offIgnore < 0 || offIgnore >= 100 || offDamage < 0 ||
+    effect.ignoreDefense <= 0 || effect.ignoreDefense >= 100 || effect.finalDamage <= 0
+  ) return "unknown";
+  const matches = (expectedIgnore, expectedDamage) =>
+    Math.abs(ignoreDefense - expectedIgnore) <= 0.011 &&
+    Math.abs(finalDamage - expectedDamage) <= 0.015;
+  if (matches(offIgnore, offDamage)) return "off";
+  return matches(
+    100 - (100 - offIgnore) * (1 - effect.ignoreDefense / 100),
+    (100 + offDamage) * (1 + effect.finalDamage / 100) - 100,
+  ) ? "on" : "unknown";
+}
+
+/** Confirmed snapshot IED is restored to OFF before applying the existing modeled cycle. */
+export function normalizeAuraWeaponBossProfile(profile, reference) {
+  const snapshot = profile?.details?.temporaryBuffs?.auraWeapon;
+  const state = auraWeaponSnapshotState(snapshot, reference);
+  const details = profile?.details;
+  const model = details?.combatModel;
+  const eq = profile?.statEquivalence;
+  if (
+    profile?.statModel !== "standard" || state !== "on" || details.auraWeaponNormalization ||
+    !model?.effects?.some((effect) => effect.source === "오라 웨폰" && effect.applied &&
+      effect.modifiers?.ignoreDefenseSources?.includes(snapshot.effect.ignoreDefense)) ||
+    !(snapshot.ignoreDefense < 100 && eq?.currentIgnoreDefense >= 0 &&
+      eq.currentIgnoreDefense < 1 && Number.isFinite(eq.oneMainPercentRelative) &&
+      eq.oneMainPercentRelative > 0)
+  ) return profile;
+
+  const remainingRatio = (100 - reference.ignoreDefense) /
+    (100 - snapshot.ignoreDefense);
+  const currentIgnoreDefense = 1 - (1 - eq.currentIgnoreDefense) * remainingRatio;
+  if (currentIgnoreDefense < 0) return profile;
+  const statEquivalence = { ...eq, currentIgnoreDefense };
+  const ignoreDefenseCalibration = {};
+  for (const defense of [300, 380]) {
+    const components = ignoreDefenseGainComponents(
+      currentIgnoreDefense,
+      defense / 100 * Number(eq.targetDefenseRemaining ?? 1),
+      model.damageChannels,
+      number(details.classDamageProfileConfidence),
+    );
+    const byMainPercent = (value) => value / eq.oneMainPercentRelative;
+    const blendedToMainPercent = byMainPercent(components.blended);
+    statEquivalence[`ied40Against${defense}ToMainPercent`] = blendedToMainPercent;
+    ignoreDefenseCalibration[`against${defense}`] = {
+      unprofiledToMainPercent: byMainPercent(components.unprofiled),
+      profiledToMainPercent: byMainPercent(components.profiled),
+      blendedToMainPercent,
+    };
+  }
+  return {
+    ...profile,
+    statEquivalence,
+    details: {
+      ...details,
+      dopedIgnoreDefense: currentIgnoreDefense * 100,
+      combatModel: {
+        ...model,
+        totals: { ...model.totals, ignoreDefense: currentIgnoreDefense },
+      },
+      ignoreDefenseCalibration,
+      auraWeaponNormalization: {
+        offIgnoreDefense: reference.ignoreDefense,
+        previousIed40Against380ToMainPercent: eq.ied40Against380ToMainPercent,
+      },
+    },
+  };
+}
+
 function changeEquipmentIgnoreDefense(
   currentIgnoreDefense,
   currentSources,
@@ -4975,31 +5063,17 @@ export function calculateCharacterPotentialConversion({
       number(classDamageProfile.iedBlendConfidence ?? 1),
     ))
     : 0;
-  const ignoreDefenseGainComponents = (enemyDefense) => {
-    const unprofiled = calculateDamageChannelIgnoreDefenseGain({
-      currentIgnoreDefense: dopedIgnoreDefense,
-      addedIgnoreDefense: 0.4,
-      enemyDefense,
-      channels: [],
-    });
-    const profiled = calculateDamageChannelIgnoreDefenseGain({
-      currentIgnoreDefense: dopedIgnoreDefense,
-      addedIgnoreDefense: 0.4,
-      enemyDefense,
-      channels: combatModel.damageChannels,
-    });
-    return {
-      unprofiled,
-      profiled,
-      blended: unprofiled +
-        (profiled - unprofiled) * classDamageProfileConfidence,
-    };
-  };
   const ied40Against300Components = ignoreDefenseGainComponents(
+    dopedIgnoreDefense,
     3 * targetDefenseRemaining,
+    combatModel.damageChannels,
+    classDamageProfileConfidence,
   );
   const ied40Against380Components = ignoreDefenseGainComponents(
+    dopedIgnoreDefense,
     3.8 * targetDefenseRemaining,
+    combatModel.damageChannels,
+    classDamageProfileConfidence,
   );
   const ied40Against300 = ied40Against300Components.blended /
     oneMainPercentRelative;
