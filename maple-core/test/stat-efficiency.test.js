@@ -556,6 +556,44 @@ test("자동 보스 프리셋은 380 방어율 대상의 전체 피해로 조합
   assert.equal(result.selection.source.union, "auto-joint-damage");
 });
 
+test("자동 보스 유니온은 크리티컬 리인포스의 100% 초과 크확을 반영한다", () => {
+  const commonUnion = [
+    "DEX 75 증가", "보스 몬스터 공격 시 데미지 40% 증가", "방어율 무시 40% 증가",
+  ];
+  const presets = [
+    { preset_no: 3, union_state_stat: [...commonUnion, "크리티컬 확률 40% 증가"] },
+    { preset_no: 10, union_state_stat: [...commonUnion, "크리티컬 확률 10% 증가", "공격력 10 증가"] },
+  ];
+  const input = {
+    characterClass: "보우마스터",
+    characterLevel: 290,
+    mainStat: "DEX",
+    subStats: ["STR"],
+    attackType: "attack",
+    statData: statData({
+      DEX: 76_051, STR: 9_920, 공격력: 8_255, 데미지: 64,
+      "보스 몬스터 데미지": 483, "방어율 무시": 96.68,
+      "크리티컬 확률": 185, "크리티컬 데미지": 110.55,
+    }),
+    unionRaiderData: {
+      use_preset_no: 10,
+      union_state_stat: presets[1].union_state_stat,
+      union_state_stat_preset: presets,
+    },
+    presetPolicy: { mode: "auto" },
+  };
+  assert.equal(resolveCharacterPresetSnapshot(input).selection.selected.union, 10);
+
+  const skillData = [{ character_skill: [{
+    skill_name: "크리티컬 리인포스", skill_level: 30,
+    skill_effect: "30초 동안 크리티컬 확률에 비례해 크리티컬 데미지 증가\n재사용 대기시간 120초",
+  }] }];
+  assert.equal(resolveCharacterPresetSnapshot({ ...input, skillData }).selection.selected.union, 3);
+  assert.equal(resolveCharacterPresetSnapshot({
+    ...input, skillData, presetPolicy: { mode: "active" },
+  }).selection.selected.union, 10);
+});
+
 test("자동 보스 링크는 후보 유니온 벞지로 소울 컨트랙트 가치를 평가한다", () => {
   const soulContract = [{
     skill_name: "소울 컨트랙트",

@@ -2014,6 +2014,10 @@ function skillAverageUptime(skillData, skillName, fallback = 0) {
     : fallback;
 }
 
+function criticalReinforceDamage(criticalRate, uptime) {
+  return Math.max(0, criticalRate) * 0.5 * uptime;
+}
+
 function cycleEventActive(event, elapsed) {
   const preparation = number(event?.preparation);
   if (preparation > 0) return elapsed >= preparation;
@@ -3176,6 +3180,8 @@ function jointBossPresetScore({
   attackType,
   conditionalLinks,
   statusAilmentDamage,
+  criticalReinforceUptime,
+  criticalReinforceExtraRate,
 }) {
   const statValue = (stat) => changedFinalStat(
     number(stats[stat]),
@@ -3211,18 +3217,18 @@ function jointBossPresetScore({
     selectedVector.damage + selectedVector.bossDamage -
     activeVector.damage - activeVector.bossDamage +
     conditionalLinks.damage + conditionalLinks.bossDamage + statusAilmentDamage;
-  const criticalRate = Math.max(
+  const rawCriticalRate = Math.max(
     0,
-    Math.min(
-      100,
-      number(stats["크리티컬 확률"]) +
-        selectedVector.criticalRate - activeVector.criticalRate,
-    ),
+    number(stats["크리티컬 확률"]) +
+      selectedVector.criticalRate - activeVector.criticalRate,
   );
   const criticalDamage = Math.max(
     0,
     number(stats["크리티컬 데미지"]) +
       selectedVector.criticalDamage - activeVector.criticalDamage,
+  ) + criticalReinforceDamage(
+    rawCriticalRate + criticalReinforceExtraRate,
+    criticalReinforceUptime,
   );
   const activeRemaining = Math.max(
     Number.EPSILON,
@@ -3243,7 +3249,7 @@ function jointBossPresetScore({
   );
   const defenseMultiplier = Math.max(0.0001, 1 - 3.8 * (1 - ignoreDefense));
   const criticalMultiplier =
-    1 + criticalRate / 100 * (0.35 + criticalDamage / 100);
+    1 + Math.min(100, rawCriticalRate) / 100 * (0.35 + criticalDamage / 100);
   const farmingPenalty = Math.pow(0.98, selectedVector.farmingOptions);
   return statTerm * attack * Math.max(0.01, 1 + damageTotal / 100) *
     criticalMultiplier * defenseMultiplier * farmingPenalty;
@@ -3259,11 +3265,21 @@ function selectJointBossPreset({
   attackType,
   characterLevel,
   characterClass,
+  skillData,
 }) {
   if (!Array.isArray(statData?.final_stat) || !statData.final_stat.length) {
     return null;
   }
   const stats = finalStats(statData);
+  // 일반 크리티컬 확률은 100%에서 포화되지만 크리티컬 리인포스는
+  // 초과분을 포함한다. 자동 선택에서는 스킬의 시간 가동률로 근사한다.
+  const criticalReinforceUptime = CRITICAL_REINFORCE_CLASSES.has(characterClass)
+    ? skillAverageUptime(skillData, "크리티컬 리인포스", 30 / 120)
+    : 0;
+  const criticalReinforceExtraRate = criticalReinforceUptime > 0
+    ? sharpEyesHyperCriticalRate(skillData) +
+      (learnedSkill(skillData, "쓸만한 샤프 아이즈") ? 10 : 0)
+    : 0;
   const activeSnapshot = applyPresetSelection(data, active, active.equipment);
   const activeVector = presetDependentVector(
     { ...data, ...activeSnapshot },
@@ -3344,6 +3360,8 @@ function selectJointBossPreset({
             data,
             trialSnapshot,
           ),
+          criticalReinforceUptime,
+          criticalReinforceExtraRate,
         });
         if (!best || score > best.score) best = { candidate, score };
       }
@@ -3386,6 +3404,7 @@ export function resolveCharacterPresetSnapshot({
   unionRaiderData = {},
   linkSkillData = {},
   abilityData = {},
+  skillData,
   mainStat,
   subStats = [],
   attackType,
@@ -3437,6 +3456,7 @@ export function resolveCharacterPresetSnapshot({
       attackType,
       characterLevel,
       characterClass,
+      skillData,
     });
     if (jointSelection) {
       selected = jointSelection;
@@ -4010,6 +4030,7 @@ export function calculateCharacterPotentialConversion({
       unionRaiderData,
       linkSkillData,
       abilityData,
+      skillData,
       mainStat,
       subStats: resolvedSubStats,
       attackType,
@@ -4755,7 +4776,7 @@ export function calculateCharacterPotentialConversion({
   const criticalReinforceAverageCriticalDamage =
     dopedCriticalRate === null
       ? 0
-      : dopedCriticalRate * 0.5 * criticalReinforceUptime;
+      : criticalReinforceDamage(dopedCriticalRate, criticalReinforceUptime);
   const effectiveBossCriticalRate = dopedCriticalRate === null
     ? null
     : dopedCriticalRate + number(classDopingAdjustment.bossCriticalRate);
