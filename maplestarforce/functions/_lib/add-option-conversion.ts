@@ -15,6 +15,7 @@ import {
   unionAllocatedStat,
   unionUnreflectedStat,
   xenonHexaStatScale,
+  type CharacterStatSources,
 } from "maple-core/stat-efficiency";
 import {
   composeCombatModel,
@@ -41,6 +42,7 @@ export type SpecialAddOptionConversionInput = {
   statModel: SpecialAddOptionStatModel;
   doping?: unknown;
   includeLoadedDice?: boolean;
+  selectedStatSources?: CharacterStatSources | null;
 } & Partial<CharacterPotentialSnapshot>;
 
 export type SpecialAddOptionConversionResult = {
@@ -551,6 +553,8 @@ function calculateXenon(
   snapshot: CharacterPotentialSnapshot,
 ): SpecialAddOptionConversionResult {
   const stats = finalStats(snapshot.statData);
+  const source = input.selectedStatSources;
+  const sourceAttack = source && source.attack.공격력.flat > 0 ? source.attack.공격력 : null;
   const activeSnapshot = input.activeSnapshot
     ? resolvedSnapshot({ ...input, snapshot: input.activeSnapshot })
     : snapshot;
@@ -678,7 +682,8 @@ function calculateXenon(
   for (const stat of XENON_STATS) {
     const final = stats[stat];
     const activeStatPercent = activePercent.stat[stat];
-    const unreflectedValue = unreflected[stat].total;
+    const attribute = source?.attributes[stat];
+    const unreflectedValue = attribute?.fixed ?? unreflected[stat].total;
     const activeUnreflectedValue = activeUnreflected[stat].total;
     if (!(final > activeUnreflectedValue)) {
       throw new Error(`NEXON API에서 제논의 ${stat} 환산 기준을 계산하지 못했습니다.`);
@@ -686,7 +691,7 @@ function calculateXenon(
     const activeBase = Math.ceil(
       (final - activeUnreflectedValue) / (1 + activeStatPercent / 100),
     );
-    base[stat] =
+    base[stat] = attribute?.base ?? (
       activeBase +
       equipmentFlatStat(snapshot.equipmentData, stat, characterLevel) -
       equipmentFlatStat(activeSnapshot.equipmentData, stat, characterLevel) +
@@ -697,10 +702,10 @@ function calculateXenon(
       unionAllocatedStat(snapshot.unionRaiderData, stat) -
       unionAllocatedStat(activeSnapshot.unionRaiderData, stat) +
       linkFlatStat(snapshot.linkSkillData, stat, characterLevel) -
-      linkFlatStat(activeSnapshot.linkSkillData, stat, characterLevel);
-    current[stat] =
-      Math.floor(base[stat] * (1 + percent.stat[stat] / 100)) +
-      unreflectedValue;
+      linkFlatStat(activeSnapshot.linkSkillData, stat, characterLevel));
+    const statPercent = attribute?.percent ?? percent.stat[stat];
+    current[stat] = source?.computed[stat] ??
+      (Math.floor(base[stat] * (1 + statPercent / 100)) + unreflectedValue);
     const extraFlat =
       number(flatStats?.[stat]) +
       number(adjustmentFlatStats?.[stat]) +
@@ -710,7 +715,7 @@ function calculateXenon(
     const extraPercent =
       number(adjustmentStatPercent?.[stat]) +
       number(adjustment.allStatPercent);
-    dopedPercent[stat] = percent.stat[stat] + extraPercent;
+    dopedPercent[stat] = statPercent + extraPercent;
     dopedBase[stat] = base[stat] + extraFlat;
     doped[stat] =
       Math.floor(dopedBase[stat] * (1 + dopedPercent[stat] / 100)) +
@@ -730,14 +735,14 @@ function calculateXenon(
     activeUnion.texts,
   );
   const selectedCombat = snapshotCombatTotals(snapshot, hyper.entries, union.texts);
-  const rawAttack =
+  const rawAttack = sourceAttack?.flat ?? (
     activeRawAttack +
     selectedCombat.flatAttack -
     activeCombat.flatAttack +
     coreBonusFlatAttack(selectedExternal.setEffect) -
     coreBonusFlatAttack(activeExternal.setEffect) +
     coreBonusFlatAttack(selectedPet.selected) -
-    coreBonusFlatAttack(activePet.active);
+    coreBonusFlatAttack(activePet.active));
 
   const conditionalDamage = Math.max(
     0,
@@ -745,15 +750,13 @@ function calculateXenon(
       conditionalDamageFromAbility(snapshot.abilityData) -
       conditionalDamageFromAbility(activeSnapshot.abilityData),
   );
-  const currentDamage =
-    stats["데미지"] + selectedCombat.damage - activeCombat.damage;
-  const currentBossDamage =
-    stats["보스 몬스터 데미지"] +
-    selectedCombat.bossDamage -
-    activeCombat.bossDamage;
+  const currentDamage = source?.computed["데미지"] ??
+    (stats["데미지"] + selectedCombat.damage - activeCombat.damage);
+  const currentBossDamage = source?.computed["보스 몬스터 데미지"] ??
+    (stats["보스 몬스터 데미지"] + selectedCombat.bossDamage - activeCombat.bossDamage);
   const currentIgnoreDefense = Math.min(
     1,
-    Math.max(0, number(stats["방어율 무시"]) / 100),
+    Math.max(0, number(source?.computed["방어율 무시"] ?? stats["방어율 무시"]) / 100),
   );
   const combatEffects = input.doping ? calculateBossItemCombatEffects({
     symbolData: snapshot.symbolData,
@@ -912,11 +915,11 @@ function calculateXenon(
   const combatModel = composeCombatModel({
     baseline: {
       flatAttack: rawAttack,
-      attackPercent: percent.attack,
+      attackPercent: sourceAttack?.percent ?? percent.attack,
       damage: currentDamage,
       bossDamage: currentBossDamage,
-      criticalRate: stats["크리티컬 확률"],
-      criticalDamage: stats["크리티컬 데미지"],
+      criticalRate: source?.computed["크리티컬 확률"] ?? stats["크리티컬 확률"],
+      criticalDamage: source?.computed["크리티컬 데미지"] ?? stats["크리티컬 데미지"],
       ignoreDefense: currentIgnoreDefense,
     },
     baselineSources: [
@@ -1002,7 +1005,7 @@ function calculateXenon(
       statTerm,
       activeAttack: apiAttack,
       activeAttackPercent: activePercent.attack,
-      selectedAttackPercent: percent.attack,
+      selectedAttackPercent: sourceAttack?.percent ?? percent.attack,
       rawAttack,
       dopedAttack,
       dopedAttackPercent: attackPercent,
@@ -1030,7 +1033,8 @@ function calculateXenon(
         activePetFlatAttack: coreBonusFlatAttack(activePet.active),
       },
       presetSelection: input.presetSelection ?? null,
-      presetPolicy: "active snapshot plus selected preset deltas and explicit doping",
+      presetPolicy: source ? "selected preset sources and explicit doping"
+        : "active snapshot plus selected preset deltas and explicit doping",
       xenonHexaRatio,
     },
   };

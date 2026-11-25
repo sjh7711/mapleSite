@@ -438,7 +438,7 @@ test("환산 계약 버전으로 이전 단일 부스탯 캐시와 키를 분리
     versionedUrl.searchParams.get("conversionVersion"),
     characterConversionCacheVersion,
   );
-  assert.equal(characterConversionCacheVersion, "combat-profile-v87-hexa-passive-sources");
+  assert.equal(characterConversionCacheVersion, "combat-profile-v88-selected-preset-sources");
   const freshSnapshotKey = createSnapshotCacheKey(request, "테스트", "fresh");
   const staleSnapshotKey = createSnapshotCacheKey(request, "테스트", "stale");
   assert.equal(characterSnapshotCacheVersion, "character-snapshot-v4");
@@ -794,6 +794,68 @@ test("manual 정책을 적용하고 선택 장비의 환산 요약만 응답한�
   assert.equal(responseText.includes("item_total_option"), false);
   assert.equal(responseText.includes(RAW_MARKER), false);
   assert.equal(responseText.includes(OCID), false);
+});
+
+test("보스 프리셋을 고르면 활성 사냥 스탯의 버프와 별개로 선택 출처를 합산한다", async () => {
+  const url = new URL(apiRequest().url);
+  url.searchParams.set("presetMode", "manual");
+  for (const field of ["equipmentPreset", "hyperPreset", "unionPreset", "linkPreset", "abilityPreset"]) {
+    url.searchParams.set(field, "2");
+  }
+  const getConversion = async (temporaryBonus, mode = "manual") => {
+    const endpoint = new URL(url);
+    endpoint.searchParams.set("presetMode", mode);
+    if (mode === "auto") {
+      for (const field of ["equipmentPreset", "hyperPreset", "unionPreset", "linkPreset", "abilityPreset"]) {
+        endpoint.searchParams.delete(field);
+      }
+    }
+    const response = await handleCharacterConversion(createContext(new Request(endpoint)), {
+      cache: null,
+      sleep: async () => {},
+      fetchImpl: async (input) => {
+        const path = new URL(input);
+        const payload = presetNexonPayload(path);
+        if (path.pathname.endsWith("/character/skill") && path.searchParams.get("character_skill_grade") === "0") {
+          payload.character_skill = [{
+            skill_name: "윈터 파워업", skill_level: 1, skill_effect: "보스 몬스터 공격 시 데미지 20% 증가",
+          }];
+        }
+        if (path.pathname.endsWith("/character/link-skill")) {
+          payload.character_link_skill_preset_2 = [{
+            skill_name: "자연의 벗", skill_level: 2,
+            skill_effect: "데미지 5% 증가\n일반 몬스터 20명 처치 시 30초 동안 일반 몬스터 공격 시 데미지 11% 증가",
+          }];
+        }
+        if (path.pathname.endsWith("/character/stat")) {
+          for (const row of payload.final_stat) {
+            if (["데미지", "보스 몬스터 데미지", "크리티컬 데미지", "공격력"].includes(row.stat_name)) {
+              row.stat_value = String(Number(row.stat_value) + temporaryBonus);
+            }
+          }
+        }
+        return Response.json(payload);
+      },
+    });
+    const body = await response.json();
+    assert.equal(response.status, 200, JSON.stringify(body));
+    return body;
+  };
+  const clean = await getConversion(0);
+  const hunting = await getConversion(30);
+  assert.deepEqual(hunting.profiles.fullBoss.statEquivalence, clean.profiles.fullBoss.statEquivalence);
+  assert.notEqual(hunting.profiles.base.details.currentDamage, clean.profiles.base.details.currentDamage);
+  const { details } = hunting.profiles.fullBoss;
+  assert.equal(details.selectedStatTotals.데미지, 5);
+  assert.equal(details.currentDamage, 5);
+  assert.equal(details.selectedStatTotals["보스 몬스터 데미지"], 100);
+  assert.equal(details.currentBossDamage, 100);
+  assert.equal(details.selectedStatTotals.STR, details.currentMain);
+  assert.equal(details.selectedStatTotals.공격력, details.currentAttack);
+  assert.equal(details.statVerification.find(({ name }) => name === "보스 몬스터 데미지").api, 330);
+  const [autoClean, autoHunting] = await Promise.all([getConversion(0, "auto"), getConversion(30, "auto")]);
+  assert.deepEqual(autoHunting.presetSelection.selected, autoClean.presetSelection.selected);
+  assert.deepEqual(autoHunting.profiles.fullBoss.statEquivalence, autoClean.profiles.fullBoss.statEquivalence);
 });
 
 test("/id 후 공개 스냅샷을 제한 속도·4개 이하 동시성으로 조회한다", async () => {
@@ -1809,6 +1871,8 @@ test("윈터 파워업과 중첩 이벤트를 표시하고 기본 보공을 중�
     assert.deepEqual(entries.filter(({ kind }) => kind === "common-passive").map(({ name }) => name).sort(),
       [...commonPassives].sort());
     assert.ok(entries.every(({ includedInBaseline }) => includedInBaseline));
-    assert.equal(details.currentBossDamage, 300);
   }
+  assert.equal(body.profiles.base.details.currentBossDamage, 300);
+  // 출처로 제공된 장비 보공 80과 이벤트 보공 80을 한 번씩 합산한다.
+  assert.equal(body.profiles.fullBoss.details.currentBossDamage, 160);
 });

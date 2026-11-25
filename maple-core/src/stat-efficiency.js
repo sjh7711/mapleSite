@@ -3348,11 +3348,17 @@ function selectJointBossPreset({
   characterClass,
   skillData,
   includedNativeSharpEyesDamage,
+  includeUsefulSharpEyes,
 }) {
   if (!Array.isArray(statData?.final_stat) || !statData.final_stat.length) {
     return null;
   }
   const stats = finalStats(statData);
+  const usefulSharpEyesRate = includedNativeSharpEyesDamage == null &&
+    learnedSkill(skillData, "쓸만한 샤프 아이즈") ? 10 : 0;
+  if (includeUsefulSharpEyes) {
+    stats["크리티컬 확률"] = number(stats["크리티컬 확률"]) + usefulSharpEyesRate;
+  }
   // 일반 크리티컬 확률은 100%에서 포화되지만 크리티컬 리인포스는
   // 초과분을 포함한다. 자동 선택에서는 스킬의 시간 가동률로 근사한다.
   const criticalReinforceUptime = CRITICAL_REINFORCE_CLASSES.has(characterClass)
@@ -3361,7 +3367,7 @@ function selectJointBossPreset({
   const criticalReinforceExtraRate = criticalReinforceUptime > 0 &&
     includedNativeSharpEyesDamage == null
     ? sharpEyesHyperCriticalRate(skillData) +
-      (learnedSkill(skillData, "쓸만한 샤프 아이즈") ? 10 : 0)
+      (includeUsefulSharpEyes ? 0 : usefulSharpEyesRate)
     : 0;
   const activeSnapshot = applyPresetSelection(data, active, active.equipment);
   const activeVector = presetDependentVector(
@@ -3496,6 +3502,7 @@ export function resolveCharacterPresetSnapshot({
   statData,
   presetPolicy,
   includedNativeSharpEyesDamage = null,
+  includeUsefulSharpEyes = false,
 }) {
   const data = {
     equipmentData,
@@ -3542,6 +3549,7 @@ export function resolveCharacterPresetSnapshot({
       characterClass,
       skillData,
       includedNativeSharpEyesDamage,
+      includeUsefulSharpEyes,
     });
     if (jointSelection) {
       selected = jointSelection;
@@ -4012,7 +4020,9 @@ function hexaStatCombatBonuses(hexaStatData) {
  * available sources. The only aggregate API inputs used here are allocated AP
  * (a component of STR/DEX/INT/LUK) and never the totals being checked.
  */
-export function reconstructCharacterStats({ character, snapshot, mainStat, activeSkillNames = [] }) {
+export function reconstructCharacterStats({
+  character, snapshot, mainStat, activeSkillNames = [], presetMode = "active", attackType = "attack",
+}) {
   const {
     statData, equipmentData, setEffectData, otherStatData, cashEquipmentData,
     petEquipmentData, skillData, linkSkillData, hyperStatData, unionRaiderData,
@@ -4031,7 +4041,10 @@ export function reconstructCharacterStats({ character, snapshot, mainStat, activ
   const summonedLinkDamage = Math.max(0, ...equippedLinks.flatMap(({ skill_name, skill_effect }) =>
     skill_name === "커버넌트" ? [number(String(skill_effect ?? "")
       .match(/소환수 소환 시 데미지\s*(\d+(?:\.\d+)?)%\s*증가/u)?.[1])] : []));
-  const linkTexts = equippedLinks.map(({ skill_effect }) => skill_effect)
+  // The first line of Nature's Friend is permanent. The following lines
+  // describe a separate effect triggered by killing normal monsters.
+  const linkTexts = equippedLinks.map(({ skill_name, skill_effect }) =>
+    skill_name === "자연의 벗" ? String(skill_effect ?? "").split(/\r?\n/u, 1)[0] : skill_effect)
     .filter((text) => text &&
       !/\d+\s*초|공격하면|상태 이상|파티원|적에게|약점|재발동|재사용|공격할 때|소환 시|전투 상태/u.test(text));
   const abilityTexts = (abilityData?.ability_info ?? []).map(({ ability_value }) => ability_value)
@@ -4040,7 +4053,7 @@ export function reconstructCharacterStats({ character, snapshot, mainStat, activ
     .map(({ stat_increase }) => stat_increase);
   const unionMembers = (unionRaiderData?.union_raider_stat ?? [])
     .filter((text) => /^보스 몬스터 공격 시 데미지/u.test(text) || !/공격 시|확률로|마다|적 처치/u.test(text));
-  const pet = resolvePetEquipmentBonuses(petEquipmentData, "attack", "active");
+  const pet = resolvePetEquipmentBonuses(petEquipmentData, attackType, presetMode);
   const options = parseEquipmentOptions(
     equipmentOptionLines(equipmentData, character.character_class),
     number(character.character_level),
@@ -4050,7 +4063,7 @@ export function reconstructCharacterStats({ character, snapshot, mainStat, activ
     parseSetEffects({ set_effect: activeSets }),
     otherStatBonuses(otherStatData),
     cashEquipmentBonuses(cashEquipmentData),
-    pet.active,
+    presetMode === "auto" ? pet.selected : pet.active,
     pet.skills,
     parseTextBonuses(skillTexts),
     guildPassiveBonuses(guildData),
@@ -4092,6 +4105,7 @@ export function reconstructCharacterStats({ character, snapshot, mainStat, activ
   const xenonStats = mainStat === "ALL" ? ["STR", "DEX", "LUK"] : [];
   const hexaScale = xenonStats.length ? xenonHexaStatScale(hexaStatData, statData) : 1;
   const hexa = hexaUnreflectedMainStat(hexaStatData, hexaScale);
+  const attributes = {};
   if (STAT_NAMES.includes(mainStat) || xenonStats.length) {
     const ap = finalStats(statData);
     const apPercent = parseTextBonuses(allCharacterSkills(skillData).map((skill) => skill.skill_effect)).apPercent;
@@ -4103,11 +4117,12 @@ export function reconstructCharacterStats({ character, snapshot, mainStat, activ
       const percent = options.percent[stat] + sumItemAllStatPercent(equipmentData) + permanent.percent[stat];
       const unreflected = unreflectedStats({ ...snapshot, mainStat: stat, subStats: [] });
       const statHexa = stat === mainStat || xenonStats.includes(stat) ? hexa : 0;
-      computed[stat] = Math.floor(base * (1 + percent / 100) + 1e-8) +
-        unreflected.main - unreflected.hexaMain + statHexa;
+      const fixed = unreflected.main - unreflected.hexaMain + statHexa;
+      attributes[stat] = { base, percent, fixed };
+      computed[stat] = Math.floor(base * (1 + percent / 100) + 1e-8) + fixed;
     }
   }
-  return { computed, attack, summonedLinkDamage };
+  return { computed, attack, attributes, summonedLinkDamage };
 }
 
 function ensurePositive(value, label) {
@@ -4234,6 +4249,7 @@ export function calculateCharacterPotentialConversion({
   includedNativeSharpEyesDamage = null,
   presetPolicy,
   resolvedPresetSnapshot = null,
+  selectedStatSources = null,
 }) {
   const requestedSubStats = Array.isArray(subStats) ? subStats : [subStat];
   const resolvedSubStats = [...new Set(requestedSubStats)].filter(
@@ -4250,6 +4266,11 @@ export function calculateCharacterPotentialConversion({
     );
   }
   const primarySubStat = resolvedSubStats[0];
+  const sourceValues = selectedStatSources?.computed;
+  const sourceAttributes = selectedStatSources?.attributes;
+  const attackName = attackType === "magic" ? "마력" : "공격력";
+  const computedAttack = selectedStatSources?.attack[attackName];
+  const sourceAttack = computedAttack?.flat > 0 ? computedAttack : null;
   const stats = finalStats(statData);
   const characterLevel = number(character.character_level);
   const resolvedPresets = resolvedPresetSnapshot ??
@@ -4408,19 +4429,15 @@ export function calculateCharacterPotentialConversion({
   );
   const enumeratedBaseSub = enumeratedBaseSubs[primarySubStat];
 
-  const mainPercent =
-    equipmentOptions.percent[mainStat] +
-    equipmentAllStatPercent +
-    sets.percent[mainStat] +
-    supplemental.percent[mainStat] +
-    number(classDopingAdjustment.mainStatPercent);
+  const presetStatPercent = (stat) => sourceAttributes?.[stat]?.percent ?? (
+    equipmentOptions.percent[stat] + equipmentAllStatPercent +
+    sets.percent[stat] + supplemental.percent[stat]
+  );
+  const mainPercent = presetStatPercent(mainStat) + number(classDopingAdjustment.mainStatPercent);
   const subPercents = Object.fromEntries(
     resolvedSubStats.map((stat) => [
       stat,
-      equipmentOptions.percent[stat] +
-        equipmentAllStatPercent +
-        sets.percent[stat] +
-        supplemental.percent[stat] +
+      presetStatPercent(stat) +
         number(
           classDopingAdjustment.subStatPercentByStat?.[stat] ??
             classDopingAdjustment.subStatPercent,
@@ -4428,14 +4445,14 @@ export function calculateCharacterPotentialConversion({
     ]),
   );
   const subPercent = subPercents[primarySubStat];
-  const attackPercent =
+  const attackPercent = sourceAttack?.percent ?? (
     (attackType === "magic"
       ? equipmentOptions.magicPercent
       : equipmentOptions.attackPercent) +
     (attackType === "magic" ? sets.magicPercent : sets.attackPercent) +
     (attackType === "magic"
       ? supplemental.magicPercent
-      : supplemental.attackPercent);
+      : supplemental.attackPercent));
 
   const activeMainPercent =
     activeEquipmentOptions.percent[mainStat] +
@@ -4471,7 +4488,7 @@ export function calculateCharacterPotentialConversion({
   );
   const apiCurrentSub = apiCurrentSubs[primarySubStat];
   const apiCurrentAttack = ensurePositive(
-    stats[attackType === "magic" ? "마력" : "공격력"],
+    stats[attackName],
     attackType === "magic" ? "최종 마력" : "최종 공격력",
   );
   const apiCurrentCriticalDamage = ensurePositive(
@@ -4569,62 +4586,27 @@ export function calculateCharacterPotentialConversion({
             classDopingAdjustment.subStatPercent,
         ) !== 0,
     );
+  function presetBaseStat(stat, activeBase) {
+    const attribute = sourceAttributes?.[stat];
+    if (attribute) return attribute.base;
+    const equipmentDelta = equipmentPresetChanged
+      ? sumEquipmentFlatStat(selectedEquipmentData, stat, characterLevel, character.character_class) -
+        sumEquipmentFlatStat(activeEquipmentData, stat, characterLevel, character.character_class) +
+        title.flat[stat] - activeTitle.flat[stat] + sets.flat[stat] - activeSets.flat[stat]
+      : 0;
+    return activeBase + equipmentDelta +
+      petEquipment.selected.flat[stat] - petEquipment.active.flat[stat] +
+      links.flat[stat] - activeLinks.flat[stat] + unionAllocatedDelta(stat);
+  }
   const baseMain = ensurePositive(
-    activeBaseMain +
-      (equipmentPresetChanged
-        ? sumEquipmentFlatStat(
-            selectedEquipmentData,
-            mainStat,
-            characterLevel,
-            character.character_class,
-          ) -
-          sumEquipmentFlatStat(
-            activeEquipmentData,
-            mainStat,
-            characterLevel,
-            character.character_class,
-          ) +
-          title.flat[mainStat] -
-          activeTitle.flat[mainStat] +
-          sets.flat[mainStat] -
-          activeSets.flat[mainStat]
-        : 0) +
-      petEquipment.selected.flat[mainStat] -
-      petEquipment.active.flat[mainStat] +
-      links.flat[mainStat] -
-      activeLinks.flat[mainStat] +
-      unionAllocatedDelta(mainStat) +
-      number(classDopingAdjustment.baseMain),
+    presetBaseStat(mainStat, activeBaseMain) + number(classDopingAdjustment.baseMain),
     "% 적용 대상 보스 프리셋 주스탯",
   );
   const baseSubs = Object.fromEntries(
     resolvedSubStats.map((stat) => [
       stat,
       ensurePositive(
-        activeBaseSubs[stat] +
-          (equipmentPresetChanged
-            ? sumEquipmentFlatStat(
-              selectedEquipmentData,
-              stat,
-              characterLevel,
-              character.character_class,
-            ) -
-            sumEquipmentFlatStat(
-              activeEquipmentData,
-              stat,
-              characterLevel,
-              character.character_class,
-              ) +
-              title.flat[stat] -
-              activeTitle.flat[stat] +
-              sets.flat[stat] -
-              activeSets.flat[stat]
-            : 0) +
-          petEquipment.selected.flat[stat] -
-          petEquipment.active.flat[stat] +
-          links.flat[stat] -
-          activeLinks.flat[stat] +
-          unionAllocatedDelta(stat) +
+        presetBaseStat(stat, activeBaseSubs[stat]) +
           number(
             classDopingAdjustment.baseSubByStat?.[stat] ??
               classDopingAdjustment.baseSub,
@@ -4635,15 +4617,16 @@ export function calculateCharacterPotentialConversion({
   );
   const baseSub = baseSubs[primarySubStat];
   const currentStatChanged = presetChanged || classStatAdjustmentApplied;
-  const currentMain = currentStatChanged
-    ? Math.floor(baseMain * (1 + mainPercent / 100)) + unreflected.main
+  const currentMain = sourceAttributes?.[mainStat] || currentStatChanged
+    ? Math.floor(baseMain * (1 + mainPercent / 100) + 1e-8) +
+      (sourceAttributes?.[mainStat]?.fixed ?? unreflected.main)
     : apiCurrentMain;
   const currentSubs = Object.fromEntries(
     resolvedSubStats.map((stat) => [
       stat,
-      currentStatChanged
-        ? Math.floor(baseSubs[stat] * (1 + subPercents[stat] / 100)) +
-          unreflected.subs[stat]
+      sourceAttributes?.[stat] || currentStatChanged
+        ? Math.floor(baseSubs[stat] * (1 + subPercents[stat] / 100) + 1e-8) +
+          (sourceAttributes?.[stat]?.fixed ?? unreflected.subs[stat])
         : apiCurrentSubs[stat],
     ]),
   );
@@ -4696,7 +4679,7 @@ export function calculateCharacterPotentialConversion({
   const activeRawAttack = hasUnreflectedSnapshot
     ? Math.ceil(apiCurrentAttack / (1 + activeAttackPercent / 100))
     : apiCurrentAttack / (1 + activeAttackPercent / 100);
-  const rawAttack = presetChanged
+  const rawAttack = sourceAttack?.flat ?? (presetChanged
     ? activeRawAttack +
       selectedCombat.flatAttack -
         activeCombat.flatAttack +
@@ -4714,11 +4697,11 @@ export function calculateCharacterPotentialConversion({
         relevantFlatAttack(activeSets, attackType) +
         relevantFlatAttack(petEquipment.selected, attackType) -
         relevantFlatAttack(petEquipment.active, attackType)
-    : activeRawAttack;
-  const currentAttack = presetChanged
-    ? Math.floor(rawAttack * (1 + attackPercent / 100))
+    : activeRawAttack);
+  const currentAttack = sourceAttack || presetChanged
+    ? Math.floor(rawAttack * (1 + attackPercent / 100) + 1e-8)
     : apiCurrentAttack;
-  const currentCriticalDamage =
+  const currentCriticalDamage = sourceValues?.["크리티컬 데미지"] ?? (
     apiCurrentCriticalDamage +
     selectedCombat.criticalDamage -
     activeCombat.criticalDamage +
@@ -4735,8 +4718,8 @@ export function calculateCharacterPotentialConversion({
     sets.criticalDamage -
     activeSets.criticalDamage +
     petEquipment.selected.criticalDamage -
-    petEquipment.active.criticalDamage;
-  const currentCriticalRate = apiCurrentCriticalRate === null
+    petEquipment.active.criticalDamage);
+  const currentCriticalRate = sourceValues?.["크리티컬 확률"] ?? (apiCurrentCriticalRate === null
     ? null
     : Math.max(
         0,
@@ -4757,8 +4740,8 @@ export function calculateCharacterPotentialConversion({
           activeSets.criticalRate +
           petEquipment.selected.criticalRate -
           petEquipment.active.criticalRate,
-      );
-  const currentDamage =
+      ));
+  const currentDamage = sourceValues?.["데미지"] ?? (
     number(stats["데미지"]) +
     selectedCombat.damage -
     activeCombat.damage +
@@ -4775,8 +4758,8 @@ export function calculateCharacterPotentialConversion({
     sets.damage -
     activeSets.damage +
     petEquipment.selected.damage -
-    petEquipment.active.damage;
-  const currentBossDamage =
+    petEquipment.active.damage);
+  const currentBossDamage = sourceValues?.["보스 몬스터 데미지"] ?? (
     number(stats["보스 몬스터 데미지"]) +
     selectedCombat.bossDamage -
     activeCombat.bossDamage +
@@ -4793,8 +4776,10 @@ export function calculateCharacterPotentialConversion({
     sets.bossDamage -
     activeSets.bossDamage +
     petEquipment.selected.bossDamage -
-    petEquipment.active.bossDamage;
-  const currentIgnoreDefense = changeEquipmentIgnoreDefense(
+    petEquipment.active.bossDamage);
+  const currentIgnoreDefense = sourceValues?.["방어율 무시"] != null
+    ? sourceValues["방어율 무시"] / 100
+    : changeEquipmentIgnoreDefense(
     number(stats["방어율 무시"]) / 100,
     [
       ...activeCombat.ignoreDefenseSources,
