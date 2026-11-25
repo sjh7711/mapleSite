@@ -6,7 +6,9 @@ import {
 } from "maple-core/stat-profile";
 import {
   CHARACTER_BASELINE_SKILL_SUMMARY_VERSION,
+  auraWeaponSnapshotState,
   calculateCharacterIgnoreDefenseEquivalent,
+  normalizeAuraWeaponBossProfile,
 } from "maple-core/stat-efficiency";
 import {
   cardWithHead,
@@ -35,6 +37,7 @@ import { characterEquipmentSummaryBoard } from "./character-equipment-summary.js
 const STORAGE_KEY = "maplestarforce:character-profile:v2";
 const LEGACY_STORAGE_KEY = "maplestarforce:character-profile:v1";
 const SAVED_NAMES_STORAGE_KEY = "maplestarforce:character-names:v1";
+const AURA_WEAPON_REFERENCE_STORAGE_PREFIX = "maplestarforce:aura-weapon-off:v1:";
 const EQUIPMENT_TOOLTIP_SUMMARY_VERSION = 12;
 const HIDDEN_CHARACTER_WARNING_PREFIXES = Object.freeze([
   "샤프 아이즈 계열과 직업 보정을 포함한 보스전 크리티컬 확률이",
@@ -87,7 +90,10 @@ const DEFAULT_PRESET_MANUAL = Object.freeze(
 const listeners = new Set();
 
 let saved = loadSaved();
-registerResultShareProfile(() => saved);
+registerResultShareProfile(() => {
+  if (!saved?.profiles?.fullBoss) return saved;
+  return { ...saved, profiles: { ...saved.profiles, fullBoss: activeFullBossProfile() } };
+});
 let savedCharacterNames = loadSavedCharacterNames();
 let presetRequest = normalizePresetRequest(
   saved?.presetRequest ?? saved?.presetSelection,
@@ -369,9 +375,41 @@ export function subscribeCharacterProfile(listener) {
   return () => listeners.delete(listener);
 }
 
+function auraWeaponReferenceKey(character) {
+  return AURA_WEAPON_REFERENCE_STORAGE_PREFIX + JSON.stringify([character.world, character.name]);
+}
+
+function auraWeaponReference(character) {
+  try {
+    return JSON.parse(calculatorStorage.getItem(auraWeaponReferenceKey(character)));
+  } catch {
+    return null;
+  }
+}
+
+function storeAuraWeaponReference(character, snapshot) {
+  try {
+    const key = auraWeaponReferenceKey(character);
+    if (snapshot) calculatorStorage.setItem(key, JSON.stringify(snapshot));
+    else calculatorStorage.removeItem(key);
+    message = snapshot ? "오라 웨폰 OFF 기준을 저장했습니다." : "오라 웨폰 OFF 기준을 지웠습니다.";
+    messageTone = "success";
+  } catch {
+    message = "오라 웨폰 OFF 기준을 브라우저에 저장하지 못했습니다.";
+    messageTone = "error";
+  }
+  emitProfile();
+}
+
+function activeFullBossProfile() {
+  const profile = saved?.profiles?.fullBoss;
+  return profile && !isSharedResult()
+    ? normalizeAuraWeaponBossProfile(profile, auraWeaponReference(saved.character))
+    : profile;
+}
+
 export function getActiveProfile({ capability } = {}) {
-  if (!saved) return null;
-  const profile = saved.profiles?.fullBoss;
+  const profile = activeFullBossProfile();
   if (capability && profile?.capabilities?.[capability] === false) return null;
   if (!profile) return null;
   const active = {
@@ -622,6 +660,32 @@ function fullBossDopingDetails(profile, conventionalAddOption, collapsed = false
     content.append(element("strong", "profile-doping__title", FULL_BOSS_DOPING.label));
   }
   content.append(element("p", "profile-doping__totals", fullBossDopingSummary(profile)));
+  const buffs = profile.details?.temporaryBuffs;
+  if (buffs?.registeredPetSkills?.length) {
+    content.append(element("p", "profile-doping__class",
+      `펫 자동버프 등록 · ${buffs.registeredPetSkills.join(" · ")}`));
+  }
+  const aura = buffs?.auraWeapon;
+  if (profile.statModel === "standard" && aura && !isSharedResult()) {
+    const off = auraWeaponReference(profile.character);
+    const state = auraWeaponSnapshotState(aura, off);
+    const normalization = profile.details.auraWeaponNormalization;
+    const status = normalization
+      ? `기본 스탯에 포함 · 방무 +10% (380) ${coefficient(normalization.previousIed40Against380ToMainPercent / 4)}%급 → ${coefficient(profile.statEquivalence.ied40Against380ToMainPercent / 4)}%급`
+      : state === "off" ? "OFF 기준과 일치" : "상태 미확인";
+    content.append(element("p", "profile-doping__class",
+      `오라 웨폰 · ${status} · API 방무 ${coefficient(aura.ignoreDefense)}% · 최종 데미지 ${coefficient(aura.finalDamage)}%`));
+    const action = element("button", "button button--quiet",
+      off ? "오라 웨폰 OFF 기준 지우기" : "오라 웨폰 OFF 기준 저장");
+    action.type = "button";
+    action.disabled = pending;
+    action.title = off
+      ? "다른 세팅의 OFF 기준을 저장할 때 이 기준을 지울 수 있습니다."
+      : "오라 웨폰과 비교 대상 버프가 꺼진 상태를 조회한 뒤 저장하세요.";
+    action.addEventListener("click", () =>
+      storeAuraWeaponReference(profile.character, off ? null : aura));
+    content.append(action);
+  }
   const baselineSkills = Array.isArray(profile.details?.baselineSkills)
     ? profile.details.baselineSkills : [];
   const eventSkills = baselineSkills.filter((skill) => skill.kind === "event");

@@ -438,7 +438,7 @@ test("환산 계약 버전으로 이전 단일 부스탯 캐시와 키를 분리
     versionedUrl.searchParams.get("conversionVersion"),
     characterConversionCacheVersion,
   );
-  assert.equal(characterConversionCacheVersion, "combat-profile-v76-boss-link-selection");
+  assert.equal(characterConversionCacheVersion, "combat-profile-v77-aura-weapon");
   const freshSnapshotKey = createSnapshotCacheKey(request, "테스트", "fresh");
   const staleSnapshotKey = createSnapshotCacheKey(request, "테스트", "stale");
   assert.equal(characterSnapshotCacheVersion, "character-snapshot-v2");
@@ -507,6 +507,54 @@ test("프리셋 쿼리를 검증하고 정책 전체를 캐시 키에서 분리�
       .union,
     10,
   );
+});
+
+test("펫 자동버프 등록과 오라 웨폰 비교용 스탯을 반환한다", async () => {
+  const fetchProfile = async (auraOn) => {
+    const response = await handleCharacterConversion(createContext(apiRequest()), {
+      cache: null,
+      sleep: async () => {},
+      fetchImpl: async (input) => {
+        const url = new URL(input);
+        const payload = nexonPayload(url);
+        if (url.pathname.endsWith("/pet-equipment")) {
+          payload.pet_1_auto_skill = { skill_1: "다른 프리셋 스킬" };
+          payload.world_share_pet_1_auto_skill = { skill_1: "오라 웨폰" };
+          payload.world_share_pet_2_auto_skill = { skill_1: "오라 웨폰", skill_2: "쓸만한 샤프 아이즈" };
+        }
+        if (url.pathname.endsWith("/skill") && url.searchParams.get("character_skill_grade") === "5") {
+          payload.character_skill = [{
+            skill_name: "오라 웨폰", skill_level: 30,
+            skill_effect: "130초 동안 몬스터 방어율 무시 16%, 최종 데미지 6% 증가. 재사용 대기시간 120초",
+          }];
+        }
+        if (url.pathname.endsWith("/stat")) {
+          const stats = Object.fromEntries(payload.final_stat.map(({ stat_name, stat_value }) =>
+            [stat_name, stat_value]));
+          Object.assign(stats, {
+            "방어율 무시": auraOn ? "98.12" : "97.76",
+            "최종 데미지": auraOn ? "94.03" : "83.05",
+            "최대 스탯공격력": auraOn ? "10600" : "10000",
+          });
+          payload.final_stat = Object.entries(stats).map(([stat_name, stat_value]) => ({ stat_name, stat_value }));
+        }
+        return Response.json({ ...payload, date: auraOn ? "later" : "earlier" });
+      },
+    });
+    assert.equal(response.status, 200);
+    return (await response.json()).profiles.fullBoss.details.temporaryBuffs;
+  };
+  const off = await fetchProfile(false);
+  const on = await fetchProfile(true);
+
+  assert.deepEqual(on.registeredPetSkills, ["오라 웨폰", "쓸만한 샤프 아이즈"]);
+  assert.match(off.auraWeapon.basis, /^[0-9a-f]{64}$/u);
+  assert.deepEqual(on.auraWeapon, {
+    basis: off.auraWeapon.basis,
+    ignoreDefense: 98.12,
+    finalDamage: 94.03,
+    effect: { ignoreDefense: 16, finalDamage: 6 },
+  });
 });
 
 test("manual 정책을 적용하고 선택 장비의 환산 요약만 응답한다", async () => {
