@@ -542,6 +542,66 @@ function allCharacterSkills(skillData) {
   });
 }
 
+function loadedDiceFaces(skills) {
+  if (!skills.some(({ skill_name }) => skill_name === "로디드 다이스")) return null;
+  const effect = (name) => String(skills.find(({ skill_name }) =>
+    skill_name === name)?.skill_effect ?? "");
+  const single = effect("럭키 다이스");
+  const double = effect("더블 럭키 다이스");
+  const extra = double ? effect("더블 럭키 다이스-엑스트라 넘버") : "";
+  const faces = [];
+  for (const [face, line] of [...(single || double).matchAll(/^([345])\s*:\s*(.+)$/gmu),
+    ...extra.matchAll(/^(7)\s*:\s*(.+)$/gmu)].map((match) => [Number(match[1]), match[2]])) {
+    const bonuses = parseTextBonuses([line]);
+    const fields = {
+      flatAttack: bonuses.flatAttack,
+      criticalRate: bonuses.criticalRate,
+      damage: bonuses.damage,
+      ignoreDefense: bonuses.ignoreDefenseSources[0] ?? 0,
+    };
+    if (Object.values(fields).some((value) => value > 0)) faces.push({ face, ...fields });
+  }
+  const doubleIncrease = percentFromEffect(double,
+    /주사위 눈이 같으면[^\d\n]*(\d+)\s*혹은\s*\d+%p/u);
+  return {
+    faces,
+    double: skills.some(({ skill_name }) => skill_name === "더블 럭키 다이스"),
+    doubleIncrease,
+    extraLearned: skills.some(({ skill_name }) => skill_name === "더블 럭키 다이스-엑스트라 넘버"),
+  };
+}
+
+/** Stat-window outcomes of the learned single and double Lucky Dice. */
+export function loadedDiceOutcomes(skillData) {
+  const rules = loadedDiceFaces(allCharacterSkills(skillData));
+  if (!rules) return null;
+  const { faces, double, doubleIncrease, extraLearned } = rules;
+  if ([3, 4, 5, ...(extraLearned ? [7] : [])].some((face) =>
+    !faces.some((item) => item.face === face)) || (double && !doubleIncrease)) return [];
+  const oneRoll = faces.map(({ face, ...fields }) => ({ rolls: [face], ...fields }));
+  if (!double) return oneRoll;
+  const combined = [];
+  for (const [position, first] of faces.entries()) {
+    for (const [j, second] of faces.slice(position).entries()) {
+      for (const rolls of [[first, second],
+        ...faces.slice(position + j).map((third) => [first, second, third])]) {
+        const buffs = [...new Set(rolls)];
+        const fields = Object.fromEntries(
+          ["flatAttack", "criticalRate", "damage", "ignoreDefense"].map((key) => [
+            key,
+            buffs.reduce((total, face) => {
+              const count = rolls.filter((roll) => roll === face).length;
+              return total + (face[key] > 0 ? face[key] + (count - 1) * doubleIncrease : 0);
+            }, 0),
+          ]),
+        );
+        combined.push({ rolls: rolls.map(({ face }) => face), ...fields });
+      }
+    }
+  }
+  return [...oneRoll, ...combined];
+}
+
 function matrixSkillCoreSummary(vMatrixData, hexaMatrixData) {
   const summarize = (entries, source) => (entries ?? []).map((entry) => ({
     source,
@@ -1076,6 +1136,7 @@ function specialCycleEvents({
   combatDuration,
   apStats,
   equipmentData,
+  loadedDiceRolls,
 }) {
   const name = String(skill?.skill_name ?? "").trim();
   const effect = String(skill?.skill_effect ?? "");
@@ -1148,16 +1209,26 @@ function specialCycleEvents({
   }
 
   if (name === "로디드 다이스") {
-    const hasDoubleDice = skills.some(
-      (candidate) => candidate?.skill_name === "더블 럭키 다이스",
-    );
+    const rules = loadedDiceFaces(skills);
+    const fifthFace = rules?.faces.find(({ face }) => face === 5);
+    const doubleBonus = rules?.double ? rules.doubleIncrease || 10 : 0;
+    const defaultDamage = (fifthFace?.damage ?? 20) + doubleBonus;
+    let modifiers = { damage: defaultDamage };
+    if (Array.isArray(loadedDiceRolls)) {
+      const selected = [...loadedDiceRolls].sort((a, b) => a - b).join(",");
+      const outcome = loadedDiceOutcomes([{ character_skill: skills }])
+        ?.find(({ rolls }) => rolls.join(",") === selected);
+      if (!outcome) return [];
+      const { flatAttack, criticalRate, damage, ignoreDefense } = outcome;
+      modifiers = { flatAttack, criticalRate, damage, ignoreDefense };
+    }
     return [{
       name,
-      model: "loaded-dice-five-high-point",
+      model: Array.isArray(loadedDiceRolls) ? "loaded-dice-selected" : "loaded-dice-five-high-point",
       highPoint: true,
       duration: combatDuration,
       cooldown: 0,
-      modifiers: { damage: hasDoubleDice ? 30 : 20 },
+      modifiers,
     }];
   }
 
@@ -1478,6 +1549,8 @@ export function calculateActiveSkillCycleBonuses(
     characterClass = "",
     equipmentData = null,
     buffDurationPercent = 0,
+    includeLoadedDice = true,
+    loadedDiceRolls,
   } = {},
 ) {
   const result = {
@@ -1498,6 +1571,7 @@ export function calculateActiveSkillCycleBonuses(
     const effect = String(skill?.skill_effect ?? "");
     if (
       !name ||
+      (name === "로디드 다이스" && !includeLoadedDice) ||
       ACTIVE_SKILL_CYCLE_EXCLUSIONS.has(name) ||
       MODELED_SPECIAL_RING_PATTERN.test(name)
     ) {
@@ -1528,6 +1602,7 @@ export function calculateActiveSkillCycleBonuses(
       combatDuration,
       apStats,
       equipmentData,
+      loadedDiceRolls,
     });
     if (specialEvents !== null) {
       for (const event of specialEvents) {
@@ -3617,31 +3692,35 @@ function abilityCombatBonuses(abilityData, attackType) {
   );
 }
 
-const HEXA_MAIN_STAT_BY_LEVEL = [0, 100, 200, 300, 400, 600, 800, 1000, 1300, 1600, 2000];
+const HEXA_MAIN_STAT_UNITS = [0, 1, 2, 3, 4, 6, 8, 10, 13, 16, 20];
+
+function hexaStatCores(data) {
+  return [
+    ...(data?.character_hexa_stat_core ?? []),
+    ...(data?.character_hexa_stat_core_2 ?? []),
+    ...(data?.character_hexa_stat_core_3 ?? []),
+  ];
+}
+
+function hexaStatEntries(core) {
+  return [
+    [core.main_stat_name, HEXA_MAIN_STAT_UNITS[number(core.main_stat_level)] ?? 0],
+    [core.sub_stat_name_1, number(core.sub_stat_level_1)],
+    [core.sub_stat_name_2, number(core.sub_stat_level_2)],
+  ];
+}
 
 export function hexaUnreflectedMainStat(hexaStatData, scale = 1) {
-  const cores = [
-    ...(hexaStatData?.character_hexa_stat_core ?? []),
-    ...(hexaStatData?.character_hexa_stat_core_2 ?? []),
-    ...(hexaStatData?.character_hexa_stat_core_3 ?? []),
-  ];
-  return cores.reduce((sum, core) => {
-    // HEXA 스탯의 주력 스탯은 잠재능력 스탯%를 받지 않는다.
-    // 메인 옵션은 레벨별 표, 서브 옵션은 레벨당 100을 사용한다.
-    const main =
-      core.main_stat_name === "주력 스탯 증가"
-        ? (HEXA_MAIN_STAT_BY_LEVEL[number(core.main_stat_level)] ?? 0)
-        : 0;
-    const sub1 =
-      core.sub_stat_name_1 === "주력 스탯 증가"
-        ? number(core.sub_stat_level_1) * 100
-        : 0;
-    const sub2 =
-      core.sub_stat_name_2 === "주력 스탯 증가"
-        ? number(core.sub_stat_level_2) * 100
-        : 0;
-    return sum + Math.round((main + sub1 + sub2) * scale);
+  return hexaStatCores(hexaStatData).reduce((sum, core) => {
+    const units = hexaStatEntries(core).reduce((total, [name, value]) =>
+      name === "주력 스탯 증가" ? total + value : total, 0);
+    return sum + Math.round(units * 100 * scale);
   }, 0);
+}
+
+export function xenonHexaStatScale(hexaStatData, statData) {
+  const date = String(hexaStatData?.date ?? statData?.date ?? "");
+  return date && date < "2026-09-17" ? 0.48 : 0.66;
 }
 
 function abilityUnreflectedStat(abilityData, stat) {
@@ -3804,6 +3883,135 @@ function unreflectedStats({
   };
 }
 
+// Buffs with an activation condition and effects on individual attacks do not
+// contribute to the character's always-on stat total.
+function statWindowSkillTexts(skillData) {
+  return allCharacterSkills(skillData).flatMap(({ skill_name, skill_effect }) => {
+    const text = String(skill_effect ?? "");
+    const passive = [...text.matchAll(/\[패시브 효과\s*:\s*([^\]]+)\]/gu)];
+    if (passive.length) return passive.map((match) => match[1]);
+    if (/리인포스|보스\s*킬러|이그노어\s*가드|[ -]강화$/u.test(skill_name)) return [];
+    return text.split(/\r?\n/u).map((line) => line.trim().replace(/^영구적으로\s*/u, ""))
+      .filter((line) =>
+        /^(?:데미지|보스 몬스터 공격 시 데미지|최종 데미지|크리티컬 (?:데미지|확률)|(?:몬스터 )?방어율 무시|공격력|마력|올스탯|힘|민첩|지력|행운|모든 능력치)/u.test(line) &&
+        !/\d+\s*초|재사용|적중|타격|중첩|소환|공격할 때|스킬 사용 시|일정 확률|상태 이상/u.test(line));
+  });
+}
+
+function hexaStatCombatBonuses(hexaStatData) {
+  const result = emptyBonuses();
+  for (const [name, units] of hexaStatCores(hexaStatData).flatMap(hexaStatEntries)) {
+    if (units <= 0) continue;
+    if (name === "크리티컬 데미지 증가") result.criticalDamage += units * 0.35;
+    if (name === "보스 데미지 증가" || name === "보스 몬스터 데미지 증가") result.bossDamage += units;
+    if (name === "데미지 증가") result.damage += units * 0.75;
+    if (name === "방어율 무시 증가") result.ignoreDefenseSources.push(units);
+    if (name === "공격력 증가" || name === "공격력/마력 증가") {
+      result.flatAttack += units * 5;
+      result.flatMagic += units * 5;
+    }
+  }
+  return result;
+}
+
+/**
+ * Reconstruct the equipped character's stat window from independently
+ * available sources. The only aggregate API inputs used here are allocated AP
+ * (a component of STR/DEX/INT/LUK) and never the totals being checked.
+ */
+export function reconstructCharacterStats({ character, snapshot, mainStat }) {
+  const {
+    statData, equipmentData, setEffectData, otherStatData, cashEquipmentData,
+    petEquipmentData, skillData, linkSkillData, hyperStatData, unionRaiderData,
+    unionArtifactData, unionChampionData, propensityData, hexaStatData,
+    symbolData, abilityData,
+  } = snapshot;
+  if (!activeEquipment(equipmentData ?? {}).length || !allCharacterSkills(skillData).length) return null;
+
+  const activeSets = (setEffectData?.set_effect ?? []).map((set) => ({
+    ...set,
+    set_effect_info: (set.set_effect_info ?? []).filter((entry) =>
+      set.total_set_count == null || number(entry.set_count) <= number(set.total_set_count)),
+  }));
+  const skillTexts = statWindowSkillTexts(skillData);
+  const linkTexts = linkSkills(linkSkillData).map(({ skill_effect }) => skill_effect)
+    .filter((text) => text &&
+      !/\d+\s*초|공격하면|상태 이상|파티원|적에게|약점|재발동|재사용|공격할 때|소환 시|전투 상태/u.test(text));
+  const abilityTexts = (abilityData?.ability_info ?? []).map(({ ability_value }) => ability_value)
+    .filter((text) => text && !/상태 이상|재사용|일정 확률|확률로/u.test(text));
+  const hyperTexts = hyperStatPresetEntries(hyperStatData, hyperStatData?.use_preset_no)
+    .map(({ stat_increase }) => stat_increase);
+  const unionMembers = (unionRaiderData?.union_raider_stat ?? [])
+    .filter((text) => /^보스 몬스터 공격 시 데미지/u.test(text) || !/공격 시|확률로|마다|적 처치/u.test(text));
+  const pet = resolvePetEquipmentBonuses(petEquipmentData, "attack", "active");
+  const options = parseEquipmentOptions(
+    equipmentOptionLines(equipmentData, character.character_class),
+    number(character.character_level),
+  );
+  const permanent = mergeBonuses(
+    titleBonuses(equipmentData),
+    parseSetEffects({ set_effect: activeSets }),
+    otherStatBonuses(otherStatData),
+    cashEquipmentBonuses(cashEquipmentData),
+    pet.active,
+    pet.skills,
+    parseTextBonuses(skillTexts),
+    parseTextBonuses(linkTexts),
+    parseTextBonuses((unionArtifactData?.union_artifact_effect ?? []).map(({ name }) => name)),
+    parseTextBonuses((unionChampionData?.champion_badge_total_info ?? []).map(({ stat }) => stat)),
+  );
+  const combat = mergeBonuses(
+    permanent,
+    parseTextBonuses(hyperTexts),
+    parseTextBonuses(unionRaiderData?.union_state_stat ?? []),
+    parseTextBonuses(unionMembers),
+    parseTextBonuses(abilityTexts),
+    hexaStatCombatBonuses(hexaStatData),
+  );
+  const weapon = equipmentCombatTotals(equipmentData, "attack", character.character_class);
+  const magicWeapon = equipmentCombatTotals(equipmentData, "magic", character.character_class);
+  const damageMultipliers = skillTexts.flatMap((text) =>
+    [...text.matchAll(/(?:^|[,\n]\s*)최종 데미지\s*\+?\s*(\d+(?:\.\d+)?)%/gu)]
+      .map((match) => 1 + number(match[1]) / 100));
+  const ignoreSources = [...weapon.ignoreDefenseSources, ...combat.ignoreDefenseSources];
+  if (Number.isFinite(propensityData?.charisma_level)) {
+    ignoreSources.push(Math.floor(propensityData.charisma_level / 10));
+  }
+  const attack = {
+    공격력: { flat: weapon.flatAttack + combat.flatAttack, percent: options.attackPercent + combat.attackPercent },
+    마력: { flat: magicWeapon.flatAttack + combat.flatMagic, percent: options.magicPercent + combat.magicPercent },
+  };
+  const computed = {
+    "데미지": weapon.damage + combat.damage,
+    "보스 몬스터 데미지": weapon.bossDamage + combat.bossDamage,
+    "크리티컬 확률": 5 + weapon.criticalRate + combat.criticalRate,
+    "크리티컬 데미지": weapon.criticalDamage + combat.criticalDamage,
+    "방어율 무시": 100 * (1 - ignoreSources.reduce((remaining, value) => remaining * (1 - value / 100), 1)),
+    "최종 데미지": 100 * (damageMultipliers.reduce((total, value) => total * value, 1) - 1),
+    ...Object.fromEntries(Object.entries(attack).map(([name, { flat, percent }]) =>
+      [name, Math.floor(flat * (1 + percent / 100) + 1e-8)])),
+  };
+  const xenonStats = mainStat === "ALL" ? ["STR", "DEX", "LUK"] : [];
+  const hexaScale = xenonStats.length ? xenonHexaStatScale(hexaStatData, statData) : 1;
+  const hexa = hexaUnreflectedMainStat(hexaStatData, hexaScale);
+  if (STAT_NAMES.includes(mainStat) || xenonStats.length) {
+    const ap = finalStats(statData);
+    const apPercent = parseTextBonuses(allCharacterSkills(skillData).map((skill) => skill.skill_effect)).apPercent;
+    for (const stat of STAT_NAMES) {
+      if (!Object.hasOwn(ap, `AP 배분 ${stat}`)) continue;
+      const base = Math.floor(ap[`AP 배분 ${stat}`] * (1 + apPercent / 100) + 1e-8) +
+        sumItemTotal(equipmentData, stat) + options.flat[stat] + permanent.flat[stat] +
+        unionAllocatedStat(unionRaiderData, stat);
+      const percent = options.percent[stat] + sumItemAllStatPercent(equipmentData) + permanent.percent[stat];
+      const unreflected = unreflectedStats({ ...snapshot, mainStat: stat, subStats: [] });
+      const statHexa = stat === mainStat || xenonStats.includes(stat) ? hexa : 0;
+      computed[stat] = Math.floor(base * (1 + percent / 100) + 1e-8) +
+        unreflected.main - unreflected.hexaMain + statHexa;
+    }
+  }
+  return { computed, attack };
+}
+
 function ensurePositive(value, label) {
   if (!Number.isFinite(value) || value <= 0) {
     throw new Error(`API 데이터에서 ${label}을(를) 계산하지 못했습니다.`);
@@ -3879,84 +4087,6 @@ function ignoreDefenseGainComponents(currentIgnoreDefense, enemyDefense, channel
   };
 }
 
-export function auraWeaponSnapshotState(current, reference) {
-  if (!reference?.basis || !current?.basis ||
-    ![current.basis, current.legacyBasis].includes(reference.basis)) return "unknown";
-  const { ignoreDefense, finalDamage, effect } = current;
-  const { ignoreDefense: offIgnore, finalDamage: offDamage } = reference;
-  if (
-    ![ignoreDefense, finalDamage, offIgnore, offDamage,
-      effect?.ignoreDefense, effect?.finalDamage].every(Number.isFinite) ||
-    offIgnore < 0 || offIgnore >= 100 || offDamage < 0 ||
-    effect.ignoreDefense <= 0 || effect.ignoreDefense >= 100 || effect.finalDamage <= 0
-  ) return "unknown";
-  const matches = (expectedIgnore, expectedDamage) =>
-    Math.abs(ignoreDefense - expectedIgnore) <= 0.011 &&
-    Math.abs(finalDamage - expectedDamage) <= 0.015;
-  if (matches(offIgnore, offDamage)) return "off";
-  return matches(
-    100 - (100 - offIgnore) * (1 - effect.ignoreDefense / 100),
-    (100 + offDamage) * (1 + effect.finalDamage / 100) - 100,
-  ) ? "on" : "unknown";
-}
-
-/** Confirmed snapshot IED is restored to OFF before applying the existing modeled cycle. */
-export function normalizeAuraWeaponBossProfile(profile, reference) {
-  const snapshot = profile?.details?.temporaryBuffs?.auraWeapon;
-  const state = auraWeaponSnapshotState(snapshot, reference);
-  const details = profile?.details;
-  const model = details?.combatModel;
-  const eq = profile?.statEquivalence;
-  if (
-    profile?.statModel !== "standard" || state !== "on" || details.auraWeaponNormalization ||
-    !model?.effects?.some((effect) => effect.source === "오라 웨폰" && effect.applied &&
-      effect.modifiers?.ignoreDefenseSources?.includes(snapshot.effect.ignoreDefense)) ||
-    !(snapshot.ignoreDefense < 100 && eq?.currentIgnoreDefense >= 0 &&
-      eq.currentIgnoreDefense < 1 && Number.isFinite(eq.oneMainPercentRelative) &&
-      eq.oneMainPercentRelative > 0)
-  ) return profile;
-
-  const remainingRatio = (100 - reference.ignoreDefense) /
-    (100 - snapshot.ignoreDefense);
-  const currentIgnoreDefense = 1 - (1 - eq.currentIgnoreDefense) * remainingRatio;
-  if (currentIgnoreDefense < 0) return profile;
-  const statEquivalence = { ...eq, currentIgnoreDefense };
-  const ignoreDefenseCalibration = {};
-  for (const defense of [300, 380]) {
-    const components = ignoreDefenseGainComponents(
-      currentIgnoreDefense,
-      defense / 100 * Number(eq.targetDefenseRemaining ?? 1),
-      model.damageChannels,
-      number(details.classDamageProfileConfidence),
-    );
-    const byMainPercent = (value) => value / eq.oneMainPercentRelative;
-    const blendedToMainPercent = byMainPercent(components.blended);
-    statEquivalence[`ied40Against${defense}ToMainPercent`] = blendedToMainPercent;
-    ignoreDefenseCalibration[`against${defense}`] = {
-      unprofiledToMainPercent: byMainPercent(components.unprofiled),
-      profiledToMainPercent: byMainPercent(components.profiled),
-      blendedToMainPercent,
-    };
-  }
-  return {
-    ...profile,
-    statEquivalence,
-    details: {
-      ...details,
-      dopedIgnoreDefense: currentIgnoreDefense * 100,
-      combatModel: {
-        ...model,
-        totals: { ...model.totals, ignoreDefense: currentIgnoreDefense },
-      },
-      ignoreDefenseCalibration,
-      auraWeaponNormalization: {
-        offIgnoreDefense: reference.ignoreDefense,
-        previousIed40Against380ToMainPercent: eq.ied40Against380ToMainPercent,
-      },
-    },
-  };
-}
-
 function changeEquipmentIgnoreDefense(
   currentIgnoreDefense,
   currentSources,
@@ -4002,6 +4132,7 @@ export function calculateCharacterPotentialConversion({
   subStats,
   attackType,
   doping,
+  includeLoadedDice = true,
   presetPolicy,
   resolvedPresetSnapshot = null,
 }) {
@@ -4147,6 +4278,8 @@ export function calculateCharacterPotentialConversion({
       characterClass: character.character_class,
       equipmentData: selectedEquipmentData,
       buffDurationPercent,
+      includeLoadedDice,
+      loadedDiceRolls: doping?.loadedDiceRolls,
     },
   );
   const enumeratedBaseMain = ensurePositive(

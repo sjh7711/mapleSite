@@ -2621,6 +2621,28 @@
   color: var(--text-green, #a9d9c0);
 }
 
+.page--calculator .profile-stat-verification {
+  font-size: 0.75rem;
+}
+
+.page--calculator .profile-stat-verification summary {
+  cursor: pointer;
+}
+
+.page--calculator .profile-stat-verification__table {
+  width: 100%;
+  margin-top: 0.35rem;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.page--calculator .profile-stat-verification__table :is(th, td) {
+  padding: 0.25rem;
+  border-bottom: 1px solid var(--border-soft, #2b303c);
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+
 .page--calculator .profile-doping__details {
   margin-top: 2px;
 }

@@ -25,6 +25,7 @@ import {
   type NexonRequestDependencies,
 } from "./nexon";
 import { NEXON_ATTRIBUTION } from "./http";
+import { verifyCharacterStats } from "./stat-verification";
 import {
   calculateSpecialAddOptionConversion,
   type SpecialAddOptionConversionResult,
@@ -1018,7 +1019,6 @@ export async function buildCharacterConversion(
 export function buildCharacterConversionFromData(
   data: CharacterPotentialData,
   presetPolicy: PresetPolicy = { mode: "auto" },
-  normalizedBossStatData?: JsonObject,
 ): CharacterConversionSuccess {
   const { character, snapshot } = data;
   const className = requiredString(character, "character_class", "직업");
@@ -1027,9 +1027,14 @@ export function buildCharacterConversionFromData(
     throw new ConversionUnavailableError(inferredProfile.reason);
   }
   const model = inferredProfile.model ?? "standard";
+  const verification = verifyCharacterStats(
+    data,
+    inferredProfile.mainStat,
+    model !== "demon-avenger",
+  );
   const fullBossStatData = model === "demon-avenger"
     ? snapshot.statData
-    : normalizedBossStatData ?? snapshot.statData;
+    : verification.stats;
 
   const subStats = [
     ...new Set(
@@ -1112,6 +1117,7 @@ export function buildCharacterConversionFromData(
         ...calculationInput,
         statData: fullBossStatData,
         doping: FULL_BOSS_DOPING,
+        includeLoadedDice: verification.diceState !== "unresolved",
         presetPolicy,
         resolvedPresetSnapshot: resolvedPresets,
       });
@@ -1174,6 +1180,7 @@ export function buildCharacterConversionFromData(
         presetSelection: resolvedPresets.selection,
         statModel: model,
         doping: FULL_BOSS_DOPING,
+        includeLoadedDice: verification.diceState !== "unresolved",
       });
     } catch {
       throw new ConversionUnavailableError(
@@ -1234,6 +1241,12 @@ export function buildCharacterConversionFromData(
       championBlessingLevel: FULL_BOSS_DOPING.championBlessingLevel,
     };
   }
+  profiles.fullBoss.details = {
+    ...profiles.fullBoss.details,
+    statVerification: verification.comparison,
+    registeredPetSkills: verification.registeredPetSkills,
+    loadedDiceSnapshotState: verification.diceState,
+  };
   const cashEquipmentSummary = cashEquipmentDisplaySummary(
     snapshot.cashEquipmentData,
   );

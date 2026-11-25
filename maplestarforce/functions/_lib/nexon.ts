@@ -82,6 +82,10 @@ export const NEXON_ENDPOINTS = Object.freeze({
     path: "/character/hyper-stat",
     allowedParameters: ["ocid"],
   },
+  propensity: {
+    path: "/character/propensity",
+    allowedParameters: ["ocid"],
+  },
   hexaStat: {
     path: "/character/hexamatrix-stat",
     allowedParameters: ["ocid"],
@@ -175,6 +179,7 @@ export type CharacterPotentialSnapshot = {
   skillData: JsonObject[];
   symbolData: JsonObject;
   hyperStatData: JsonObject;
+  propensityData?: JsonObject;
   hexaStatData: JsonObject;
   hexaMatrixData: JsonObject;
   vMatrixData: JsonObject;
@@ -521,6 +526,7 @@ export async function fetchCharacterPotentialData(
     { field: "linkSkillData", endpoint: "linkSkill", parameters: { ocid } },
     { field: "symbolData", endpoint: "symbol", parameters: { ocid } },
     { field: "hyperStatData", endpoint: "hyperStat", parameters: { ocid } },
+    { field: "propensityData", endpoint: "propensity", parameters: { ocid } },
     { field: "hexaStatData", endpoint: "hexaStat", parameters: { ocid } },
     { field: "hexaMatrixData", endpoint: "hexaMatrix", parameters: { ocid } },
     { field: "vMatrixData", endpoint: "vMatrix", parameters: { ocid } },
@@ -598,6 +604,7 @@ export async function fetchCharacterPotentialData(
       ),
       symbolData: payloadByField.symbolData,
       hyperStatData: payloadByField.hyperStatData,
+      propensityData: payloadByField.propensityData,
       hexaStatData: payloadByField.hexaStatData,
       hexaMatrixData: payloadByField.hexaMatrixData,
       vMatrixData: payloadByField.vMatrixData,
