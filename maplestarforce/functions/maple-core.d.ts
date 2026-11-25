@@ -24,6 +24,14 @@ declare module "maple-core/stat-profile" {
 declare module "maple-core/stat-efficiency" {
   export const CHARACTER_BASELINE_SKILL_SUMMARY_VERSION: number;
   export function hexaUnreflectedMainStat(data: Record<string, unknown>, scale?: number): number;
+  export function xenonHexaStatScale(hexaData: Record<string, unknown>, statData: Record<string, unknown>): number;
+  export function loadedDiceOutcomes(skillData: Array<Record<string, unknown>>): Array<{
+    rolls: number[];
+    flatAttack: number;
+    criticalRate: number;
+    damage: number;
+    ignoreDefense: number;
+  }> | null;
   export function linkSkillBonuses(data: Record<string, unknown>): Record<string, unknown>;
   export function unionAllocatedStat(data: Record<string, unknown>, stat: string): number;
   export function unionUnreflectedStat(data: Record<string, unknown>, stat: string): number;

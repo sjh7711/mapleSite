@@ -679,6 +679,10 @@ function fullBossDopingDetails(profile, conventionalAddOption, collapsed = false
   }
   const verification = statVerificationDetails(profile.details?.statVerification);
   if (verification) content.append(verification);
+  if (profile.details?.loadedDiceSnapshotState === "unresolved") {
+    content.append(element("p", "profile-doping__class",
+      "럭키 다이스 · API에 반영된 효과를 확인하지 못해 추가 효과를 보류했습니다."));
+  }
   const baselineSkills = Array.isArray(profile.details?.baselineSkills)
     ? profile.details.baselineSkills : [];
   const eventSkills = baselineSkills.filter((skill) => skill.kind === "event");

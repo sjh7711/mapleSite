@@ -1,6 +1,7 @@
 import {
   calculateActiveSkillCycleBonuses,
   calculateCombatRingBonuses,
+  loadedDiceOutcomes,
   reconstructCharacterStats,
 } from "maple-core/stat-efficiency";
 import type { CharacterPotentialData, JsonObject } from "./nexon";
@@ -55,6 +56,8 @@ export function verifyCharacterStats(
   for (const [name, value] of Object.entries(computed)) {
     if (agrees(name, value, observed[name])) verified[name] = value;
   }
+  const diceOutcomes = loadedDiceOutcomes(snapshot.skillData);
+  let diceState = diceOutcomes ? "unresolved" : null;
 
   const pet = snapshot.petEquipmentData;
   const petPrefix = String(pet?.pet_activate_flag) === "1" ? "world_share_pet_" : "pet_";
@@ -116,6 +119,35 @@ export function verifyCharacterStats(
       });
       if (fields) applyBuff(ring.name, fields);
     }
+
+    if (diceOutcomes?.length) {
+      const comparable = { ...observed, ...verified };
+      const diceFields = ["데미지", "공격력", "크리티컬 확률", "방어율 무시"];
+      const controlFields = ["마력", "보스 몬스터 데미지", "크리티컬 데미지"];
+      const agreesWith = (prediction: StatValues, names: string[]) =>
+        names.every((name) => agrees(name, prediction[name], comparable[name]));
+      if (agreesWith(computed, diceFields)) {
+        diceState = "base-matched";
+      } else if (agreesWith(computed, controlFields)) {
+        const rawAttack = source.attack["공격력"];
+        const matches = diceOutcomes.flatMap((outcome) => {
+          const candidate = {
+            데미지: computed["데미지"] + outcome.damage,
+            공격력: Math.floor((rawAttack.flat + outcome.flatAttack) *
+              (1 + rawAttack.percent / 100) + 1e-8),
+            "크리티컬 확률": computed["크리티컬 확률"] + outcome.criticalRate,
+            "방어율 무시": 100 - (100 - computed["방어율 무시"]) * (1 - outcome.ignoreDefense / 100),
+          };
+          return agreesWith(candidate, diceFields) ? [outcome] : [];
+        });
+        if (matches.length === 1) {
+          const { rolls } = matches[0];
+          const changed = diceFields.filter((name) => !agrees(name, computed[name], comparable[name]));
+          applyBuff(`럭키 다이스 ${rolls.join("·")}`, changed);
+          diceState = "included";
+        }
+      }
+    }
   }
 
   const comparison = Object.entries(observed).filter(([name]) =>
@@ -132,5 +164,5 @@ export function verifyCharacterStats(
     final_stat: rows.map((row) => Object.hasOwn(verified, row.stat_name)
       ? { ...row, stat_value: String(verified[row.stat_name]) } : row),
   };
-  return { stats: statData, comparison, registeredPetSkills };
+  return { stats: statData, comparison, registeredPetSkills, diceState };
 }

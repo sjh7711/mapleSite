@@ -542,6 +542,66 @@ function allCharacterSkills(skillData) {
   });
 }
 
+function loadedDiceFaces(skills) {
+  if (!skills.some(({ skill_name }) => skill_name === "로디드 다이스")) return null;
+  const effect = (name) => String(skills.find(({ skill_name }) =>
+    skill_name === name)?.skill_effect ?? "");
+  const single = effect("럭키 다이스");
+  const double = effect("더블 럭키 다이스");
+  const extra = double ? effect("더블 럭키 다이스-엑스트라 넘버") : "";
+  const faces = [];
+  for (const [face, line] of [...(single || double).matchAll(/^([345])\s*:\s*(.+)$/gmu),
+    ...extra.matchAll(/^(7)\s*:\s*(.+)$/gmu)].map((match) => [Number(match[1]), match[2]])) {
+    const bonuses = parseTextBonuses([line]);
+    const fields = {
+      flatAttack: bonuses.flatAttack,
+      criticalRate: bonuses.criticalRate,
+      damage: bonuses.damage,
+      ignoreDefense: bonuses.ignoreDefenseSources[0] ?? 0,
+    };
+    if (Object.values(fields).some((value) => value > 0)) faces.push({ face, ...fields });
+  }
+  const doubleIncrease = percentFromEffect(double,
+    /주사위 눈이 같으면[^\d\n]*(\d+)\s*혹은\s*\d+%p/u);
+  return {
+    faces,
+    double: skills.some(({ skill_name }) => skill_name === "더블 럭키 다이스"),
+    doubleIncrease,
+    extraLearned: skills.some(({ skill_name }) => skill_name === "더블 럭키 다이스-엑스트라 넘버"),
+  };
+}
+
+/** Stat-window outcomes of the learned single and double Lucky Dice. */
+export function loadedDiceOutcomes(skillData) {
+  const rules = loadedDiceFaces(allCharacterSkills(skillData));
+  if (!rules) return null;
+  const { faces, double, doubleIncrease, extraLearned } = rules;
+  if ([3, 4, 5, ...(extraLearned ? [7] : [])].some((face) =>
+    !faces.some((item) => item.face === face)) || (double && !doubleIncrease)) return [];
+  const oneRoll = faces.map(({ face, ...fields }) => ({ rolls: [face], ...fields }));
+  if (!double) return oneRoll;
+  const combined = [];
+  for (const [position, first] of faces.entries()) {
+    for (const [j, second] of faces.slice(position).entries()) {
+      for (const rolls of [[first, second],
+        ...faces.slice(position + j).map((third) => [first, second, third])]) {
+        const buffs = [...new Set(rolls)];
+        const fields = Object.fromEntries(
+          ["flatAttack", "criticalRate", "damage", "ignoreDefense"].map((key) => [
+            key,
+            buffs.reduce((total, face) => {
+              const count = rolls.filter((roll) => roll === face).length;
+              return total + (face[key] > 0 ? face[key] + (count - 1) * doubleIncrease : 0);
+            }, 0),
+          ]),
+        );
+        combined.push({ rolls: rolls.map(({ face }) => face), ...fields });
+      }
+    }
+  }
+  return [...oneRoll, ...combined];
+}
+
 function matrixSkillCoreSummary(vMatrixData, hexaMatrixData) {
   const summarize = (entries, source) => (entries ?? []).map((entry) => ({
     source,
@@ -1076,6 +1136,7 @@ function specialCycleEvents({
   combatDuration,
   apStats,
   equipmentData,
+  loadedDiceRolls,
 }) {
   const name = String(skill?.skill_name ?? "").trim();
   const effect = String(skill?.skill_effect ?? "");
@@ -1148,16 +1209,26 @@ function specialCycleEvents({
   }
 
   if (name === "로디드 다이스") {
-    const hasDoubleDice = skills.some(
-      (candidate) => candidate?.skill_name === "더블 럭키 다이스",
-    );
+    const rules = loadedDiceFaces(skills);
+    const fifthFace = rules?.faces.find(({ face }) => face === 5);
+    const doubleBonus = rules?.double ? rules.doubleIncrease || 10 : 0;
+    const defaultDamage = (fifthFace?.damage ?? 20) + doubleBonus;
+    let modifiers = { damage: defaultDamage };
+    if (Array.isArray(loadedDiceRolls)) {
+      const selected = [...loadedDiceRolls].sort((a, b) => a - b).join(",");
+      const outcome = loadedDiceOutcomes([{ character_skill: skills }])
+        ?.find(({ rolls }) => rolls.join(",") === selected);
+      if (!outcome) return [];
+      const { flatAttack, criticalRate, damage, ignoreDefense } = outcome;
+      modifiers = { flatAttack, criticalRate, damage, ignoreDefense };
+    }
     return [{
       name,
-      model: "loaded-dice-five-high-point",
+      model: Array.isArray(loadedDiceRolls) ? "loaded-dice-selected" : "loaded-dice-five-high-point",
       highPoint: true,
       duration: combatDuration,
       cooldown: 0,
-      modifiers: { damage: hasDoubleDice ? 30 : 20 },
+      modifiers,
     }];
   }
 
@@ -1478,6 +1549,8 @@ export function calculateActiveSkillCycleBonuses(
     characterClass = "",
     equipmentData = null,
     buffDurationPercent = 0,
+    includeLoadedDice = true,
+    loadedDiceRolls,
   } = {},
 ) {
   const result = {
@@ -1498,6 +1571,7 @@ export function calculateActiveSkillCycleBonuses(
     const effect = String(skill?.skill_effect ?? "");
     if (
       !name ||
+      (name === "로디드 다이스" && !includeLoadedDice) ||
       ACTIVE_SKILL_CYCLE_EXCLUSIONS.has(name) ||
       MODELED_SPECIAL_RING_PATTERN.test(name)
     ) {
@@ -1528,6 +1602,7 @@ export function calculateActiveSkillCycleBonuses(
       combatDuration,
       apStats,
       equipmentData,
+      loadedDiceRolls,
     });
     if (specialEvents !== null) {
       for (const event of specialEvents) {
@@ -3643,6 +3718,11 @@ export function hexaUnreflectedMainStat(hexaStatData, scale = 1) {
   }, 0);
 }
 
+export function xenonHexaStatScale(hexaStatData, statData) {
+  const date = String(hexaStatData?.date ?? statData?.date ?? "");
+  return date && date < "2026-09-17" ? 0.48 : 0.66;
+}
+
 function abilityUnreflectedStat(abilityData, stat) {
   return (abilityData?.ability_info ?? []).reduce((sum, ability) => {
     let value = 0;
@@ -3911,7 +3991,10 @@ export function reconstructCharacterStats({ character, snapshot, mainStat }) {
     ...Object.fromEntries(Object.entries(attack).map(([name, { flat, percent }]) =>
       [name, Math.floor(flat * (1 + percent / 100) + 1e-8)])),
   };
-  if (STAT_NAMES.includes(mainStat)) {
+  const xenonStats = mainStat === "ALL" ? ["STR", "DEX", "LUK"] : [];
+  const hexaScale = xenonStats.length ? xenonHexaStatScale(hexaStatData, statData) : 1;
+  const hexa = hexaUnreflectedMainStat(hexaStatData, hexaScale);
+  if (STAT_NAMES.includes(mainStat) || xenonStats.length) {
     const ap = finalStats(statData);
     const apPercent = parseTextBonuses(allCharacterSkills(skillData).map((skill) => skill.skill_effect)).apPercent;
     for (const stat of STAT_NAMES) {
@@ -3921,8 +4004,9 @@ export function reconstructCharacterStats({ character, snapshot, mainStat }) {
         unionAllocatedStat(unionRaiderData, stat);
       const percent = options.percent[stat] + sumItemAllStatPercent(equipmentData) + permanent.percent[stat];
       const unreflected = unreflectedStats({ ...snapshot, mainStat: stat, subStats: [] });
+      const statHexa = stat === mainStat || xenonStats.includes(stat) ? hexa : 0;
       computed[stat] = Math.floor(base * (1 + percent / 100) + 1e-8) +
-        (stat === mainStat ? unreflected.main : unreflected.main - unreflected.hexaMain);
+        unreflected.main - unreflected.hexaMain + statHexa;
     }
   }
   return { computed, attack };
@@ -4048,6 +4132,7 @@ export function calculateCharacterPotentialConversion({
   subStats,
   attackType,
   doping,
+  includeLoadedDice = true,
   presetPolicy,
   resolvedPresetSnapshot = null,
 }) {
@@ -4193,6 +4278,8 @@ export function calculateCharacterPotentialConversion({
       characterClass: character.character_class,
       equipmentData: selectedEquipmentData,
       buffDurationPercent,
+      includeLoadedDice,
+      loadedDiceRolls: doping?.loadedDiceRolls,
     },
   );
   const enumeratedBaseMain = ensurePositive(

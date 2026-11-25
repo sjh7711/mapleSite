@@ -1029,7 +1029,7 @@ export function buildCharacterConversionFromData(
   const model = inferredProfile.model ?? "standard";
   const verification = verifyCharacterStats(
     data,
-    model === "standard" ? inferredProfile.mainStat : undefined,
+    inferredProfile.mainStat,
     model !== "demon-avenger",
   );
   const fullBossStatData = model === "demon-avenger"
@@ -1117,6 +1117,7 @@ export function buildCharacterConversionFromData(
         ...calculationInput,
         statData: fullBossStatData,
         doping: FULL_BOSS_DOPING,
+        includeLoadedDice: verification.diceState !== "unresolved",
         presetPolicy,
         resolvedPresetSnapshot: resolvedPresets,
       });
@@ -1179,6 +1180,7 @@ export function buildCharacterConversionFromData(
         presetSelection: resolvedPresets.selection,
         statModel: model,
         doping: FULL_BOSS_DOPING,
+        includeLoadedDice: verification.diceState !== "unresolved",
       });
     } catch {
       throw new ConversionUnavailableError(
@@ -1243,6 +1245,7 @@ export function buildCharacterConversionFromData(
     ...profiles.fullBoss.details,
     statVerification: verification.comparison,
     registeredPetSkills: verification.registeredPetSkills,
+    loadedDiceSnapshotState: verification.diceState,
   };
   const cashEquipmentSummary = cashEquipmentDisplaySummary(
     snapshot.cashEquipmentData,

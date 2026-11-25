@@ -14,6 +14,7 @@ import {
   selectedBuffDurationPercent,
   unionAllocatedStat,
   unionUnreflectedStat,
+  xenonHexaStatScale,
 } from "maple-core/stat-efficiency";
 import {
   composeCombatModel,
@@ -23,7 +24,6 @@ import {
 
 const STAT_KEYS = ["STR", "DEX", "INT", "LUK"] as const;
 const XENON_STATS = ["STR", "DEX", "LUK"] as const;
-const XENON_HEXA_UPDATE_DATE = "2026-09-17";
 
 export type AddOptionStatKey = (typeof STAT_KEYS)[number] | "HP";
 export type SpecialAddOptionStatModel =
@@ -40,6 +40,7 @@ export type SpecialAddOptionConversionInput = {
   presetSelection?: Record<string, unknown>;
   statModel: SpecialAddOptionStatModel;
   doping?: unknown;
+  includeLoadedDice?: boolean;
 } & Partial<CharacterPotentialSnapshot>;
 
 export type SpecialAddOptionConversionResult = {
@@ -573,12 +574,7 @@ function calculateXenon(
   const activeUnion = activeUnionState(activeSnapshot.unionRaiderData);
   const hyper = activeHyperPreset(snapshot.hyperStatData);
   const union = activeUnionState(snapshot.unionRaiderData);
-  const snapshotDate = text(
-    activeSnapshot.hexaStatData.date ?? activeSnapshot.statData.date,
-  );
-  const xenonHexaRatio = snapshotDate && snapshotDate < XENON_HEXA_UPDATE_DATE
-    ? 0.48
-    : 0.66;
+  const xenonHexaRatio = xenonHexaStatScale(activeSnapshot.hexaStatData, activeSnapshot.statData);
   const hexa = hexaUnreflectedMainStat(snapshot.hexaStatData, xenonHexaRatio);
   const activeHexa = hexaUnreflectedMainStat(activeSnapshot.hexaStatData, xenonHexaRatio);
   const activePercent = mergePercentBonuses(
@@ -613,6 +609,7 @@ function calculateXenon(
     ]),
   ) as Record<(typeof XENON_STATS)[number], Record<string, number>>;
   const { totals, adjustment } = dopingRecords(input);
+  const doping = object(input.doping);
   const classAlwaysOnCombat = resolveClassAlwaysOnCombatAdjustment(
     text(input.character.character_class),
     snapshot.skillData,
@@ -643,6 +640,8 @@ function calculateXenon(
       characterClass: text(input.character.character_class),
       equipmentData: snapshot.equipmentData,
       buffDurationPercent,
+      includeLoadedDice: input.includeLoadedDice,
+      loadedDiceRolls: doping?.loadedDiceRolls,
     },
   );
   const conditionalLinks = calculateConditionalLinkCycleBonuses(
@@ -650,7 +649,6 @@ function calculateXenon(
     buffDurationPercent,
   );
   const guildNoblesse = calculateGuildNoblesseBonuses(snapshot.guildData);
-  const doping = object(input.doping);
   const guildBaseline = object(doping?.guildBaseline) ?? {};
   const guildDifference = input.doping && guildNoblesse.available
     ? {

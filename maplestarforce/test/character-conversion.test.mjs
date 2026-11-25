@@ -521,7 +521,7 @@ test("출처 합산과 API로 오라 웨폰·쓸만한 샤프 아이즈·컨티 
     "방어율 무시": 73, "최종 데미지": 20, "보스 몬스터 데미지": 130,
     "크리티컬 확률": 95, "크리티컬 데미지": 106.6,
   };
-  const fetchConversion = async (stats) => {
+  const fetchConversion = async (stats, className = "렌") => {
     const url = new URL(apiRequest().url);
     url.searchParams.set("presetMode", "active");
     const response = await handleCharacterConversion(createContext(new Request(url)), {
@@ -530,13 +530,13 @@ test("출처 합산과 API로 오라 웨폰·쓸만한 샤프 아이즈·컨티 
       fetchImpl: async (input) => {
         const request = new URL(input);
         const apiPath = request.pathname;
-        const payload = nexonPayload(request, { className: "렌" });
+        const payload = nexonPayload(request, { className });
         if (apiPath.endsWith("/item-equipment")) {
           return Response.json({ preset_no: 1, item_equipment: [
             {
               item_equipment_slot: "무기", item_name: "무기",
               item_total_option: {
-                str: "100", dex: "200", all_stat: "5", attack_power: "1000",
+                str: "100", dex: "200", luk: "20", all_stat: "5", attack_power: "1000",
                 magic_power: "500", boss_damage: "100", ignore_monster_armor: "40",
               },
               potential_option_1: "공격력 +100%",
@@ -576,6 +576,22 @@ test("출처 합산과 API로 오라 웨폰·쓸만한 샤프 아이즈·컨티 
               skill_effect: "270초 동안 크리티컬 확률 10%, 크리티컬 데미지 8% 증가",
             },
           ];
+          if (className !== "렌") {
+            const faces = "3 : 공격력 15 증가\n4 : 크리티컬 확률 15% 증가\n5 : 데미지 20% 증가";
+            payload.character_skill.push(
+              { skill_name: "로디드 다이스", skill_level: 30,
+                skill_effect: "HP 100 소비, 주사위 1개의 눈을 정할 수 있음\n재사용 대기시간 1초\n[패시브 효과 : 공격력 40 증가]" },
+              { skill_name: "럭키 다이스", skill_level: 20, skill_effect: faces },
+            );
+            if (className === "바이퍼") {
+              payload.character_skill.push(
+                { skill_name: "더블 럭키 다이스", skill_level: 8, skill_effect:
+                  `1을 제외하고 주사위 눈이 같으면 아래 효과의 10 혹은 10%p만큼 강화\n${faces}` },
+                { skill_name: "더블 럭키 다이스-엑스트라 넘버", skill_level: 1,
+                  skill_effect: "더블 럭키 다이스에 7 추가\n7 : 몬스터 방어율 무시 20% 증가" },
+              );
+            }
+          }
         }
         if (apiPath.endsWith("/link-skill")) {
           payload.character_link_skill = [
@@ -618,6 +634,29 @@ test("출처 합산과 API로 오라 웨폰·쓸만한 샤프 아이즈·컨티 
   assert.equal(different.fullBoss.details.currentBossDamage, 175);
   assert.equal(different.fullBoss.details.currentCriticalRate, 106);
   assert.equal(different.fullBoss.details.currentIgnoreDefense, 77.32);
+
+  const diceEffect = (profile) => profile.details.activeSkillCycles
+    .find(({ name }) => name === "로디드 다이스");
+  const diceReading = { ...buffsOff, 공격력: 2080, LUK: 383, "AP 배분 LUK": 300 };
+  const xenon = await fetchConversion({ ...diceReading, 데미지: 53 }, "제논");
+  const xenonChecks = Object.fromEntries(xenon.fullBoss.details.statVerification.map((row) => [row.name, row]));
+  assert.equal(xenonChecks.LUK.matched, true);
+  assert.equal(xenonChecks.데미지.buff, "럭키 다이스 5");
+  assert.equal(xenon.fullBoss.details.loadedDiceSnapshotState, "included");
+  assert.equal(diceEffect(xenon.fullBoss).damage, 20);
+  const xenonBase = await fetchConversion(diceReading, "제논");
+  assert.equal(xenonBase.fullBoss.details.loadedDiceSnapshotState, "base-matched");
+  assert.deepEqual(xenon.fullBoss.statEquivalence, xenonBase.fullBoss.statEquivalence);
+
+  const viper = await fetchConversion({ ...diceReading, "방어율 무시": 78.4 }, "바이퍼");
+  const ied = viper.fullBoss.details.statVerification.find(({ name }) => name === "방어율 무시");
+  assert.equal(ied.buff, "럭키 다이스 7");
+  assert.equal(viper.fullBoss.details.currentIgnoreDefense, 73);
+  assert.equal(diceEffect(viper.fullBoss).damage, 30);
+  const viperUnknown = await fetchConversion({ ...diceReading, 데미지: 49 }, "바이퍼");
+  assert.equal(viperUnknown.fullBoss.details.loadedDiceSnapshotState, "unresolved");
+  assert.equal(viperUnknown.fullBoss.details.currentDamage, 49);
+  assert.equal(diceEffect(viperUnknown.fullBoss), undefined);
 });
 
 test("manual 정책을 적용하고 선택 장비의 환산 요약만 응답한다", async () => {
