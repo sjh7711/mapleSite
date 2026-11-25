@@ -1018,6 +1018,7 @@ export async function buildCharacterConversion(
 export function buildCharacterConversionFromData(
   data: CharacterPotentialData,
   presetPolicy: PresetPolicy = { mode: "auto" },
+  sharpEyesOffStatData?: JsonObject,
 ): CharacterConversionSuccess {
   const { character, snapshot } = data;
   const className = requiredString(character, "character_class", "직업");
@@ -1025,6 +1026,10 @@ export function buildCharacterConversionFromData(
   if (!inferredProfile.supported) {
     throw new ConversionUnavailableError(inferredProfile.reason);
   }
+  const model = inferredProfile.model ?? "standard";
+  const fullBossStatData = model === "demon-avenger"
+    ? snapshot.statData
+    : sharpEyesOffStatData ?? snapshot.statData;
 
   const subStats = [
     ...new Set(
@@ -1050,6 +1055,7 @@ export function buildCharacterConversionFromData(
   try {
     resolvedPresets = resolveCharacterPresetSnapshot({
       ...snapshot,
+      statData: fullBossStatData,
       mainStat: inferredProfile.mainStat,
       subStats,
       attackType: inferredProfile.attackType,
@@ -1071,6 +1077,7 @@ export function buildCharacterConversionFromData(
   const selectedPresetSnapshot = {
     ...snapshot,
     ...resolvedPresets.selectedSnapshot,
+    statData: fullBossStatData,
   };
   const basePresetSelection: PresetSelection = {
     ...resolvedPresets.selection,
@@ -1090,7 +1097,6 @@ export function buildCharacterConversionFromData(
     selectedSnapshot: resolvedPresets.activeSnapshot,
     selection: basePresetSelection,
   };
-  const model = inferredProfile.model ?? "standard";
   let profiles: CharacterConversionSuccess["profiles"];
   if (model === "standard") {
     let baseResult: ReturnType<typeof calculateCharacterPotentialConversion>;
@@ -1104,6 +1110,7 @@ export function buildCharacterConversionFromData(
       });
       fullBossResult = calculateCharacterPotentialConversion({
         ...calculationInput,
+        statData: fullBossStatData,
         doping: FULL_BOSS_DOPING,
         presetPolicy,
         resolvedPresetSnapshot: resolvedPresets,
