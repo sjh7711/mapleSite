@@ -6,9 +6,7 @@ import {
 } from "maple-core/stat-profile";
 import {
   CHARACTER_BASELINE_SKILL_SUMMARY_VERSION,
-  auraWeaponSnapshotState,
   calculateCharacterIgnoreDefenseEquivalent,
-  normalizeAuraWeaponBossProfile,
 } from "maple-core/stat-efficiency";
 import {
   cardWithHead,
@@ -37,24 +35,6 @@ import { characterEquipmentSummaryBoard } from "./character-equipment-summary.js
 const STORAGE_KEY = "maplestarforce:character-profile:v2";
 const LEGACY_STORAGE_KEY = "maplestarforce:character-profile:v1";
 const SAVED_NAMES_STORAGE_KEY = "maplestarforce:character-names:v1";
-const AURA_WEAPON_REFERENCE_STORAGE_PREFIX = "maplestarforce:aura-weapon-off:v1:";
-const SNAPSHOT_BUFF_REFERENCES = {
-  sharpEyes: {
-    prefix: "maplestarforce:sharp-eyes-off:v1:",
-    header: "X-Sharp-Eyes-Off-Reference",
-    fields: { criticalRate: "크확", criticalDamage: "크뎀" },
-  },
-  continuousRing: {
-    prefix: "maplestarforce:continuous-ring-off:v1:",
-    header: "X-Continuous-Ring-Off-Reference",
-    fields: { attack: "공격력", magic: "마력", bossDamage: "보공" },
-  },
-  conditionalLinks: {
-    prefix: "maplestarforce:conditional-links-off:v1:",
-    header: "X-Conditional-Links-Off-Reference",
-    fields: { damage: "데미지" },
-  },
-};
 const EQUIPMENT_TOOLTIP_SUMMARY_VERSION = 12;
 const HIDDEN_CHARACTER_WARNING_PREFIXES = Object.freeze([
   "샤프 아이즈 계열과 직업 보정을 포함한 보스전 크리티컬 확률이",
@@ -107,10 +87,7 @@ const DEFAULT_PRESET_MANUAL = Object.freeze(
 const listeners = new Set();
 
 let saved = loadSaved();
-registerResultShareProfile(() => {
-  if (!saved?.profiles?.fullBoss) return saved;
-  return { ...saved, profiles: { ...saved.profiles, fullBoss: activeFullBossProfile() } };
-});
+registerResultShareProfile(() => saved);
 let savedCharacterNames = loadSavedCharacterNames();
 let presetRequest = normalizePresetRequest(
   saved?.presetRequest ?? saved?.presetSelection,
@@ -392,68 +369,8 @@ export function subscribeCharacterProfile(listener) {
   return () => listeners.delete(listener);
 }
 
-function auraWeaponReferenceKey(character) {
-  return AURA_WEAPON_REFERENCE_STORAGE_PREFIX + JSON.stringify([character.world, character.name]);
-}
-
-function readBuffReference(key) {
-  try {
-    return JSON.parse(calculatorStorage.getItem(key));
-  } catch {
-    return null;
-  }
-}
-
-function auraWeaponReference(character) {
-  return readBuffReference(auraWeaponReferenceKey(character));
-}
-
-function snapshotBuffReferenceKey(buff, characterName) {
-  return SNAPSHOT_BUFF_REFERENCES[buff].prefix + characterName.normalize("NFC").toLowerCase();
-}
-
-async function storeSnapshotBuffReference(buff, name, characterName, snapshot, correctionApplied) {
-  const key = snapshotBuffReferenceKey(buff, characterName);
-  if (!snapshot && correctionApplied &&
-    !await searchCharacter(characterName, presetRequest, { withoutBuffReference: buff })) return;
-  if (snapshot) {
-    const fields = Object.keys(SNAPSHOT_BUFF_REFERENCES[buff].fields);
-    const reference = { basis: snapshot.basis };
-    for (const field of fields) reference[field] = snapshot[field];
-    calculatorStorage.setItem(key, JSON.stringify(reference));
-  } else {
-    calculatorStorage.removeItem(key);
-  }
-  message = snapshot
-    ? `${name} OFF 기준을 저장했습니다.`
-    : `${name} OFF 기준을 지웠습니다.`;
-  messageTone = "success";
-  emitProfile();
-}
-
-function storeAuraWeaponReference(character, snapshot) {
-  try {
-    const key = auraWeaponReferenceKey(character);
-    if (snapshot) calculatorStorage.setItem(key, JSON.stringify(snapshot));
-    else calculatorStorage.removeItem(key);
-    message = snapshot ? "오라 웨폰 OFF 기준을 저장했습니다." : "오라 웨폰 OFF 기준을 지웠습니다.";
-    messageTone = "success";
-  } catch {
-    message = "오라 웨폰 OFF 기준을 브라우저에 저장하지 못했습니다.";
-    messageTone = "error";
-  }
-  emitProfile();
-}
-
-function activeFullBossProfile() {
-  const profile = saved?.profiles?.fullBoss;
-  return profile && !isSharedResult()
-    ? normalizeAuraWeaponBossProfile(profile, auraWeaponReference(saved.character))
-    : profile;
-}
-
 export function getActiveProfile({ capability } = {}) {
-  const profile = activeFullBossProfile();
+  const profile = saved?.profiles?.fullBoss;
   if (capability && profile?.capabilities?.[capability] === false) return null;
   if (!profile) return null;
   const active = {
@@ -700,6 +617,48 @@ export function baselineSkillSummary(skill) {
   return `${skill.name}${parts.length ? ` (${parts.join(", ")})` : ""}`;
 }
 
+function statVerificationDetails(rows) {
+  if (!Array.isArray(rows) || !rows.length) return null;
+  const table = element("table", "profile-stat-verification__table");
+  const head = element("thead");
+  const header = element("tr");
+  for (const label of ["스탯", "출처 합산", "API", "확인 결과"]) {
+    const cell = element("th", "", label);
+    cell.scope = "col";
+    header.append(cell);
+  }
+  head.append(header);
+  table.append(head);
+  const body = element("tbody");
+  for (const { name, calculated, api, buff, matched } of rows) {
+    const row = element("tr");
+    const label = element("th", "", name);
+    label.scope = "row";
+    const suffix = /^(?:STR|DEX|INT|LUK|HP|공격력|마력)$/u.test(name) ? "" : "%";
+    const digits = suffix ? 2 : 0;
+    const value = (amount) => `${coefficient(amount, digits)}${suffix}`;
+    const delta = api - calculated;
+    const deltaText = `${delta > 0 ? "+" : ""}${coefficient(delta, digits)}${suffix ? "%p" : ""}`;
+    const status = buff ? `${buff} 중복 보정`
+      : calculated === null ? "자료 부족" : matched ? "일치" : `차이 ${deltaText}`;
+    row.append(label,
+      element("td", "", calculated === null ? "—" : value(calculated)),
+      element("td", "", value(api)),
+      element("td", "", status));
+    body.append(row);
+  }
+  table.append(body);
+  const panel = element("details", "profile-stat-verification");
+  const verified = rows.filter(({ matched, buff }) => matched || buff).length;
+  panel.append(
+    element("summary", "", `API 스탯 검증 · ${verified}/${rows.length}개 확인`),
+    element("p", "profile-doping__class",
+      "현재 활성 프리셋의 공개 출처를 합산합니다. 차이를 확인할 수 없는 항목은 API값을 사용합니다."),
+    table,
+  );
+  return panel;
+}
+
 function fullBossDopingDetails(profile, conventionalAddOption, collapsed = false) {
   if (conventionalAddOption) return null;
   const panel = element(collapsed ? "details" : "section", "profile-doping");
@@ -713,61 +672,13 @@ function fullBossDopingDetails(profile, conventionalAddOption, collapsed = false
     content.append(element("strong", "profile-doping__title", FULL_BOSS_DOPING.label));
   }
   content.append(element("p", "profile-doping__totals", fullBossDopingSummary(profile)));
-  const buffs = profile.details?.temporaryBuffs;
-  if (buffs?.registeredPetSkills?.length) {
+  const petSkills = profile.details?.registeredPetSkills;
+  if (petSkills?.length) {
     content.append(element("p", "profile-doping__class",
-      `펫 자동버프 등록 · ${buffs.registeredPetSkills.join(" · ")}`));
+      `펫 자동버프 등록 · ${petSkills.join(" · ")}`));
   }
-  const aura = buffs?.auraWeapon;
-  if (profile.statModel === "standard" && aura && !isSharedResult()) {
-    const off = auraWeaponReference(profile.character);
-    const state = auraWeaponSnapshotState(aura, off);
-    const normalization = profile.details.auraWeaponNormalization;
-    const status = normalization
-      ? `기본 스탯에 포함 · 방무 +10% (380) ${coefficient(normalization.previousIed40Against380ToMainPercent / 4)}%급 → ${coefficient(profile.statEquivalence.ied40Against380ToMainPercent / 4)}%급`
-      : state === "off" ? "OFF 기준과 일치" : "상태 미확인";
-    content.append(element("p", "profile-doping__class",
-      `오라 웨폰 · ${status} · API 방무 ${coefficient(aura.ignoreDefense)}% · 최종 데미지 ${coefficient(aura.finalDamage)}%`));
-    const action = element("button", "button button--quiet",
-      off ? "오라 웨폰 OFF 기준 지우기" : "오라 웨폰 OFF 기준 저장");
-    action.type = "button";
-    action.disabled = pending;
-    action.title = off
-      ? "다른 세팅의 OFF 기준을 저장할 때 이 기준을 지울 수 있습니다."
-      : "오라 웨폰과 비교 대상 버프가 꺼진 상태를 조회한 뒤 저장하세요.";
-    action.addEventListener("click", () =>
-      storeAuraWeaponReference(profile.character, off ? null : aura));
-    content.append(action);
-  }
-  if (profile.statModel !== "demon-avenger" && !isSharedResult()) {
-    for (const [buff, { fields }] of Object.entries(SNAPSHOT_BUFF_REFERENCES)) {
-      const reading = buffs?.[buff];
-      if (!reading) continue;
-      const name = reading.name ?? "쓸만한 샤프 아이즈";
-      const characterName = profile.character.name;
-      const off = readBuffReference(snapshotBuffReferenceKey(buff, characterName));
-      const correctionApplied = profile.details[`${buff}Normalization`] === true;
-      const matchesOff = off?.basis === reading.basis &&
-        Object.keys(fields).every((field) => off[field] === reading[field]);
-      const status = correctionApplied
-        ? "기본 스탯에 포함 · 중복 보정"
-        : matchesOff ? "OFF 기준과 일치" : "상태 미확인";
-      const values = Object.entries(fields).map(([field, label]) =>
-        `${label} ${coefficient(reading[field])}${field === "attack" || field === "magic" ? "" : "%"}`);
-      content.append(element("p", "profile-doping__class",
-        `${name} · ${status} · API ${values.join(" · ")}`));
-      const action = element("button", "button button--quiet",
-        `${name} OFF 기준 ${off ? "지우기" : "저장"}`);
-      action.type = "button";
-      action.disabled = pending;
-      action.title = off
-        ? "다른 세팅의 OFF 기준을 저장할 때 이 기준을 지울 수 있습니다."
-        : `${name} 효과만 꺼진 상태에서 정보를 갱신한 뒤 저장하세요.`;
-      action.addEventListener("click", () =>
-        storeSnapshotBuffReference(buff, name, characterName, off ? null : reading, correctionApplied));
-      content.append(action);
-    }
-  }
+  const verification = statVerificationDetails(profile.details?.statVerification);
+  if (verification) content.append(verification);
   const baselineSkills = Array.isArray(profile.details?.baselineSkills)
     ? profile.details.baselineSkills : [];
   const eventSkills = baselineSkills.filter((skill) => skill.kind === "event");
@@ -987,7 +898,7 @@ function profileCoefficient(
 async function searchCharacter(
   name,
   request = presetRequest,
-  { refresh = false, equipmentTooltipUpgrade = false, withoutBuffReference = null } = {},
+  { refresh = false, equipmentTooltipUpgrade = false } = {},
 ) {
   if (pending) return false;
   const characterName = name.trim();
@@ -1006,18 +917,9 @@ async function searchCharacter(
   messageTone = "";
   emitProfile();
   try {
-    const buffHeaders = {};
-    for (const [buff, { header }] of Object.entries(SNAPSHOT_BUFF_REFERENCES)) {
-      if (buff === withoutBuffReference) continue;
-      const off = readBuffReference(snapshotBuffReferenceKey(buff, characterName));
-      if (off) buffHeaders[header] = JSON.stringify(off);
-    }
     const requestOptions = {
-      headers: {
-        Accept: "application/json",
-        ...buffHeaders,
-      },
-      cache: refresh || Object.keys(buffHeaders).length || withoutBuffReference ? "no-store" : "default",
+      headers: { Accept: "application/json" },
+      cache: refresh ? "no-store" : "default",
     };
     // 구형 로컬 저장본을 올릴 때는 브라우저의 예전 HTTP 응답만
     // 재사용하지 않는다. 서버에서는 refresh=1 없이 버전 캐시와

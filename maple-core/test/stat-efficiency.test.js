@@ -11,12 +11,10 @@ import {
   targetDefenseEffectsFromSkills,
 } from "maple-core/combat-model";
 import {
-  auraWeaponSnapshotState,
   calculateActiveSkillCycleBonuses,
   calculateCombatRingBonuses,
   calculateCharacterPotentialConversion,
   calculateIgnoreDefenseEquivalent,
-  normalizeAuraWeaponBossProfile,
   resolveClassDamageChannels,
   resolveCharacterExternalBonuses,
   resolveCharacterPresetSnapshot,
@@ -2371,52 +2369,6 @@ function criticalRateConversion(
     skillData,
   });
 }
-
-test("같은 세팅에서 확인된 오라 웨폰 방무만 보스 계산에서 한 번 제거한다", () => {
-  const off = { basis: "same-setup", ignoreDefense: 97.76, finalDamage: 83.05,
-    effect: { ignoreDefense: 16, finalDamage: 6 } };
-  const on = { ...off, ignoreDefense: 98.12, finalDamage: 94.03 };
-  const profileFor = (auraWeapon) => {
-    const profile = calculateCharacterPotentialConversion({
-      character: { character_level: 296, character_class: "렌" },
-      mainStat: "STR",
-      subStat: "DEX",
-      attackType: "attack",
-      doping: FULL_BOSS_DOPING,
-      presetPolicy: { mode: "active" },
-      statData: statData({
-        STR: 87_398, DEX: 11_016, 공격력: 9_145,
-        "방어율 무시": auraWeapon.ignoreDefense,
-        "최종 데미지": auraWeapon.finalDamage,
-        "크리티컬 데미지": 114.6, "AP 배분 STR": 1499, "AP 배분 DEX": 4,
-      }),
-      equipmentData: { item_equipment: [] },
-      setEffectData: { set_effect: [] },
-      skillData: [{ character_skill_grade: "5", character_skill: [{
-        skill_name: "오라 웨폰", skill_level: 30,
-        skill_effect: "130초 동안 몬스터 방어율 무시 16%, 최종 데미지 6% 증가. 재사용 대기시간 120초",
-      }] }],
-    });
-    profile.details.temporaryBuffs = { auraWeapon };
-    return { ...profile, statModel: "standard" };
-  };
-  const offProfile = profileFor(off);
-  const onProfile = profileFor(on);
-  const corrected = normalizeAuraWeaponBossProfile(onProfile, off);
-
-  assert.equal(auraWeaponSnapshotState(off, off), "off");
-  assert.equal(auraWeaponSnapshotState(on, off), "on");
-  assert.equal(auraWeaponSnapshotState({ ...on, finalDamage: 83.05 }, off), "unknown");
-  assert.equal(normalizeAuraWeaponBossProfile(onProfile, { ...off, basis: "different" }), onProfile);
-  assert.equal(normalizeAuraWeaponBossProfile(offProfile, off), offProfile);
-  assert.equal(normalizeAuraWeaponBossProfile(corrected, off), corrected);
-  for (const key of ["currentIgnoreDefense", "ied40Against300ToMainPercent",
-    "ied40Against380ToMainPercent"]) {
-    assert.ok(onProfile.statEquivalence[key] !== offProfile.statEquivalence[key], key);
-    assert.ok(Math.abs(corrected.statEquivalence[key] - offProfile.statEquivalence[key]) < 1e-9, key);
-  }
-  assert.equal(corrected.details.temporaryBuffs.auraWeapon.ignoreDefense, 98.12);
-});
 
 test("챔피언의 가호 5레벨은 공통 풀도핑 능력치에 한 번씩 합산된다", () => {
   const base = criticalRateConversion("히어로", 80, undefined, null).details;

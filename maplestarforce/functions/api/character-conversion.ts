@@ -19,15 +19,6 @@ import {
   type CharacterPotentialData,
   type NexonRequestDependencies,
 } from "../_lib/nexon";
-import {
-  characterTemporaryBuffs,
-  parseConditionalLinkReference,
-  parseContinuousRingReference,
-  parseSharpEyesReference,
-  restoreContinuousRingOffStats,
-  restoreConditionalLinkOffStats,
-  restoreSharpEyesOffStats,
-} from "../_lib/temporary-buffs";
 
 export type Bindings = {
   NEXON_API_KEY: string;
@@ -47,9 +38,8 @@ export type CharacterConversionDependencies = NexonRequestDependencies & {
 const CACHE_SECONDS = 10 * 60;
 const SNAPSHOT_STALE_SECONDS = 6 * 60 * 60;
 export { CHARACTER_CONVERSION_CACHE_VERSION };
-// 응답에서 사용하지 않는 장비 변경 전용 정보를 제거했다.
-// 이전 응답과 10분 캐시를 분리한다.
-export const CHARACTER_SNAPSHOT_CACHE_VERSION = "character-snapshot-v2";
+// 성향을 포함한 원본 스냅샷으로 합산값을 검증한다.
+export const CHARACTER_SNAPSHOT_CACHE_VERSION = "character-snapshot-v3";
 const SNAPSHOT_CLOCK_SKEW_MS = 5 * 60 * 1_000;
 const CHARACTER_NAME_PATTERN = /^[\p{L}\p{N}]+$/u;
 const PRESET_QUERY_FIELDS = [
@@ -252,6 +242,7 @@ function isObject(value: unknown): value is Record<string, unknown> {
 }
 
 const SNAPSHOT_OBJECT_FIELDS = [
+  "propensityData",
   "statData",
   "equipmentData",
   "cashEquipmentData",
@@ -448,16 +439,8 @@ export async function handleCharacterConversion(
 
     const cache =
       dependencies.cache === undefined ? caches.default : dependencies.cache;
-    const sharpEyesReference = parseSharpEyesReference(request.headers.get("X-Sharp-Eyes-Off-Reference"));
-    const continuousRingReference = parseContinuousRingReference(
-      request.headers.get("X-Continuous-Ring-Off-Reference"),
-    );
-    const conditionalLinkReference = parseConditionalLinkReference(
-      request.headers.get("X-Conditional-Links-Off-Reference"),
-    );
-    const hasBuffReference = Boolean(sharpEyesReference || continuousRingReference || conditionalLinkReference);
     const cacheKey = createCacheKey(request, characterName, presetPolicy);
-    if (cache && !refresh && !hasBuffReference) {
+    if (cache && !refresh) {
       try {
         const cachedResponse = await cache.match(cacheKey);
         if (cachedResponse) {
@@ -530,51 +513,7 @@ export async function handleCharacterConversion(
       }
     }
 
-    const temporaryBuffs = await characterTemporaryBuffs(envelope.data);
-    const statData = envelope.data.snapshot.statData;
-    const conditionalLinkOffStatData = restoreConditionalLinkOffStats(
-      statData, temporaryBuffs.conditionalLinks, conditionalLinkReference,
-    );
-    const linkNormalizedStats = conditionalLinkOffStatData ?? statData;
-    const buffsAtLinkOff = conditionalLinkOffStatData
-      ? await characterTemporaryBuffs({
-        ...envelope.data,
-        snapshot: { ...envelope.data.snapshot, statData: linkNormalizedStats },
-      })
-      : temporaryBuffs;
-    const continuousRingOffStatData = restoreContinuousRingOffStats(
-      linkNormalizedStats,
-      buffsAtLinkOff.continuousRing,
-      continuousRingReference,
-    );
-    // 컨티 OFF로 저장했던 샤프 아이즈 기준은 컨티 수치를 복구한 뒤에도 비교한다.
-    const sharpEyesAtRingOff = continuousRingOffStatData && sharpEyesReference &&
-        buffsAtLinkOff.sharpEyes?.basis !== sharpEyesReference.basis
-      ? (await characterTemporaryBuffs({
-          ...envelope.data,
-          snapshot: { ...envelope.data.snapshot, statData: continuousRingOffStatData },
-        })).sharpEyes
-      : buffsAtLinkOff.sharpEyes;
-    const sharpEyesOffStatData = restoreSharpEyesOffStats(
-      continuousRingOffStatData ?? linkNormalizedStats,
-      sharpEyesAtRingOff,
-      sharpEyesReference,
-    );
-    const result = buildCharacterConversionFromData(
-      envelope.data,
-      presetPolicy,
-      sharpEyesOffStatData ?? continuousRingOffStatData ?? conditionalLinkOffStatData,
-    );
-    result.profiles.fullBoss.details = {
-      ...result.profiles.fullBoss.details,
-      temporaryBuffs: { ...buffsAtLinkOff, conditionalLinks: temporaryBuffs.conditionalLinks },
-      conditionalLinksNormalization: Boolean(conditionalLinkOffStatData) &&
-        result.profiles.fullBoss.statModel !== "demon-avenger",
-      sharpEyesNormalization: Boolean(sharpEyesOffStatData) &&
-        result.profiles.fullBoss.statModel !== "demon-avenger",
-      continuousRingNormalization: Boolean(continuousRingOffStatData) &&
-        result.profiles.fullBoss.statModel !== "demon-avenger",
-    };
+    const result = buildCharacterConversionFromData(envelope.data, presetPolicy);
     result.dataFreshness = {
       source: usedStaleSnapshot
         ? "stale-cache"
@@ -594,7 +533,7 @@ export async function handleCharacterConversion(
     const response = jsonResponse(result, {
       status: 200,
       headers: {
-        "Cache-Control": usedStaleSnapshot || hasBuffReference
+        "Cache-Control": usedStaleSnapshot
           ? "private, no-store"
           : `public, max-age=${CACHE_SECONDS}`,
         "X-Conversion-Version": CHARACTER_CONVERSION_CACHE_VERSION,
@@ -602,12 +541,11 @@ export async function handleCharacterConversion(
     });
 
     if (cache && !usedStaleSnapshot) {
-      const writes: Promise<unknown>[] = [];
-      if (!hasBuffReference) {
-        writes.push(cache.put(cacheKey, response.clone()).catch((error) => {
+      const writes: Promise<unknown>[] = [
+        cache.put(cacheKey, response.clone()).catch((error) => {
           logFailure("character_conversion_cache_put_failed", error);
-        }));
-      }
+        }),
+      ];
       if (fetchedFromUpstream) {
         writes.push(
           cache.put(

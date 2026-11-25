@@ -3617,30 +3617,29 @@ function abilityCombatBonuses(abilityData, attackType) {
   );
 }
 
-const HEXA_MAIN_STAT_BY_LEVEL = [0, 100, 200, 300, 400, 600, 800, 1000, 1300, 1600, 2000];
+const HEXA_MAIN_STAT_UNITS = [0, 1, 2, 3, 4, 6, 8, 10, 13, 16, 20];
+
+function hexaStatCores(data) {
+  return [
+    ...(data?.character_hexa_stat_core ?? []),
+    ...(data?.character_hexa_stat_core_2 ?? []),
+    ...(data?.character_hexa_stat_core_3 ?? []),
+  ];
+}
+
+function hexaStatEntries(core) {
+  return [
+    [core.main_stat_name, HEXA_MAIN_STAT_UNITS[number(core.main_stat_level)] ?? 0],
+    [core.sub_stat_name_1, number(core.sub_stat_level_1)],
+    [core.sub_stat_name_2, number(core.sub_stat_level_2)],
+  ];
+}
 
 export function hexaUnreflectedMainStat(hexaStatData, scale = 1) {
-  const cores = [
-    ...(hexaStatData?.character_hexa_stat_core ?? []),
-    ...(hexaStatData?.character_hexa_stat_core_2 ?? []),
-    ...(hexaStatData?.character_hexa_stat_core_3 ?? []),
-  ];
-  return cores.reduce((sum, core) => {
-    // HEXA 스탯의 주력 스탯은 잠재능력 스탯%를 받지 않는다.
-    // 메인 옵션은 레벨별 표, 서브 옵션은 레벨당 100을 사용한다.
-    const main =
-      core.main_stat_name === "주력 스탯 증가"
-        ? (HEXA_MAIN_STAT_BY_LEVEL[number(core.main_stat_level)] ?? 0)
-        : 0;
-    const sub1 =
-      core.sub_stat_name_1 === "주력 스탯 증가"
-        ? number(core.sub_stat_level_1) * 100
-        : 0;
-    const sub2 =
-      core.sub_stat_name_2 === "주력 스탯 증가"
-        ? number(core.sub_stat_level_2) * 100
-        : 0;
-    return sum + Math.round((main + sub1 + sub2) * scale);
+  return hexaStatCores(hexaStatData).reduce((sum, core) => {
+    const units = hexaStatEntries(core).reduce((total, [name, value]) =>
+      name === "주력 스탯 증가" ? total + value : total, 0);
+    return sum + Math.round(units * 100 * scale);
   }, 0);
 }
 
@@ -3804,6 +3803,131 @@ function unreflectedStats({
   };
 }
 
+// Buffs with an activation condition and effects on individual attacks do not
+// contribute to the character's always-on stat total.
+function statWindowSkillTexts(skillData) {
+  return allCharacterSkills(skillData).flatMap(({ skill_name, skill_effect }) => {
+    const text = String(skill_effect ?? "");
+    const passive = [...text.matchAll(/\[패시브 효과\s*:\s*([^\]]+)\]/gu)];
+    if (passive.length) return passive.map((match) => match[1]);
+    if (/리인포스|보스\s*킬러|이그노어\s*가드|[ -]강화$/u.test(skill_name)) return [];
+    return text.split(/\r?\n/u).map((line) => line.trim().replace(/^영구적으로\s*/u, ""))
+      .filter((line) =>
+        /^(?:데미지|보스 몬스터 공격 시 데미지|최종 데미지|크리티컬 (?:데미지|확률)|(?:몬스터 )?방어율 무시|공격력|마력|올스탯|힘|민첩|지력|행운|모든 능력치)/u.test(line) &&
+        !/\d+\s*초|재사용|적중|타격|중첩|소환|공격할 때|스킬 사용 시|일정 확률|상태 이상/u.test(line));
+  });
+}
+
+function hexaStatCombatBonuses(hexaStatData) {
+  const result = emptyBonuses();
+  for (const [name, units] of hexaStatCores(hexaStatData).flatMap(hexaStatEntries)) {
+    if (units <= 0) continue;
+    if (name === "크리티컬 데미지 증가") result.criticalDamage += units * 0.35;
+    if (name === "보스 데미지 증가" || name === "보스 몬스터 데미지 증가") result.bossDamage += units;
+    if (name === "데미지 증가") result.damage += units * 0.75;
+    if (name === "방어율 무시 증가") result.ignoreDefenseSources.push(units);
+    if (name === "공격력 증가" || name === "공격력/마력 증가") {
+      result.flatAttack += units * 5;
+      result.flatMagic += units * 5;
+    }
+  }
+  return result;
+}
+
+/**
+ * Reconstruct the equipped character's stat window from independently
+ * available sources. The only aggregate API inputs used here are allocated AP
+ * (a component of STR/DEX/INT/LUK) and never the totals being checked.
+ */
+export function reconstructCharacterStats({ character, snapshot, mainStat }) {
+  const {
+    statData, equipmentData, setEffectData, otherStatData, cashEquipmentData,
+    petEquipmentData, skillData, linkSkillData, hyperStatData, unionRaiderData,
+    unionArtifactData, unionChampionData, propensityData, hexaStatData,
+    symbolData, abilityData,
+  } = snapshot;
+  if (!activeEquipment(equipmentData ?? {}).length || !allCharacterSkills(skillData).length) return null;
+
+  const activeSets = (setEffectData?.set_effect ?? []).map((set) => ({
+    ...set,
+    set_effect_info: (set.set_effect_info ?? []).filter((entry) =>
+      set.total_set_count == null || number(entry.set_count) <= number(set.total_set_count)),
+  }));
+  const skillTexts = statWindowSkillTexts(skillData);
+  const linkTexts = linkSkills(linkSkillData).map(({ skill_effect }) => skill_effect)
+    .filter((text) => text &&
+      !/\d+\s*초|공격하면|상태 이상|파티원|적에게|약점|재발동|재사용|공격할 때|소환 시|전투 상태/u.test(text));
+  const abilityTexts = (abilityData?.ability_info ?? []).map(({ ability_value }) => ability_value)
+    .filter((text) => text && !/상태 이상|재사용|일정 확률|확률로/u.test(text));
+  const hyperTexts = hyperStatPresetEntries(hyperStatData, hyperStatData?.use_preset_no)
+    .map(({ stat_increase }) => stat_increase);
+  const unionMembers = (unionRaiderData?.union_raider_stat ?? [])
+    .filter((text) => /^보스 몬스터 공격 시 데미지/u.test(text) || !/공격 시|확률로|마다|적 처치/u.test(text));
+  const pet = resolvePetEquipmentBonuses(petEquipmentData, "attack", "active");
+  const options = parseEquipmentOptions(
+    equipmentOptionLines(equipmentData, character.character_class),
+    number(character.character_level),
+  );
+  const permanent = mergeBonuses(
+    titleBonuses(equipmentData),
+    parseSetEffects({ set_effect: activeSets }),
+    otherStatBonuses(otherStatData),
+    cashEquipmentBonuses(cashEquipmentData),
+    pet.active,
+    pet.skills,
+    parseTextBonuses(skillTexts),
+    parseTextBonuses(linkTexts),
+    parseTextBonuses((unionArtifactData?.union_artifact_effect ?? []).map(({ name }) => name)),
+    parseTextBonuses((unionChampionData?.champion_badge_total_info ?? []).map(({ stat }) => stat)),
+  );
+  const combat = mergeBonuses(
+    permanent,
+    parseTextBonuses(hyperTexts),
+    parseTextBonuses(unionRaiderData?.union_state_stat ?? []),
+    parseTextBonuses(unionMembers),
+    parseTextBonuses(abilityTexts),
+    hexaStatCombatBonuses(hexaStatData),
+  );
+  const weapon = equipmentCombatTotals(equipmentData, "attack", character.character_class);
+  const magicWeapon = equipmentCombatTotals(equipmentData, "magic", character.character_class);
+  const damageMultipliers = skillTexts.flatMap((text) =>
+    [...text.matchAll(/(?:^|[,\n]\s*)최종 데미지\s*\+?\s*(\d+(?:\.\d+)?)%/gu)]
+      .map((match) => 1 + number(match[1]) / 100));
+  const ignoreSources = [...weapon.ignoreDefenseSources, ...combat.ignoreDefenseSources];
+  if (Number.isFinite(propensityData?.charisma_level)) {
+    ignoreSources.push(Math.floor(propensityData.charisma_level / 10));
+  }
+  const attack = {
+    공격력: { flat: weapon.flatAttack + combat.flatAttack, percent: options.attackPercent + combat.attackPercent },
+    마력: { flat: magicWeapon.flatAttack + combat.flatMagic, percent: options.magicPercent + combat.magicPercent },
+  };
+  const computed = {
+    "데미지": weapon.damage + combat.damage,
+    "보스 몬스터 데미지": weapon.bossDamage + combat.bossDamage,
+    "크리티컬 확률": 5 + weapon.criticalRate + combat.criticalRate,
+    "크리티컬 데미지": weapon.criticalDamage + combat.criticalDamage,
+    "방어율 무시": 100 * (1 - ignoreSources.reduce((remaining, value) => remaining * (1 - value / 100), 1)),
+    "최종 데미지": 100 * (damageMultipliers.reduce((total, value) => total * value, 1) - 1),
+    ...Object.fromEntries(Object.entries(attack).map(([name, { flat, percent }]) =>
+      [name, Math.floor(flat * (1 + percent / 100) + 1e-8)])),
+  };
+  if (STAT_NAMES.includes(mainStat)) {
+    const ap = finalStats(statData);
+    const apPercent = parseTextBonuses(allCharacterSkills(skillData).map((skill) => skill.skill_effect)).apPercent;
+    for (const stat of STAT_NAMES) {
+      if (!Object.hasOwn(ap, `AP 배분 ${stat}`)) continue;
+      const base = Math.floor(ap[`AP 배분 ${stat}`] * (1 + apPercent / 100) + 1e-8) +
+        sumItemTotal(equipmentData, stat) + options.flat[stat] + permanent.flat[stat] +
+        unionAllocatedStat(unionRaiderData, stat);
+      const percent = options.percent[stat] + sumItemAllStatPercent(equipmentData) + permanent.percent[stat];
+      const unreflected = unreflectedStats({ ...snapshot, mainStat: stat, subStats: [] });
+      computed[stat] = Math.floor(base * (1 + percent / 100) + 1e-8) +
+        (stat === mainStat ? unreflected.main : unreflected.main - unreflected.hexaMain);
+    }
+  }
+  return { computed, attack };
+}
+
 function ensurePositive(value, label) {
   if (!Number.isFinite(value) || value <= 0) {
     throw new Error(`API 데이터에서 ${label}을(를) 계산하지 못했습니다.`);
@@ -3876,84 +4000,6 @@ function ignoreDefenseGainComponents(currentIgnoreDefense, enemyDefense, channel
     unprofiled,
     profiled,
     blended: unprofiled + (profiled - unprofiled) * confidence,
-  };
-}
-
-export function auraWeaponSnapshotState(current, reference) {
-  if (!reference?.basis || !current?.basis ||
-    ![current.basis, current.legacyBasis].includes(reference.basis)) return "unknown";
-  const { ignoreDefense, finalDamage, effect } = current;
-  const { ignoreDefense: offIgnore, finalDamage: offDamage } = reference;
-  if (
-    ![ignoreDefense, finalDamage, offIgnore, offDamage,
-      effect?.ignoreDefense, effect?.finalDamage].every(Number.isFinite) ||
-    offIgnore < 0 || offIgnore >= 100 || offDamage < 0 ||
-    effect.ignoreDefense <= 0 || effect.ignoreDefense >= 100 || effect.finalDamage <= 0
-  ) return "unknown";
-  const matches = (expectedIgnore, expectedDamage) =>
-    Math.abs(ignoreDefense - expectedIgnore) <= 0.011 &&
-    Math.abs(finalDamage - expectedDamage) <= 0.015;
-  if (matches(offIgnore, offDamage)) return "off";
-  return matches(
-    100 - (100 - offIgnore) * (1 - effect.ignoreDefense / 100),
-    (100 + offDamage) * (1 + effect.finalDamage / 100) - 100,
-  ) ? "on" : "unknown";
-}
-
-/** Confirmed snapshot IED is restored to OFF before applying the existing modeled cycle. */
-export function normalizeAuraWeaponBossProfile(profile, reference) {
-  const snapshot = profile?.details?.temporaryBuffs?.auraWeapon;
-  const state = auraWeaponSnapshotState(snapshot, reference);
-  const details = profile?.details;
-  const model = details?.combatModel;
-  const eq = profile?.statEquivalence;
-  if (
-    profile?.statModel !== "standard" || state !== "on" || details.auraWeaponNormalization ||
-    !model?.effects?.some((effect) => effect.source === "오라 웨폰" && effect.applied &&
-      effect.modifiers?.ignoreDefenseSources?.includes(snapshot.effect.ignoreDefense)) ||
-    !(snapshot.ignoreDefense < 100 && eq?.currentIgnoreDefense >= 0 &&
-      eq.currentIgnoreDefense < 1 && Number.isFinite(eq.oneMainPercentRelative) &&
-      eq.oneMainPercentRelative > 0)
-  ) return profile;
-
-  const remainingRatio = (100 - reference.ignoreDefense) /
-    (100 - snapshot.ignoreDefense);
-  const currentIgnoreDefense = 1 - (1 - eq.currentIgnoreDefense) * remainingRatio;
-  if (currentIgnoreDefense < 0) return profile;
-  const statEquivalence = { ...eq, currentIgnoreDefense };
-  const ignoreDefenseCalibration = {};
-  for (const defense of [300, 380]) {
-    const components = ignoreDefenseGainComponents(
-      currentIgnoreDefense,
-      defense / 100 * Number(eq.targetDefenseRemaining ?? 1),
-      model.damageChannels,
-      number(details.classDamageProfileConfidence),
-    );
-    const byMainPercent = (value) => value / eq.oneMainPercentRelative;
-    const blendedToMainPercent = byMainPercent(components.blended);
-    statEquivalence[`ied40Against${defense}ToMainPercent`] = blendedToMainPercent;
-    ignoreDefenseCalibration[`against${defense}`] = {
-      unprofiledToMainPercent: byMainPercent(components.unprofiled),
-      profiledToMainPercent: byMainPercent(components.profiled),
-      blendedToMainPercent,
-    };
-  }
-  return {
-    ...profile,
-    statEquivalence,
-    details: {
-      ...details,
-      dopedIgnoreDefense: currentIgnoreDefense * 100,
-      combatModel: {
-        ...model,
-        totals: { ...model.totals, ignoreDefense: currentIgnoreDefense },
-      },
-      ignoreDefenseCalibration,
-      auraWeaponNormalization: {
-        offIgnoreDefense: reference.ignoreDefense,
-        previousIed40Against380ToMainPercent: eq.ied40Against380ToMainPercent,
-      },
-    },
   };
 }
 
