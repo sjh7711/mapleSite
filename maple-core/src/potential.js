@@ -1,5 +1,5 @@
 import { formatApproxMeso } from "./starforce.js";
-import { calculateIgnoreDefenseEquivalent } from "./stat-efficiency.js";
+import { calculateCharacterIgnoreDefenseEquivalent } from "./stat-efficiency.js";
 import { adjustedNextResultProbability } from "./no-repeat.js";
 
 export const POTENTIAL_GRADES = {
@@ -1362,28 +1362,12 @@ export function convertPotentialTargetToEquivalents({
       mainStatPercent = value * coefficient;
     }
   } else if (targetType === "ignore-defense") {
-    const currentIgnoreDefense = Number(
-      statEquivalence.currentIgnoreDefense,
-    );
-    const oneMainPercentRelative = Number(
-      statEquivalence.oneMainPercentRelative,
-    );
-    if (
-      Number.isFinite(currentIgnoreDefense) &&
-      currentIgnoreDefense >= 0 &&
-      currentIgnoreDefense <= 1 &&
-      Number.isFinite(oneMainPercentRelative) &&
-      oneMainPercentRelative > 0 &&
-      Number.isFinite(Number(enemyDefense)) &&
-      Number(enemyDefense) > 0
-    ) {
-      mainStatPercent = calculateIgnoreDefenseEquivalent({
-        currentIgnoreDefense,
+    const defense = Number(enemyDefense);
+    if (Number.isFinite(defense) && defense > 0) {
+      mainStatPercent = calculateCharacterIgnoreDefenseEquivalent({
+        statEquivalence,
         addedIgnoreDefense: value / 100,
-        enemyDefense:
-          Number(enemyDefense) / 100 *
-          Number(statEquivalence.targetDefenseRemaining ?? 1),
-        oneMainPercentRelative,
+        enemyDefense: defense,
       });
     }
   }
@@ -1630,13 +1614,10 @@ function getBossStatEquivalentScore({
   const relevantAttackPercent =
     attackType === "magic" ? state.magicPercent : state.attackPercent;
   const addedIgnoreDefense = 1 - state.ignoreDefenseRemaining;
-  const ignoreDefenseScore = calculateIgnoreDefenseEquivalent({
-    currentIgnoreDefense: statEquivalence.currentIgnoreDefense,
+  const ignoreDefenseScore = calculateCharacterIgnoreDefenseEquivalent({
+    statEquivalence,
     addedIgnoreDefense,
-    enemyDefense:
-      enemyDefense / 100 *
-      Number(statEquivalence.targetDefenseRemaining ?? 1),
-    oneMainPercentRelative: statEquivalence.oneMainPercentRelative,
+    enemyDefense,
   });
   if (ignoreDefenseScore === null) {
     throw new Error("선택한 적 방어율에서 방어율 무시 환산을 계산하지 못했습니다.");

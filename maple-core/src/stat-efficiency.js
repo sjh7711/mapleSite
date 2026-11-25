@@ -3769,6 +3769,30 @@ export function calculateIgnoreDefenseEquivalent({
   return (after / before - 1) / oneMainPercentRelative;
 }
 
+export function calculateCharacterIgnoreDefenseEquivalent({
+  statEquivalence,
+  addedIgnoreDefense,
+  enemyDefense,
+}) {
+  const general = calculateIgnoreDefenseEquivalent({
+    currentIgnoreDefense: Number(statEquivalence?.currentIgnoreDefense),
+    addedIgnoreDefense,
+    enemyDefense: enemyDefense / 100 *
+      Number(statEquivalence?.targetDefenseRemaining ?? 1),
+    oneMainPercentRelative: Number(statEquivalence?.oneMainPercentRelative),
+  });
+  if (general === null) return null;
+  const profiled = enemyDefense === 300
+    ? statEquivalence.ied40Against300ToMainPercent
+    : enemyDefense === 380
+      ? statEquivalence.ied40Against380ToMainPercent
+      : undefined;
+  // 기본 피해가 양수면 합성된 추가 방무에 비례해 스킬별 피해가 늘어난다.
+  return Number.isFinite(profiled) && profiled > 0
+    ? profiled * (addedIgnoreDefense / 0.4)
+    : general;
+}
+
 function changeEquipmentIgnoreDefense(
   currentIgnoreDefense,
   currentSources,

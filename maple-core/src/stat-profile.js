@@ -3,7 +3,7 @@
  * Node, Discord, DOM에 의존하지 않아 브라우저와 Worker에서도 그대로 쓴다.
  */
 
-export const CHARACTER_CONVERSION_CACHE_VERSION = "combat-profile-v74-champion-blessing";
+export const CHARACTER_CONVERSION_CACHE_VERSION = "combat-profile-v75-boss-doping";
 
 // 넥슨 유니온 챔피언 가이드의 전투 능력치 5레벨 기준.
 // https://maplestory.nexon.com/Guide/N23GameInformation/Articles/409
@@ -17,6 +17,11 @@ const CHAMPION_BLESSING_LEVEL_5 = {
   ignoreDefense: 10,
 };
 
+const FULL_BOSS_ATTACK_MAGIC_PERCENT_BUFFS = [
+  { name: "세이람의 영약", percent: 10 },
+  { name: "영웅의 메아리 계열", percent: 4 },
+];
+
 export const FULL_BOSS_DOPING = {
   label: "풀도핑 (고급 무기 제련·이벤트 버프 포함)",
   championBlessingLevel: CHAMPION_BLESSING_LEVEL_5.level,
@@ -29,14 +34,19 @@ export const FULL_BOSS_DOPING = {
     "MVP 슈퍼파워",
     "향상된 10단계 주스탯 물약",
     "반짝이는 빨간 별 물약",
-    "영웅의 메아리 계열",
+    ...FULL_BOSS_ATTACK_MAGIC_PERCENT_BUFFS.map(
+      ({ name, percent }) => `${name} (공·마 +${percent}%)`,
+    ),
     "고급 무기 제련",
     "이벤트 버프",
     "쓸만한 샤프 아이즈·어드밴스드 블레스",
   ],
   totals: {
     attackMagic: 375 + CHAMPION_BLESSING_LEVEL_5.attackMagic,
-    attackMagicPercent: 50,
+    attackMagicPercent: FULL_BOSS_ATTACK_MAGIC_PERCENT_BUFFS.reduce(
+      (total, buff) => total + buff.percent,
+      0,
+    ),
     mainStat: 75 + CHAMPION_BLESSING_LEVEL_5.allStat,
     subStat: 75 + CHAMPION_BLESSING_LEVEL_5.allStat,
     hp: 1_500 + CHAMPION_BLESSING_LEVEL_5.hp,

@@ -1581,6 +1581,18 @@ test("조건 기준값을 개인 주스탯%와 공마%로 환산한다", () => {
       attackPercent: ignoreDefenseMain / 7,
     },
   );
+  for (const [enemyDefense, expected] of [[300, 6], [380, 8]]) {
+    assert.deepEqual(convertPotentialTargetToEquivalents({
+      targetType: "ignore-defense",
+      target: 10,
+      statEquivalence: {
+        ...personal,
+        ied40Against300ToMainPercent: 24,
+        ied40Against380ToMainPercent: 32,
+      },
+      enemyDefense,
+    }), { mainStatPercent: expected, attackPercent: expected / 7 });
+  }
   assert.deepEqual(
     convertPotentialTargetToEquivalents({
       targetType: "meso",
@@ -1725,6 +1737,19 @@ test("보스전 주스탯% 환산은 여러 방무 줄을 복리 합성해 한 �
     }).probability,
     0,
   );
+  const profile = {
+    ...statEquivalence,
+    ied40Against380ToMainPercent: 20,
+  };
+  for (const [target, probability] of [[28.99, 1], [29.01, 0]]) {
+    assert.equal(calculatePotentialExpected({
+      ...common,
+      tables,
+      targetType: "boss-stat-equivalent",
+      statEquivalence: profile,
+      target,
+    }).probability, probability);
+  }
 });
 
 test("보스 환산은 개인 방무 컨텍스트와 유효한 적 방어율을 요구한다", () => {
