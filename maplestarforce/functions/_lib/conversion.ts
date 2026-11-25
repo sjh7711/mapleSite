@@ -1067,6 +1067,7 @@ export function buildCharacterConversionFromData(
       characterLevel: characterLevel(character),
       characterClass: className,
       presetPolicy,
+      includedNativeSharpEyesDamage: verification.includedNativeSharpEyesDamage,
     });
   } catch (error) {
     throw new ConversionUnavailableError(
@@ -1118,6 +1119,7 @@ export function buildCharacterConversionFromData(
         statData: fullBossStatData,
         doping: FULL_BOSS_DOPING,
         includeLoadedDice: verification.diceState !== "unresolved",
+        includedNativeSharpEyesDamage: verification.includedNativeSharpEyesDamage,
         presetPolicy,
         resolvedPresetSnapshot: resolvedPresets,
       });

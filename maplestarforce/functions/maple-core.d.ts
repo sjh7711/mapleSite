@@ -39,6 +39,7 @@ declare module "maple-core/stat-efficiency" {
     character: Record<string, unknown>;
     snapshot: Record<string, unknown>;
     mainStat?: string;
+    activeSkillNames?: string[];
   }): {
     computed: Record<string, number>;
     attack: Record<"공격력" | "마력", { flat: number; percent: number }>;

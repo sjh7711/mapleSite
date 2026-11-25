@@ -7,6 +7,7 @@ import {
 import type { CharacterPotentialData, JsonObject } from "./nexon";
 
 const ATTACK_FIELDS = ["공격력", "마력"] as const;
+const DEFAULT_SHARP_EYES = { rate: 20, damage: 15 };
 
 type StatRow = { stat_name: string; stat_value: string };
 type StatValues = Record<string, number>;
@@ -22,6 +23,13 @@ function agrees(name: string, computed: number, observed: number) {
 const withMultiplier = (total: number, bonus: number) =>
   total + (100 + total) * bonus / 100;
 
+function sharpEyesEffect(text: string) {
+  const match = text.match(
+    /크리티컬 확률\s*(\d+(?:\.\d+)?)%,\s*크리티컬 데미지\s*(\d+(?:\.\d+)?)%/u,
+  );
+  return match ? { rate: Number(match[1]), damage: Number(match[2]) } : null;
+}
+
 export function verifyCharacterStats(
   data: CharacterPotentialData,
   mainStat?: string,
@@ -35,7 +43,22 @@ export function verifyCharacterStats(
     const value = Number(text);
     return text && Number.isFinite(value) ? [[stat_name, value]] : [];
   }));
-  const source = reconstructCharacterStats({ character, snapshot, mainStat });
+  const input = { character, snapshot, mainStat };
+  let source = reconstructCharacterStats(input);
+  const learnedSkills = (snapshot.skillData ?? []).flatMap((grade) =>
+    Array.isArray(grade.character_skill) ? grade.character_skill as JsonObject[] : [])
+    .filter((skill) => Number(skill.skill_level) > 0);
+  const skill = (name: string) =>
+    learnedSkills.find(({ skill_name }) => skill_name === name);
+  const skillEffect = (name: string) => String(skill(name)?.skill_effect ?? "");
+  const extremeArchery = "익스트림 아쳐리 : 활";
+  if (source && normalizeBuffs && skill(extremeArchery) &&
+    !agrees("최종 데미지", source.computed["최종 데미지"], observed["최종 데미지"])) {
+    const candidate = reconstructCharacterStats({ ...input, activeSkillNames: [extremeArchery] });
+    if (candidate && agrees("최종 데미지", candidate.computed["최종 데미지"], observed["최종 데미지"])) {
+      source = candidate;
+    }
+  }
   const computed = source?.computed ?? {};
   const verified: StatValues = {};
   const buffs = new Map<string, string>();
@@ -58,6 +81,7 @@ export function verifyCharacterStats(
   }
   const diceOutcomes = loadedDiceOutcomes(snapshot.skillData);
   let diceState = diceOutcomes ? "unresolved" : null;
+  let includedNativeSharpEyesDamage: number | null = null;
 
   const pet = snapshot.petEquipmentData;
   const petPrefix = String(pet?.pet_activate_flag) === "1" ? "world_share_pet_" : "pet_";
@@ -69,22 +93,43 @@ export function verifyCharacterStats(
   }))];
 
   if (source && normalizeBuffs) {
-    const learnedSkills = (snapshot.skillData ?? []).flatMap((grade) =>
-      Array.isArray(grade.character_skill) ? grade.character_skill as JsonObject[] : [])
-      .filter((skill) => Number(skill.skill_level) > 0);
-    const skillEffect = (name: string) =>
-      String(learnedSkills.find((skill) => skill.skill_name === name)?.skill_effect ?? "");
+    const nativeSharpEyes = sharpEyesEffect(skillEffect("샤프 아이즈"));
+    const sharpEyesCandidate = ({ rate, damage }: { rate: number; damage: number }) => ({
+      "크리티컬 확률": computed["크리티컬 확률"] + rate,
+      "크리티컬 데미지": computed["크리티컬 데미지"] + damage,
+    });
+    if (nativeSharpEyes) {
+      const candidates = [nativeSharpEyes];
+      // The API can list the Combat Orders level while the active buff
+      // still has the effect of the original level when it was cast.
+      if (Number(skill("샤프 아이즈")?.skill_level) === 31 &&
+        skill("쓸만한 컴뱃 오더스") &&
+        nativeSharpEyes.rate === 21 && nativeSharpEyes.damage === 16) {
+        candidates.push(DEFAULT_SHARP_EYES);
+      }
+      const hyperRate = Number(skillEffect("샤프 아이즈-크리티컬 레이트")
+        .match(/크리티컬 확률\s*(\d+)%/u)?.[1]) || 0;
+      const match = candidates.find(({ rate, damage }) => knownBuff(
+        sharpEyesCandidate({ rate: rate + hyperRate, damage })));
+      if (match) {
+        const critical = sharpEyesCandidate({ rate: match.rate + hyperRate, damage: match.damage });
+        Object.assign(computed, critical);
+        Object.assign(verified, critical);
+        includedNativeSharpEyesDamage = match.damage;
+
+        const hyperIed = Number(skillEffect("샤프 아이즈-이그노어 가드")
+          .match(/방어율 무시 효과\s*(\d+)%/u)?.[1]) || 0;
+        const ignoreDefense = 100 - (100 - computed["방어율 무시"]) * (1 - hyperIed / 100);
+        if (hyperIed && agrees("방어율 무시", ignoreDefense, observed["방어율 무시"])) {
+          computed["방어율 무시"] = ignoreDefense;
+          verified["방어율 무시"] = ignoreDefense;
+        }
+      }
+    }
     const sharpEyesName = "쓸만한 샤프 아이즈";
-    const sharpEyes = skillEffect(sharpEyesName).match(
-      /크리티컬 확률\s*(\d+(?:\.\d+)?)%,\s*크리티컬 데미지\s*(\d+(?:\.\d+)?)%/u,
-    );
-    // The full-doping formula adds the core version. Native Sharp Eyes has
-    // other conditional modifiers and needs its own modeled contribution.
-    if (sharpEyes) {
-      const fields = knownBuff({
-        "크리티컬 확률": computed["크리티컬 확률"] + Number(sharpEyes[1]),
-        "크리티컬 데미지": computed["크리티컬 데미지"] + Number(sharpEyes[2]),
-      });
+    const sharpEyes = sharpEyesEffect(skillEffect(sharpEyesName));
+    if (sharpEyes && includedNativeSharpEyesDamage === null) {
+      const fields = knownBuff(sharpEyesCandidate(sharpEyes));
       if (fields) applyBuff(sharpEyesName, fields);
     }
 
@@ -164,5 +209,5 @@ export function verifyCharacterStats(
     final_stat: rows.map((row) => Object.hasOwn(verified, row.stat_name)
       ? { ...row, stat_value: String(verified[row.stat_name]) } : row),
   };
-  return { stats: statData, comparison, registeredPetSkills, diceState };
+  return { stats: statData, comparison, registeredPetSkills, diceState, includedNativeSharpEyesDamage };
 }
