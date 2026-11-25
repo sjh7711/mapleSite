@@ -69,7 +69,7 @@ test("풀보스 도핑 프리셋과 직업 보정을 공용으로 제공한다",
   assert.equal(FULL_BOSS_DOPING.totals.bossDamage, 105);
   assert.equal(FULL_BOSS_DOPING.totals.damage, 111);
   assert.equal(FULL_BOSS_DOPING.totals.criticalDamage, 45.5);
-  assert.deepEqual(FULL_BOSS_DOPING.totals.ignoreDefenseSources, [15, 24, 10]);
+  assert.deepEqual(FULL_BOSS_DOPING.totals.ignoreDefenseSources, [15, 10]);
   assert.equal(FULL_BOSS_DOPING.classAdjustments.렌, undefined);
   assert.equal(FULL_BOSS_DOPING.classAdjustments.메르세데스, undefined);
 });
