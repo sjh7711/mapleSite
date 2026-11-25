@@ -21,6 +21,7 @@ declare module "maple-core/stat-profile" {
 }
 
 declare module "maple-core/stat-efficiency" {
+  export const CHARACTER_BASELINE_SKILL_SUMMARY_VERSION: number;
   export function equipmentSoulOptionLines(item: Record<string, unknown>): string[];
   export function characterBaselineSkillSummary(
     skillData: Array<Record<string, unknown>>,

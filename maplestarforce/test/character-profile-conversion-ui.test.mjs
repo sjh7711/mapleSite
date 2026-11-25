@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { CHARACTER_BASELINE_SKILL_SUMMARY_VERSION } from "maple-core/stat-efficiency";
 
 function memoryStorage() {
   const values = new Map();
@@ -328,7 +329,15 @@ test("두 환산값은 작은 카드 안에서 주값과 비교값으로 구분�
 test("현재 이벤트 스킬은 실제 보너스를 표시하고 빈 내역도 갱신 완료로 취급한다", () => {
   assert.equal(baselineSkillSummary({name:"훈련 일지",effects:{attack:40,magic:40,allStat:80,bossDamage:40,ignoreDefenseSources:[40]}}),
     "훈련 일지 (공·마 +40, 올스탯 +80, 보공 +40%, 방무 40%)");
-  assert.equal(needsBaselineSkillRefresh({details:{}}),true);
-  assert.equal(needsBaselineSkillRefresh({details:{baselineSkills:[]}}),false);
-  assert.equal(needsBaselineSkillRefresh(null),false);
+  assert.equal(baselineSkillSummary({ name: "윈터 파워업", effects: { bossDamage: 20 } }),
+    "윈터 파워업 (보공 +20%)");
+  assert.equal(needsBaselineSkillRefresh({ details: {} }), true);
+  assert.equal(needsBaselineSkillRefresh({ details: { baselineSkills: [] } }), true);
+  assert.equal(needsBaselineSkillRefresh({
+    details: {
+      baselineSkills: [],
+      baselineSkillSummaryVersion: CHARACTER_BASELINE_SKILL_SUMMARY_VERSION,
+    },
+  }), false);
+  assert.equal(needsBaselineSkillRefresh(null), false);
 });

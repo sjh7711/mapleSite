@@ -1575,6 +1575,7 @@ test("윈터 파워업과 중첩 이벤트를 표시하고 기본 보공을 중�
   const body = await response.json();
   assert.equal(response.status, 200, JSON.stringify(body));
   for (const { details } of [body.profiles.base, body.profiles.fullBoss]) {
+    assert.equal(details.baselineSkillSummaryVersion, 2);
     const entries = details.baselineSkills;
     const events = entries.filter(({ kind }) => kind === "event");
     assert.equal(events.length, Object.keys(expectedEvents).length);

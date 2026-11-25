@@ -1893,6 +1893,8 @@ function skillBonuses(skillData) {
 
 // 공개 API에서 확인한 공용 패시브와 이벤트 스킬의 표시용 내역이다.
 // 실제 환산은 final_stat을 기준으로 하므로 이 값을 다시 더하지 않는다.
+export const CHARACTER_BASELINE_SKILL_SUMMARY_VERSION = 2;
+
 export function characterBaselineSkillSummary(skillData) {
   const commonPassives = new Set([
     "스파이더 인 미러", "크레스트 오브 더 솔라",

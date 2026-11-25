@@ -1,4 +1,5 @@
 import {
+  CHARACTER_BASELINE_SKILL_SUMMARY_VERSION,
   calculateCharacterPotentialConversion,
   characterBaselineSkillSummary,
   resolveCharacterPresetSnapshot,
@@ -1214,7 +1215,11 @@ export function buildCharacterConversionFromData(
 
   const baselineSkills = characterBaselineSkillSummary(snapshot.skillData);
   for (const profile of [profiles.base, profiles.fullBoss]) {
-    profile.details = { ...profile.details, baselineSkills };
+    profile.details = {
+      ...profile.details,
+      baselineSkills,
+      baselineSkillSummaryVersion: CHARACTER_BASELINE_SKILL_SUMMARY_VERSION,
+    };
   }
   const cashEquipmentSummary = cashEquipmentDisplaySummary(
     snapshot.cashEquipmentData,
