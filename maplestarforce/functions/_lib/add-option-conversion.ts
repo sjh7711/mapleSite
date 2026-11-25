@@ -5,10 +5,14 @@ import {
   calculateConditionalLinkCycleBonuses,
   calculateGuildNoblesseBonuses,
   equipmentSoulOptionLines,
+  hexaUnreflectedMainStat,
+  linkSkillBonuses,
   resolveCharacterExternalBonuses,
   resolveClassAlwaysOnCombatAdjustment,
   resolveClassDamageChannels,
   selectedBuffDurationPercent,
+  unionAllocatedStat,
+  unionUnreflectedStat,
 } from "maple-core/stat-efficiency";
 import {
   composeCombatModel,
@@ -18,7 +22,7 @@ import {
 
 const STAT_KEYS = ["STR", "DEX", "INT", "LUK"] as const;
 const XENON_STATS = ["STR", "DEX", "LUK"] as const;
-const XENON_HEXA_RATIO = 0.48;
+const XENON_HEXA_UPDATE_DATE = "2026-09-17";
 
 export type AddOptionStatKey = (typeof STAT_KEYS)[number] | "HP";
 export type SpecialAddOptionStatModel =
@@ -397,7 +401,7 @@ function sharedPercentBonuses(
     coreBonusPercentBonuses(pet[presetMode === "auto" ? "selected" : "active"]),
     coreBonusPercentBonuses(pet.skills),
     textPercentBonuses(passiveSkillTexts(snapshot.skillData)),
-    textPercentBonuses(linkSkillTexts(snapshot.linkSkillData)),
+    coreBonusPercentBonuses(linkSkillBonuses(snapshot.linkSkillData)),
   );
 }
 
@@ -439,26 +443,6 @@ function hyperStatTotal(entries: JsonObject[], stat: StatKey): number {
   return increaseFromText(entry?.stat_increase);
 }
 
-function hexaNominalMainStat(hexaStatData: JsonObject): number {
-  const cores = [
-    ...objects(hexaStatData.character_hexa_stat_core),
-    ...objects(hexaStatData.character_hexa_stat_core_2),
-    ...objects(hexaStatData.character_hexa_stat_core_3),
-  ];
-  return cores.reduce((sum, core) => {
-    const main = core.main_stat_name === "주력 스탯 증가"
-      ? (number(core.main_stat_level) + 1) * 100
-      : 0;
-    const sub1 = core.sub_stat_name_1 === "주력 스탯 증가"
-      ? number(core.sub_stat_level_1) * 100
-      : 0;
-    const sub2 = core.sub_stat_name_2 === "주력 스탯 증가"
-      ? number(core.sub_stat_level_2) * 100
-      : 0;
-    return sum + main + sub1 + sub2;
-  }, 0);
-}
-
 function abilityStatTotal(abilityData: JsonObject, stat: StatKey): number {
   return objects(abilityData.ability_info).reduce((sum, ability) => {
     let value = 0;
@@ -469,50 +453,6 @@ function abilityStatTotal(abilityData: JsonObject, stat: StatKey): number {
     }
     return sum + value;
   }, 0);
-}
-
-function statFromTexts(texts: string[], stat: StatKey): number {
-  let result = 0;
-  for (const source of texts) {
-    const all = source.match(/^올스탯\s+(\d+(?:\.\d+)?)\s*증가/);
-    if (all) result += number(all[1]);
-    const stats = source.match(
-      /^((?:STR|DEX|INT|LUK)(?:,\s*(?:STR|DEX|INT|LUK))*)\s+(\d+(?:\.\d+)?)\s*증가/,
-    );
-    if (stats?.[1].split(/,\s*/).includes(stat)) result += number(stats[2]);
-  }
-  return result;
-}
-
-function unionStatTotal(
-  unionRaiderData: JsonObject,
-  unionArtifactData: JsonObject,
-  unionChampionData: JsonObject,
-  stateTexts: string[],
-  stat: StatKey,
-): number {
-  const texts = [
-    ...objects(unionRaiderData.union_raider_stat).map((entry) => text(entry)),
-    ...objects(unionRaiderData.union_occupied_stat).map((entry) => text(entry)),
-    ...stateTexts,
-    ...objects(unionRaiderData.union_inner_stat).flatMap((entry) =>
-      Object.values(entry).map(text).filter(Boolean),
-    ),
-    ...objects(unionArtifactData.union_artifact_effect).map((entry) => text(entry.name)),
-    ...objects(unionChampionData.champion_badge_total_info).map((entry) =>
-      text(entry.stat)
-    ),
-  ];
-  // Some Open API responses expose the first two arrays directly as strings.
-  const directTexts = [
-    ...(Array.isArray(unionRaiderData.union_raider_stat)
-      ? unionRaiderData.union_raider_stat.map(text)
-      : []),
-    ...(Array.isArray(unionRaiderData.union_occupied_stat)
-      ? unionRaiderData.union_occupied_stat.map(text)
-      : []),
-  ];
-  return statFromTexts([...texts, ...directTexts], stat);
 }
 
 function activeUnionState(unionRaiderData: JsonObject): {
@@ -530,21 +470,13 @@ function activeUnionState(unionRaiderData: JsonObject): {
 function unreflectedStat(
   snapshot: CharacterPotentialSnapshot,
   hyperEntries: JsonObject[],
-  unionStateTexts: string[],
   stat: StatKey,
-  xenon: boolean,
+  hexa: number,
 ): Record<string, number> {
   const symbol = symbolStatTotal(snapshot.symbolData, stat);
   const hyper = hyperStatTotal(hyperEntries, stat);
-  const hexa = xenon ? hexaNominalMainStat(snapshot.hexaStatData) * XENON_HEXA_RATIO : 0;
   const ability = abilityStatTotal(snapshot.abilityData, stat);
-  const union = unionStatTotal(
-    snapshot.unionRaiderData,
-    snapshot.unionArtifactData,
-    snapshot.unionChampionData,
-    unionStateTexts,
-    stat,
-  );
+  const union = unionUnreflectedStat(snapshot.unionRaiderData, stat);
   return { total: symbol + hyper + hexa + ability + union, symbol, hyper, hexa, ability, union };
 }
 
@@ -640,6 +572,14 @@ function calculateXenon(
   const activeUnion = activeUnionState(activeSnapshot.unionRaiderData);
   const hyper = activeHyperPreset(snapshot.hyperStatData);
   const union = activeUnionState(snapshot.unionRaiderData);
+  const snapshotDate = text(
+    activeSnapshot.hexaStatData.date ?? activeSnapshot.statData.date,
+  );
+  const xenonHexaRatio = snapshotDate && snapshotDate < XENON_HEXA_UPDATE_DATE
+    ? 0.48
+    : 0.66;
+  const hexa = hexaUnreflectedMainStat(snapshot.hexaStatData, xenonHexaRatio);
+  const activeHexa = hexaUnreflectedMainStat(activeSnapshot.hexaStatData, xenonHexaRatio);
   const activePercent = mergePercentBonuses(
     sharedPercentBonuses(activeSnapshot, activeSnapshot.equipmentData, "active"),
     textPercentBonuses(activeHyper.entries.map((entry) => text(entry.stat_increase))),
@@ -657,7 +597,7 @@ function calculateXenon(
   const unreflected = Object.fromEntries(
     XENON_STATS.map((stat) => [
       stat,
-      unreflectedStat(snapshot, hyper.entries, union.texts, stat, true),
+      unreflectedStat(snapshot, hyper.entries, stat, hexa),
     ]),
   ) as Record<(typeof XENON_STATS)[number], Record<string, number>>;
   const activeUnreflected = Object.fromEntries(
@@ -666,9 +606,8 @@ function calculateXenon(
       unreflectedStat(
         activeSnapshot,
         activeHyper.entries,
-        activeUnion.texts,
         stat,
-        true,
+        activeHexa,
       ),
     ]),
   ) as Record<(typeof XENON_STATS)[number], Record<string, number>>;
@@ -756,6 +695,8 @@ function calculateXenon(
       coreBonusFlatStat(activeExternal.setEffect, stat) +
       coreBonusFlatStat(selectedPet.selected, stat) -
       coreBonusFlatStat(activePet.active, stat) +
+      unionAllocatedStat(snapshot.unionRaiderData, stat) -
+      unionAllocatedStat(activeSnapshot.unionRaiderData, stat) +
       linkFlatStat(snapshot.linkSkillData, stat, characterLevel) -
       linkFlatStat(activeSnapshot.linkSkillData, stat, characterLevel);
     current[stat] =
@@ -1086,7 +1027,7 @@ function calculateXenon(
       },
       presetSelection: input.presetSelection ?? null,
       presetPolicy: "active snapshot plus selected preset deltas and explicit doping",
-      xenonHexaRatio: XENON_HEXA_RATIO,
+      xenonHexaRatio,
     },
   };
 }

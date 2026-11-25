@@ -2639,6 +2639,84 @@ test("심볼·하이퍼·HEXA를 제외한 기본 스탯을 최종 스탯에서 
   assert.equal(result.details.currentAttack, 5_102);
 });
 
+test("렌은 하이브리드 로직, HEXA와 유니온을 인게임 STR·DEX 기준으로 분류한다", () => {
+  const input = {
+    character: { character_class: "렌", character_level: 296 },
+    mainStat: "STR",
+    subStat: "DEX",
+    attackType: "attack",
+    statData: statData({
+      STR: 87_398,
+      DEX: 11_016,
+      공격력: 9_145,
+      데미지: 87,
+      "보스 몬스터 데미지": 484,
+      "크리티컬 데미지": 114.6,
+      "방어율 무시": 97.7596,
+      "AP 배분 STR": 1_498,
+      "AP 배분 DEX": 4,
+    }),
+    equipmentData: {
+      item_equipment: [
+        { potential_option_1: "STR +628%", potential_option_2: "DEX +163%" },
+      ],
+    },
+    linkSkillData: {
+      character_link_skill: [
+        { skill_name: "하이브리드 로직", skill_effect: "모든 능력치 10% 증가" },
+      ],
+    },
+    skillData: [{
+      character_skill: [
+        { skill_name: "아니마의 용사", skill_effect: "AP를 직접 투자한 모든 능력치 16% 증가" },
+      ],
+    }],
+    symbolData: { symbol: [{ symbol_str: "28200" }] },
+    hyperStatData: {
+      use_preset_no: "1",
+      hyper_stat_preset_1: [
+        { stat_type: "STR", stat_increase: "힘 180 증가" },
+        { stat_type: "DEX", stat_increase: "민첩 30 증가" },
+      ],
+    },
+    hexaStatData: {
+      character_hexa_stat_core: [{ main_stat_name: "주력 스탯 증가", main_stat_level: 9 }],
+      character_hexa_stat_core_2: [{ sub_stat_name_1: "주력 스탯 증가", sub_stat_level_1: 7 }],
+      character_hexa_stat_core_3: [{ sub_stat_name_2: "주력 스탯 증가", sub_stat_level_2: 7 }],
+    },
+    unionRaiderData: {
+      use_preset_no: 1,
+      union_raider_stat: ["STR 660 증가", "DEX 460 증가", "STR, DEX, LUK 40 증가", "ALLSTAT 50, 최대 HP 2500 증가"],
+      union_state_stat: ["STR 75 증가"],
+      union_occupied_stat: ["STR 75 증가"],
+      union_state_stat_preset: [
+        { preset_no: 1, union_state_stat: ["STR 75 증가"] },
+        { preset_no: 2, union_state_stat: ["STR 100 증가"] },
+      ],
+    },
+    abilityData: {},
+  };
+  const active = calculateCharacterPotentialConversion({
+    ...input, presetPolicy: { mode: "active" },
+  }).details;
+  assert.deepEqual(
+    [active.baseMain, active.mainPercent, active.unreflectedMain],
+    [7_489, 638, 32_130],
+  );
+  assert.deepEqual([active.baseSub, active.subPercent, active.unreflectedSub], [3_823, 173, 580]);
+  assert.equal(active.hexaUnreflectedMain, 3_000);
+  assert.equal(active.unionUnreflectedMain, 750);
+  assert.equal(active.mapleWarriorPercent, 16);
+
+  const auto = calculateCharacterPotentialConversion({
+    ...input, presetPolicy: { mode: "auto" },
+  }).details;
+  assert.equal(auto.selectedUnionPreset, 2);
+  assert.equal(auto.baseMain - active.baseMain, 25);
+  assert.equal(auto.currentMain - active.currentMain, 185);
+  assert.equal(auto.unreflectedMain, active.unreflectedMain);
+});
+
 test("레테는 기존 참조 도핑으로 기존 효율 표를 재현한다", () => {
   const result = calculateCharacterPotentialConversion({
     character: { character_level: 286 },

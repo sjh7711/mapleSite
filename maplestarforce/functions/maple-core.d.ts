@@ -23,6 +23,10 @@ declare module "maple-core/stat-profile" {
 
 declare module "maple-core/stat-efficiency" {
   export const CHARACTER_BASELINE_SKILL_SUMMARY_VERSION: number;
+  export function hexaUnreflectedMainStat(data: Record<string, unknown>, scale?: number): number;
+  export function linkSkillBonuses(data: Record<string, unknown>): Record<string, unknown>;
+  export function unionAllocatedStat(data: Record<string, unknown>, stat: string): number;
+  export function unionUnreflectedStat(data: Record<string, unknown>, stat: string): number;
   export function equipmentSoulOptionLines(item: Record<string, unknown>): string[];
   export function characterBaselineSkillSummary(
     skillData: Array<Record<string, unknown>>,

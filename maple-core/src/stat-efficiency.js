@@ -222,7 +222,7 @@ function parseTextBonuses(texts) {
   for (const rawText of texts.filter(Boolean)) {
     const text = String(rawText);
     for (const match of text.matchAll(
-      /올스탯\s*\+?\s*(\d+(?:\.\d+)?)\s*(%)?/g,
+      /(?:올스탯|ALLSTAT|(?:^|[,\n])\s*모든\s*능력치)(?:가|이)?\s*:?\s*\+?\s*(\d+(?:\.\d+)?)\s*(%)?/g,
     )) {
       const destination = match[2] ? result.percent : result.flat;
       for (const stat of STAT_NAMES) destination[stat] += number(match[1]);
@@ -238,7 +238,7 @@ function parseTextBonuses(texts) {
       individualText = individualText.replace(match[0], "");
     }
     for (const match of individualText.matchAll(
-      /(STR|DEX|INT|LUK|힘|민첩|지력|지능|행운)\s*\+?\s*(\d+(?:\.\d+)?)\s*(%)?/g,
+      /(STR|DEX|INT|LUK|힘|민첩|지력|지능|행운)(?:이)?\s*:?\s*\+?\s*(\d+(?:\.\d+)?)\s*(%)?/g,
     )) {
       const stat = KOREAN_STAT_NAMES[match[1]];
       const destination = match[3] ? result.percent : result.flat;
@@ -247,7 +247,7 @@ function parseTextBonuses(texts) {
     // 공·마가 하나의 수치를 공유하는 표기는 먼저 소비한다. 쉼표 표기의
     // 마력만 읽거나, 공유 수치와 개별 마력을 중복 합산하지 않는다.
     const attackText = text.replace(
-      /공격력\s*(?:과|및|\/|,)\s*마력(?:이)?\s*\+?\s*(\d+(?:\.\d+)?)\s*(%)?/gu,
+      /공격력\s*(?:과|및|\/|,)\s*마력(?:이)?\s*:?\s*\+?\s*(\d+(?:\.\d+)?)\s*(%)?/gu,
       (_match, value, percent) => {
         result[percent ? "attackPercent" : "flatAttack"] += number(value);
         result[percent ? "magicPercent" : "flatMagic"] += number(value);
@@ -255,7 +255,7 @@ function parseTextBonuses(texts) {
       },
     );
     for (const match of attackText.matchAll(
-      /(공격력|마력)(?:이)?\s*\+?\s*(\d+(?:\.\d+)?)%/g,
+      /(공격력|마력)(?:이)?\s*:?\s*\+?\s*(\d+(?:\.\d+)?)\s*%/g,
     )) {
       result[match[1] === "마력" ? "magicPercent" : "attackPercent"] +=
         number(match[2]);
@@ -267,7 +267,7 @@ function parseTextBonuses(texts) {
         number(match[2]);
     }
     for (const match of text.matchAll(
-      /(?:최대\s*)?HP(?:가|이)?\s*\+?\s*(\d+(?:\.\d+)?)(%)?/g,
+      /(?:최대\s*)?HP(?:가|이)?\s*:?\s*\+?\s*(\d+(?:\.\d+)?)\s*(%)?/g,
     )) {
       result[match[2] ? "hpPercent" : "flatHp"] += number(match[1]);
     }
@@ -2104,7 +2104,7 @@ function weightedCriticalReinforceUptime({
   return totalWeight > 0 ? activeWeight / totalWeight : duration / cooldown;
 }
 
-function linkSkillBonuses(linkSkillData) {
+export function linkSkillBonuses(linkSkillData) {
   const skills = [
     ...(linkSkillData?.character_link_skill ?? []),
     linkSkillData?.character_owned_link_skill,
@@ -2733,7 +2733,7 @@ function unionPresetData(unionRaiderData, selected) {
   return {
     ...unionRaiderData,
     use_preset_no: selected,
-    union_state_stat: preset?.union_state_stat ?? [],
+    union_state_stat: preset?.union_state_stat ?? unionRaiderData?.union_state_stat,
   };
 }
 
@@ -3580,7 +3580,9 @@ function abilityCombatBonuses(abilityData, attackType) {
   );
 }
 
-function hexaUnreflectedMainStat(hexaStatData) {
+const HEXA_MAIN_STAT_BY_LEVEL = [0, 100, 200, 300, 400, 600, 800, 1000, 1300, 1600, 2000];
+
+export function hexaUnreflectedMainStat(hexaStatData, scale = 1) {
   const cores = [
     ...(hexaStatData?.character_hexa_stat_core ?? []),
     ...(hexaStatData?.character_hexa_stat_core_2 ?? []),
@@ -3588,11 +3590,10 @@ function hexaUnreflectedMainStat(hexaStatData) {
   ];
   return cores.reduce((sum, core) => {
     // HEXA 스탯의 주력 스탯은 잠재능력 스탯%를 받지 않는다.
-    // 메인 옵션에는 기본 1레벨 효과가 있어 (표시 레벨 + 1) * 100,
-    // 서브 옵션은 표시 레벨 * 100으로 계산된다.
+    // 메인 옵션은 레벨별 표, 서브 옵션은 레벨당 100을 사용한다.
     const main =
       core.main_stat_name === "주력 스탯 증가"
-        ? (number(core.main_stat_level) + 1) * 100
+        ? (HEXA_MAIN_STAT_BY_LEVEL[number(core.main_stat_level)] ?? 0)
         : 0;
     const sub1 =
       core.sub_stat_name_1 === "주력 스탯 증가"
@@ -3602,7 +3603,7 @@ function hexaUnreflectedMainStat(hexaStatData) {
       core.sub_stat_name_2 === "주력 스탯 증가"
         ? number(core.sub_stat_level_2) * 100
         : 0;
-    return sum + main + sub1 + sub2;
+    return sum + Math.round((main + sub1 + sub2) * scale);
   }, 0);
 }
 
@@ -3622,7 +3623,7 @@ function textStatTotal(texts, stat) {
   let total = 0;
   for (const text of texts.filter(Boolean)) {
     const allStatMatch = String(text).match(
-      /^올스탯\s+(\d+(?:\.\d+)?)\s*증가/,
+      /^(?:올스탯|ALLSTAT)\s+(\d+(?:\.\d+)?)(?=\s*(?:증가|,|$))/,
     );
     if (allStatMatch) total += number(allStatMatch[1]);
     const statsMatch = String(text).match(
@@ -3638,22 +3639,20 @@ function textStatTotal(texts, stat) {
   return total;
 }
 
-function unionUnreflectedStat(
-  unionRaiderData,
-  stat,
-) {
-  const unionTexts = [
-    ...(unionRaiderData?.union_raider_stat ?? []),
+export function unionAllocatedStat(unionRaiderData, stat) {
+  const allocatedTexts = unionRaiderData?.union_state_stat ?? [
     ...(unionRaiderData?.union_occupied_stat ?? []),
-    ...(unionRaiderData?.union_state_stat ?? []),
     ...(unionRaiderData?.union_inner_stat ?? []).flatMap((item) =>
       Object.values(item ?? {}).filter((value) => typeof value === "string"),
     ),
   ];
-  // 공격대원·격자의 고정 스탯은 잠재능력 스탯%가 적용되지 않는다.
-  // 반면 유니온 아티팩트와 챔피언 배지의 올스탯은 스탯% 적용 대상이고
-  // character/stat 최종값에도 이미 포함되므로 여기서 빼면 안 된다.
-  return textStatTotal(unionTexts, stat);
+  return textStatTotal(allocatedTexts, stat);
+}
+
+export function unionUnreflectedStat(unionRaiderData, stat) {
+  // 공격대원 효과는 % 미적용 수치다. 공격대 배치, 아티팩트, 챔피언
+  // 휘장의 기본 스탯에는 잠재능력 스탯%가 적용된다.
+  return textStatTotal(unionRaiderData?.union_raider_stat ?? [], stat);
 }
 
 function conditionalDamageFromAbility(abilityData) {
@@ -4109,7 +4108,8 @@ export function calculateCharacterPotentialConversion({
       sumItemTotal(selectedEquipmentData, mainStat) +
       equipmentOptions.flat[mainStat] +
       sets.flat[mainStat] +
-      supplemental.flat[mainStat],
+      supplemental.flat[mainStat] +
+      unionAllocatedStat(selectedUnionRaiderData, mainStat),
     "% 적용 대상 주스탯",
   );
   const enumeratedBaseSubs = Object.fromEntries(
@@ -4120,7 +4120,8 @@ export function calculateCharacterPotentialConversion({
           sumItemTotal(selectedEquipmentData, stat) +
           equipmentOptions.flat[stat] +
           sets.flat[stat] +
-          supplemental.flat[stat],
+          supplemental.flat[stat] +
+          unionAllocatedStat(selectedUnionRaiderData, stat),
         `% 적용 대상 부스탯(${stat})`,
       ),
     ]),
@@ -4210,6 +4211,12 @@ export function calculateCharacterPotentialConversion({
     hyperStatData !== undefined &&
     hexaStatData !== undefined &&
     abilityData !== undefined;
+  function unionAllocatedDelta(stat) {
+    return hasUnreflectedSnapshot
+      ? unionAllocatedStat(selectedUnionRaiderData, stat) -
+        unionAllocatedStat(unionRaiderData, stat)
+      : 0;
+  }
   const activeUnreflected = unreflectedStats({
     symbolData,
     hyperStatData,
@@ -4306,6 +4313,7 @@ export function calculateCharacterPotentialConversion({
       petEquipment.active.flat[mainStat] +
       links.flat[mainStat] -
       activeLinks.flat[mainStat] +
+      unionAllocatedDelta(mainStat) +
       number(classDopingAdjustment.baseMain),
     "% 적용 대상 보스 프리셋 주스탯",
   );
@@ -4336,6 +4344,7 @@ export function calculateCharacterPotentialConversion({
           petEquipment.active.flat[stat] +
           links.flat[stat] -
           activeLinks.flat[stat] +
+          unionAllocatedDelta(stat) +
           number(
             classDopingAdjustment.baseSubByStat?.[stat] ??
               classDopingAdjustment.baseSub,
