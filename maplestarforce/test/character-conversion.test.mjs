@@ -438,7 +438,7 @@ test("환산 계약 버전으로 이전 단일 부스탯 캐시와 키를 분리
     versionedUrl.searchParams.get("conversionVersion"),
     characterConversionCacheVersion,
   );
-  assert.equal(characterConversionCacheVersion, "combat-profile-v86-shared-stat-sources");
+  assert.equal(characterConversionCacheVersion, "combat-profile-v87-hexa-passive-sources");
   const freshSnapshotKey = createSnapshotCacheKey(request, "테스트", "fresh");
   const staleSnapshotKey = createSnapshotCacheKey(request, "테스트", "stale");
   assert.equal(characterSnapshotCacheVersion, "character-snapshot-v4");
@@ -521,7 +521,7 @@ test("출처 합산과 API로 오라 웨폰·쓸만한 샤프 아이즈·컨티 
     "방어율 무시": 73, "최종 데미지": 20, "보스 몬스터 데미지": 130,
     "크리티컬 확률": 95, "크리티컬 데미지": 106.6,
   };
-  const fetchConversion = async (stats, className = "렌") => {
+  const fetchConversion = async (stats, className = "렌", covenant = false) => {
     const url = new URL(apiRequest().url);
     url.searchParams.set("presetMode", "active");
     const response = await handleCharacterConversion(createContext(new Request(url)), {
@@ -642,6 +642,11 @@ test("출처 합산과 API로 오라 웨폰·쓸만한 샤프 아이즈·컨티 
             { skill_name: "무아", skill_level: 2, skill_effect: "전투 상태에 돌입 시 데미지 11% 증가" },
             { skill_name: "전투의 흐름", skill_level: 2, skill_effect: "10초 동안 데미지 10% 증가" },
           ];
+          if (covenant) {
+            payload.character_link_skill.push({
+              skill_name: "커버넌트", skill_level: 2, skill_effect: "소환수 소환 시 데미지 8% 증가",
+            });
+          }
         }
         if (apiPath.endsWith("/stat")) {
           payload.final_stat = Object.entries(stats).map(([stat_name, value]) => ({
@@ -678,6 +683,14 @@ test("출처 합산과 API로 오라 웨폰·쓸만한 샤프 아이즈·컨티 
   assert.equal(different.fullBoss.details.currentBossDamage, 175);
   assert.equal(different.fullBoss.details.currentCriticalRate, 106);
   assert.equal(different.fullBoss.details.currentIgnoreDefense, 77.32);
+
+  for (const [observed, calculated] of [[33, 33], [41, 41], [54, 33]]) {
+    const conversion = await fetchConversion({ ...buffsOff, 데미지: observed }, "렌", true);
+    const damage = conversion.fullBoss.details.statVerification.find(({ name }) => name === "데미지");
+    assert.equal(damage.calculated, calculated);
+    assert.equal(damage.matched, observed === calculated);
+    assert.equal(conversion.fullBoss.details.currentDamage, observed);
+  }
 
   const bow = await fetchConversion({
     ...buffsOff,

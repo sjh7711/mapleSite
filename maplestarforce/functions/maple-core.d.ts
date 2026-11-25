@@ -43,6 +43,7 @@ declare module "maple-core/stat-efficiency" {
   }): {
     computed: Record<string, number>;
     attack: Record<"공격력" | "마력", { flat: number; percent: number }>;
+    summonedLinkDamage: number;
   } | null;
   export function equipmentSoulOptionLines(item: Record<string, unknown>): string[];
   export function characterBaselineSkillSummary(
