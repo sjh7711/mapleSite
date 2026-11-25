@@ -39,7 +39,7 @@ const CACHE_SECONDS = 10 * 60;
 const SNAPSHOT_STALE_SECONDS = 6 * 60 * 60;
 export { CHARACTER_CONVERSION_CACHE_VERSION };
 // 성향을 포함한 원본 스냅샷으로 합산값을 검증한다.
-export const CHARACTER_SNAPSHOT_CACHE_VERSION = "character-snapshot-v3";
+export const CHARACTER_SNAPSHOT_CACHE_VERSION = "character-snapshot-v4";
 const SNAPSHOT_CLOCK_SKEW_MS = 5 * 60 * 1_000;
 const CHARACTER_NAME_PATTERN = /^[\p{L}\p{N}]+$/u;
 const PRESET_QUERY_FIELDS = [

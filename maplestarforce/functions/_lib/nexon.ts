@@ -409,7 +409,7 @@ export async function mapWithConcurrency<Input, Output>(
   return results;
 }
 
-async function fetchGuildNoblesseData(
+async function fetchGuildData(
   character: JsonObject,
   apiKey: string,
   dependencies: NexonRequestDependencies,
@@ -420,7 +420,7 @@ async function fetchGuildNoblesseData(
   const worldName = typeof character.world_name === "string"
     ? character.world_name.trim()
     : "";
-  if (!guildName) return { guild_noblesse_skill: [] };
+  if (!guildName) return { guild_skill: [], guild_noblesse_skill: [] };
   if (!worldName) return {};
 
   try {
@@ -441,6 +441,7 @@ async function fetchGuildNoblesseData(
       dependencies,
     );
     return {
+      guild_skill: Array.isArray(guildPayload.guild_skill) ? guildPayload.guild_skill : [],
       guild_noblesse_skill: Array.isArray(
         guildPayload.guild_noblesse_skill,
       )
@@ -576,7 +577,7 @@ export async function fetchCharacterPotentialData(
       // worker의 공개 스냅샷 조회와 겹치므로 마지막에 길드 RTT 두 번을
       // 따로 기다리지 않으면서 최대 동시 연결 수 4는 그대로 유지한다.
       if (job.field === "character") {
-        guildData = await fetchGuildNoblesseData(
+        guildData = await fetchGuildData(
           payload,
           apiKey,
           pacedDependencies,

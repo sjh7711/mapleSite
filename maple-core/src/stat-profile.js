@@ -3,7 +3,7 @@
  * Node, Discord, DOM에 의존하지 않아 브라우저와 Worker에서도 그대로 쓴다.
  */
 
-export const CHARACTER_CONVERSION_CACHE_VERSION = "combat-profile-v85-class-stat-sources";
+export const CHARACTER_CONVERSION_CACHE_VERSION = "combat-profile-v86-shared-stat-sources";
 
 // 넥슨 유니온 챔피언 가이드의 전투 능력치 5레벨 기준.
 // https://maplestory.nexon.com/Guide/N23GameInformation/Articles/409
@@ -29,7 +29,6 @@ export const FULL_BOSS_DOPING = {
   sayramElixir: true,
   items: [
     "익스트림 레드/블루",
-    "길드의 더 큰 축복",
     "마슈르의 선물 기상 효과",
     "유니온의 힘",
     "붕어빵 뿌리기",
@@ -41,10 +40,11 @@ export const FULL_BOSS_DOPING = {
     ),
     "고급 무기 제련",
     "이벤트 버프",
-    "쓸만한 샤프 아이즈·어드밴스드 블레스",
+    "쓸만한 샤프 아이즈",
   ],
   totals: {
-    attackMagic: 375 + CHAMPION_BLESSING_LEVEL_5.attackMagic,
+    // 길드의 더 큰 축복 30과 쓸만한 어드밴스드 블레스 20은 기본 스탯으로 반영한다.
+    attackMagic: 325 + CHAMPION_BLESSING_LEVEL_5.attackMagic,
     attackMagicPercent: FULL_BOSS_ATTACK_MAGIC_PERCENT_BUFFS.reduce(
       (total, buff) => total + buff.percent,
       0,
