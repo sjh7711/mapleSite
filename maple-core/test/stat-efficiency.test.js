@@ -65,7 +65,7 @@ test("스탯 출처 합산은 숙련도·공속 패시브와 전역 방무를 �
   };
   const input = { character, snapshot, mainStat: "DEX" };
   const { computed, attack } = reconstructCharacterStats(input);
-  assert.deepEqual(attack.공격력, { flat: 121, percent: 25 });
+  assert.deepEqual(attack.공격력, { flat: 130, percent: 25 });
   assert.equal(computed.DEX, 1020);
   assert.equal(computed.마력, 60);
   assert.equal(computed["방어율 무시"], 25);
@@ -74,8 +74,45 @@ test("스탯 출처 합산은 숙련도·공속 패시브와 전역 방무를 �
   assert.equal(computed["보스 몬스터 데미지"], 0);
   assert.equal(computed["최종 데미지"], 0);
   const active = reconstructCharacterStats({ ...input, activeSkillNames: ["익스트림 아쳐리 : 활"] });
-  assert.equal(active.attack.공격력.flat, 151);
+  assert.equal(active.attack.공격력.flat, 160);
   assert.ok(Math.abs(active.computed["최종 데미지"] - 30) < 1e-9);
+});
+
+test("공통 패시브를 한 번씩 합산하고 HEXA 공격력과 마력을 구별한다", () => {
+  const luna = {
+    skill_name: "루나 게더링",
+    skill_level: 1,
+    skill_effect: "[패시브 효과 : 공격력 15, 마력 15 증가]",
+  };
+  const snapshot = {
+    statData: statData({ "AP 배분 INT": 1000, "AP 배분 LUK": 4 }),
+    equipmentData: { item_equipment: [{ item_equipment_slot: "무기", item_equipment_part: "완드" }] },
+    skillData: [
+      { character_skill_grade: "0", character_skill: [luna] },
+      { character_skill_grade: "5", character_skill: [{
+        skill_name: "쓸만한 어드밴스드 블레스", skill_level: 30,
+        skill_effect: "공격력 20, 마력 20, 방어력 425 증가\n[패시브 효과 : 올스탯 6 증가]",
+      }] },
+    ],
+    petEquipmentData: { petite_luna_pet_skill: [luna] },
+    guildData: {
+      guild_skill: [
+        { skill_name: "길드의 노하우Ⅰ", skill_level: 1, skill_effect: "공격력 30, 마력 30 증가" },
+        { skill_name: "길드의 노하우Ⅴ", skill_level: 1, skill_effect: "힘 40, 민첩 40, 지능 40, 운 40 증가" },
+        { skill_name: "길드의 노하우Ⅵ", skill_level: 0, skill_effect: "공격력 5, 마력 5 증가" },
+      ],
+      guild_noblesse_skill: [{ skill_name: "길드의 이름으로", skill_level: 15, skill_effect: "30분 동안 데미지 30% 증가" }],
+    },
+    hexaStatData: { character_hexa_stat_core: [{ main_stat_name: "마력 증가", main_stat_level: 1 }] },
+  };
+  const input = { character: { character_class: "라라" }, snapshot, mainStat: "INT" };
+  const { computed } = reconstructCharacterStats(input);
+  assert.equal(computed.공격력, 65);
+  assert.equal(computed.마력, 70);
+  assert.equal(computed.INT, 1046);
+  assert.equal(computed.LUK, 50);
+  assert.equal(computed.데미지, 0);
+  assert.deepEqual(reconstructCharacterStats({ ...input, snapshot: { ...snapshot, petEquipmentData: {} } }).computed, computed);
 });
 
 test("직접 방무와 설명에 표시된 오리진 강화 방무를 해당 스킬에만 적용한다", () => {
@@ -2424,7 +2461,7 @@ test("챔피언의 가호 5레벨은 공통 풀도핑 능력치에 한 번씩 �
 
   assert.equal(full.dopedBaseMain - base.dopedBaseMain, 125);
   assert.equal(full.dopedBaseSub - base.dopedBaseSub, 125);
-  assert.equal(full.combatModel.totals.flatAttack - base.combatModel.totals.flatAttack, 400);
+  assert.equal(full.combatModel.totals.flatAttack - base.combatModel.totals.flatAttack, 350);
   assert.equal(full.combatModel.totals.attackPercent - base.combatModel.totals.attackPercent, 14);
   assert.equal(full.combatModel.totals.bossDamage - base.combatModel.totals.bossDamage, 85);
   assert.equal(full.combatModel.totals.damage - base.combatModel.totals.damage, 31);

@@ -438,10 +438,10 @@ test("환산 계약 버전으로 이전 단일 부스탯 캐시와 키를 분리
     versionedUrl.searchParams.get("conversionVersion"),
     characterConversionCacheVersion,
   );
-  assert.equal(characterConversionCacheVersion, "combat-profile-v85-class-stat-sources");
+  assert.equal(characterConversionCacheVersion, "combat-profile-v86-shared-stat-sources");
   const freshSnapshotKey = createSnapshotCacheKey(request, "테스트", "fresh");
   const staleSnapshotKey = createSnapshotCacheKey(request, "테스트", "stale");
-  assert.equal(characterSnapshotCacheVersion, "character-snapshot-v3");
+  assert.equal(characterSnapshotCacheVersion, "character-snapshot-v4");
   assert.equal(freshSnapshotKey.url.includes("presetMode"), false);
   assert.equal(freshSnapshotKey.url.includes(characterConversionCacheVersion), false);
   assert.notEqual(freshSnapshotKey.url, staleSnapshotKey.url);
@@ -531,10 +531,28 @@ test("출처 합산과 API로 오라 웨폰·쓸만한 샤프 아이즈·컨티 
         const request = new URL(input);
         const apiPath = request.pathname;
         const payload = nexonPayload(request, { className });
+        const isBow = className === "보우마스터";
+        const luna = {
+          skill_name: "루나 게더링", skill_level: 1,
+          skill_effect: "[패시브 효과 : 공격력 15, 마력 15 증가]",
+        };
+        if (isBow && apiPath.endsWith("/character/basic")) payload.character_guild_name = "테스트길드";
+        if (apiPath.endsWith("/guild/id")) return Response.json({ oguild_id: "private-guild-id" });
+        if (apiPath.endsWith("/guild/basic")) return Response.json({
+          guild_skill: [
+            { skill_name: "길드의 노하우Ⅰ", skill_level: 1, skill_effect: "공격력 30, 마력 30 증가" },
+            { skill_name: "길드의 노하우Ⅱ", skill_level: 1, skill_effect: "공격력 6, 마력 6 증가" },
+            { skill_name: "길드의 노하우Ⅳ", skill_level: 1, skill_effect: "공격력 4, 마력 4 증가" },
+            { skill_name: "길드의 노하우Ⅴ", skill_level: 1, skill_effect: "힘 40, 민첩 40, 지능 40, 운 40 증가" },
+            { skill_name: "길드의 노하우Ⅵ", skill_level: 1, skill_effect: "공격력 5, 마력 5 증가" },
+          ],
+          guild_noblesse_skill: [],
+        });
         if (apiPath.endsWith("/item-equipment")) {
           return Response.json({ preset_no: 1, item_equipment: [
             {
               item_equipment_slot: "무기", item_name: "무기",
+              item_equipment_part: isBow ? "활" : undefined,
               item_total_option: {
                 str: "100", dex: "200", luk: "20", all_stat: "5", attack_power: "1000",
                 magic_power: "500", boss_damage: "100", ignore_monster_armor: "40",
@@ -554,11 +572,16 @@ test("출처 합산과 API로 오라 웨폰·쓸만한 샤프 아이즈·컨티 
         if (apiPath.endsWith("/pet-equipment")) {
           return Response.json({
             pet_1_auto_skill: { skill_1: "오라 웨폰", skill_2: "쓸만한 샤프 아이즈" },
+            petite_luna_pet_skill: isBow ? [luna] : [],
           });
         }
         if (apiPath.endsWith("/propensity")) return Response.json({ charisma_level: 100 });
-        if (apiPath.endsWith("/skill") && className === "보우마스터") {
+        if (apiPath.endsWith("/skill") && isBow) {
           const grade = request.searchParams.get("character_skill_grade");
+          if (grade === "0") payload.character_skill = [luna];
+          if (grade === "2") payload.character_skill = [
+            { skill_name: "소울 애로우 : 활", skill_level: 10, skill_effect: "공격력 30 증가, 화살 소비 없이 공격 가능" },
+          ];
           if (grade === "3") payload.character_skill = [
             { skill_name: "익스트림 아쳐리 : 활", skill_level: 10,
               skill_effect: "방어력 25% 감소, 공격력 30 증가, 최종 데미지 30% 증가" },
@@ -593,6 +616,10 @@ test("출처 합산과 API로 오라 웨폰·쓸만한 샤프 아이즈·컨티 
               skill_effect: "270초 동안 크리티컬 확률 10%, 크리티컬 데미지 8% 증가",
             },
           ];
+          if (isBow) payload.character_skill.push({
+            skill_name: "쓸만한 어드밴스드 블레스", skill_level: 30,
+            skill_effect: "공격력 20, 마력 20, 방어력 425 증가\n[패시브 효과 : 올스탯 6 증가]",
+          });
           if (className === "제논" || className === "바이퍼") {
             const faces = "3 : 공격력 15 증가\n4 : 크리티컬 확률 15% 증가\n5 : 데미지 20% 증가";
             payload.character_skill.push(
@@ -654,12 +681,13 @@ test("출처 합산과 API로 오라 웨폰·쓸만한 샤프 아이즈·컨티 
 
   const bow = await fetchConversion({
     ...buffsOff,
+    공격력: 2298, 마력: 754, DEX: 262,
     "최종 데미지": 56,
     "방어율 무시": 74.35,
     "크리티컬 확률": 120,
     "크리티컬 데미지": 121.6,
   }, "보우마스터");
-  for (const name of ["최종 데미지", "방어율 무시", "크리티컬 확률", "크리티컬 데미지"]) {
+  for (const name of ["공격력", "마력", "DEX", "최종 데미지", "방어율 무시", "크리티컬 확률", "크리티컬 데미지"]) {
     assert.equal(bow.fullBoss.details.statVerification.find((row) => row.name === name).matched, true, name);
   }
   assert.equal(bow.fullBoss.details.includedNativeSharpEyesDamage, 15);

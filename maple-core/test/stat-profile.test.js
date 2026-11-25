@@ -59,7 +59,7 @@ test("이중 부스탯 도적은 DEX와 STR을 모두 추론한다", () => {
 
 test("풀보스 도핑 프리셋과 직업 보정을 공용으로 제공한다", () => {
   assert.equal(FULL_BOSS_DOPING.championBlessingLevel, 5);
-  assert.equal(FULL_BOSS_DOPING.totals.attackMagic, 400);
+  assert.equal(FULL_BOSS_DOPING.totals.attackMagic, 350);
   assert.equal(FULL_BOSS_DOPING.totals.attackMagicPercent, 14);
   assert.ok(FULL_BOSS_DOPING.items.includes("세이람의 영약 (공·마 +10%)"));
   assert.ok(FULL_BOSS_DOPING.items.includes("영웅의 메아리 계열 (공·마 +4%)"));

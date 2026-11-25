@@ -358,9 +358,13 @@ function cashEquipmentBonuses(cashEquipmentData) {
   );
 }
 
+function lunaPetSkills(petEquipmentData) {
+  return (petEquipmentData?.petite_luna_pet_skill ?? []).filter((skill) => skill?.skill_effect);
+}
+
 function petSkillBonuses(petEquipmentData) {
   return parseTextBonuses(
-    (petEquipmentData?.petite_luna_pet_skill ?? []).flatMap((skill) => {
+    lunaPetSkills(petEquipmentData).flatMap((skill) => {
       const effect = String(skill?.skill_effect ?? "");
       const passive = [...effect.matchAll(
         /\[패시브 효과\s*:\s*([^\]]+)\]/g,
@@ -3914,7 +3918,7 @@ function normalizeStatWindowText(value) {
     .replace(/지능/g, "지력");
 }
 
-function statWindowSkillTexts(skillData, equipmentData, activeSkillNames) {
+function statWindowSkillTexts(skillData, equipmentData, petEquipmentData, activeSkillNames) {
   const highGradeSkills = new Set((skillData ?? []).filter(({ character_skill_grade }) =>
     /^(?:5|6|ascent)$/iu.test(String(character_skill_grade))).flatMap(({ character_skill }) =>
     character_skill ?? []));
@@ -3930,18 +3934,23 @@ function statWindowSkillTexts(skillData, equipmentData, activeSkillNames) {
     .sort((left, right) => number(right.skill_level) - number(left.skill_level))[0];
   const weaponType = activeEquipment(equipmentData).find((item) =>
     item.item_equipment_slot === "무기")?.item_equipment_part;
-  return [...unique.values()].flatMap((skill) => {
+  const petSkillNames = new Set(lunaPetSkills(petEquipmentData).map(({ skill_name }) => skill_name));
+  const texts = [...unique.values()].flatMap((skill) => {
     const { skill_name, skill_effect } = skill;
+    if (petSkillNames.has(skill_name)) return [];
     if (MUTUALLY_EXCLUSIVE_BLESSINGS.has(skill_name) && skill_name !== blessing?.skill_name) return [];
     const confirmedActive = activeSkillNames.includes(skill_name);
     if (STAT_WINDOW_CONDITIONAL_SKILLS.has(skill_name) && !confirmedActive) return [];
     const text = String(skill_effect ?? "");
     const passive = [...text.matchAll(/\[패시브 효과\s*:\s*([^\]]+)\]/gu)];
+    // V 코어의 블레스는 본문 공격력·마력과 별도 패시브 올스탯이 모두 상시 효과다.
+    const permanentBless = skill_name === "쓸만한 어드밴스드 블레스";
     if (!passive.length && !confirmedActive &&
       /리인포스|보스\s*킬러|이그노어\s*가드|[ -]강화$/u.test(skill_name)) return [];
-    const needsPermanentMarker = !passive.length &&
+    const needsPermanentMarker = !permanentBless && !passive.length &&
       (highGradeSkills.has(skill) || STAT_WINDOW_ATTACK_TEXT.test(text));
     const lines = passive.length ? passive.map((match) => match[1]) : [text];
+    if (permanentBless && passive.length) lines.unshift(text.slice(0, passive[0].index));
     return lines.flatMap((part) => part.split(/\r?\n|\.\s+(?=\p{L})/u)).flatMap((raw) => {
       if (needsPermanentMarker && !STAT_WINDOW_PERMANENT_LEAD.test(raw.trim())) return [];
       // 수치 뒤의 %p는 개별 공격기의 퍼뎀 증가 표기다.
@@ -3964,6 +3973,19 @@ function statWindowSkillTexts(skillData, equipmentData, activeSkillNames) {
         !STAT_WINDOW_TRIGGER.test(clause.replace(/보스 몬스터 공격 시 데미지/g, "보공")));
     });
   });
+  // 소울 애로우는 인벤토리의 최상위 활 전용 화살 공격력을 적용한다.
+  // 공개 API에 화살이 없으므로 티타늄 화살 수치로 합산 후 API와 검증한다.
+  if (weaponType === "활" && unique.has("소울 애로우 : 활")) texts.push("공격력 9 증가");
+  return texts;
+}
+
+function guildPassiveBonuses(guildData) {
+  const effects = (guildData?.guild_skill ?? []).flatMap(({ skill_name, skill_level, skill_effect }) =>
+    number(skill_level) > 0 &&
+    /^길드의 노하우\s*(?:I|II|IV|V|VI)$/u.test(String(skill_name).normalize("NFKC"))
+      ? [normalizeStatWindowText(String(skill_effect ?? "")).replace(/(^|,\s*)운(?=\s*\d)/gu, "$1행운")]
+      : []);
+  return parseTextBonuses(effects);
 }
 
 function hexaStatCombatBonuses(hexaStatData) {
@@ -3974,10 +3996,8 @@ function hexaStatCombatBonuses(hexaStatData) {
     if (name === "보스 데미지 증가" || name === "보스 몬스터 데미지 증가") result.bossDamage += units;
     if (name === "데미지 증가") result.damage += units * 0.75;
     if (name === "방어율 무시 증가") result.ignoreDefenseSources.push(units);
-    if (name === "공격력 증가" || name === "공격력/마력 증가") {
-      result.flatAttack += units * 5;
-      result.flatMagic += units * 5;
-    }
+    if (name === "공격력 증가" || name === "공격력/마력 증가") result.flatAttack += units * 5;
+    if (name === "마력 증가" || name === "공격력/마력 증가") result.flatMagic += units * 5;
   }
   return result;
 }
@@ -3992,7 +4012,7 @@ export function reconstructCharacterStats({ character, snapshot, mainStat, activ
     statData, equipmentData, setEffectData, otherStatData, cashEquipmentData,
     petEquipmentData, skillData, linkSkillData, hyperStatData, unionRaiderData,
     unionArtifactData, unionChampionData, propensityData, hexaStatData,
-    symbolData, abilityData,
+    symbolData, abilityData, guildData,
   } = snapshot;
   if (!activeEquipment(equipmentData ?? {}).length || !allCharacterSkills(skillData).length) return null;
 
@@ -4001,7 +4021,7 @@ export function reconstructCharacterStats({ character, snapshot, mainStat, activ
     set_effect_info: (set.set_effect_info ?? []).filter((entry) =>
       set.total_set_count == null || number(entry.set_count) <= number(set.total_set_count)),
   }));
-  const skillTexts = statWindowSkillTexts(skillData, equipmentData, activeSkillNames);
+  const skillTexts = statWindowSkillTexts(skillData, equipmentData, petEquipmentData, activeSkillNames);
   const linkTexts = linkSkills(linkSkillData).map(({ skill_effect }) => skill_effect)
     .filter((text) => text &&
       !/\d+\s*초|공격하면|상태 이상|파티원|적에게|약점|재발동|재사용|공격할 때|소환 시|전투 상태/u.test(text));
@@ -4024,6 +4044,7 @@ export function reconstructCharacterStats({ character, snapshot, mainStat, activ
     pet.active,
     pet.skills,
     parseTextBonuses(skillTexts),
+    guildPassiveBonuses(guildData),
     parseTextBonuses(linkTexts),
     parseTextBonuses((unionArtifactData?.union_artifact_effect ?? []).map(({ name }) => name)),
     parseTextBonuses((unionChampionData?.champion_badge_total_info ?? []).map(({ stat }) => stat)),
