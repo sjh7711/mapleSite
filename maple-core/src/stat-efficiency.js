@@ -3892,7 +3892,7 @@ const STAT_WINDOW_STAT_LEAD =
 const STAT_WINDOW_MASTERY_LEAD =
   /^[\p{L}\s,]{0,65}숙련도\s*(?:증가량\s*)?\d+(?:\.\d+)?%/u;
 const STAT_WINDOW_TRIGGER =
-  /\d+\s*초|재사용|적중|타격|중첩|소환 시|공격할 때|공격을 받을|발동 시|스킬 사용 시|받는 대상|상태 이상에|(?:크리티컬|공격|적 처치|회피 성공|피격|획득|레벨업|전투 상태)\s*시|\d+%p|감소되는|소비/u;
+  /\d+\s*(?:초|소비)|재사용|적중|타격|중첩|소환 시|공격할 때|공격을 받을|발동 시|스킬 사용 시|받는 대상|상태 이상에|(?:크리티컬|공격|적 처치|회피 성공|피격|획득|레벨업|전투 상태)\s*시|\d+%p|감소되는/u;
 const STAT_WINDOW_PERMANENT_LEAD = /^(?:추가로\s*)?영구(?:적으로|히)\s*/u;
 const STAT_WINDOW_ATTACK_TEXT = /\d+(?:\.\d+)?%\s*(?:의\s*)?데미지로/u;
 const STAT_WINDOW_CONDITIONAL_SKILLS = new Set([
@@ -3944,7 +3944,8 @@ function statWindowSkillTexts(skillData, equipmentData, activeSkillNames) {
     const lines = passive.length ? passive.map((match) => match[1]) : [text];
     return lines.flatMap((part) => part.split(/\r?\n|\.\s+(?=\p{L})/u)).flatMap((raw) => {
       if (needsPermanentMarker && !STAT_WINDOW_PERMANENT_LEAD.test(raw.trim())) return [];
-      let line = normalizeStatWindowText(raw);
+      // 수치 뒤의 %p는 개별 공격기의 퍼뎀 증가 표기다.
+      let line = normalizeStatWindowText(raw).replace(/,\s*[^,]*\d+(?:\.\d+)?%p.*$/u, "");
       if (GLOBAL_REVERSE_DEFENSE_SKILLS.has(skill_name)) {
         line = line.replace(
           /(^|,\s*)(?:공격 시\s*)?(?:몬스터의?\s*|적의\s*)?(?:물리\s*)?방어율(?:을)?\s*(\d+(?:\.\d+)?)%\s*무시/gu,

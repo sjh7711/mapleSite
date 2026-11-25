@@ -45,6 +45,7 @@ test("스탯 출처 합산은 숙련도·공속 패시브와 전역 방무를 �
       ] },
       { character_skill_grade: "2", character_skill: [
         skill("보우 액셀레이션", "공격 속도 2단계, 민첩성 20 증가"),
+        skill("소울 애로우 : 활", "공격력 30 증가, 화살 소비 없이 공격 가능"),
       ] },
       { character_skill_grade: "3", character_skill: [
         skill("익스트림 아쳐리 : 활", "방어력 25% 감소, 공격력 30 증가, 최종 데미지 30% 증가"),
@@ -64,7 +65,7 @@ test("스탯 출처 합산은 숙련도·공속 패시브와 전역 방무를 �
   };
   const input = { character, snapshot, mainStat: "DEX" };
   const { computed, attack } = reconstructCharacterStats(input);
-  assert.deepEqual(attack.공격력, { flat: 91, percent: 25 });
+  assert.deepEqual(attack.공격력, { flat: 121, percent: 25 });
   assert.equal(computed.DEX, 1020);
   assert.equal(computed.마력, 60);
   assert.equal(computed["방어율 무시"], 25);
@@ -73,7 +74,7 @@ test("스탯 출처 합산은 숙련도·공속 패시브와 전역 방무를 �
   assert.equal(computed["보스 몬스터 데미지"], 0);
   assert.equal(computed["최종 데미지"], 0);
   const active = reconstructCharacterStats({ ...input, activeSkillNames: ["익스트림 아쳐리 : 활"] });
-  assert.equal(active.attack.공격력.flat, 121);
+  assert.equal(active.attack.공격력.flat, 151);
   assert.ok(Math.abs(active.computed["최종 데미지"] - 30) < 1e-9);
 });
 
