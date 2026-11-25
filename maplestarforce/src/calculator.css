@@ -2581,6 +2581,7 @@
 .page--calculator .profile-doping {
   display: grid;
   grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr);
   gap: 5px;
   min-width: 0;
   padding: 9px 10px;
@@ -2605,6 +2606,7 @@
 
 .page--calculator .profile-doping__content {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 5px;
   min-width: 0;
 }
@@ -2631,6 +2633,7 @@
 
 .page--calculator .profile-stat-verification__table {
   width: 100%;
+  table-layout: fixed;
   margin-top: 0.35rem;
   border-collapse: collapse;
   font-variant-numeric: tabular-nums;
