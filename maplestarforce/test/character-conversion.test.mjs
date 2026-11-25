@@ -438,7 +438,7 @@ test("환산 계약 버전으로 이전 단일 부스탯 캐시와 키를 분리
     versionedUrl.searchParams.get("conversionVersion"),
     characterConversionCacheVersion,
   );
-  assert.equal(characterConversionCacheVersion, "combat-profile-v71");
+  assert.equal(characterConversionCacheVersion, "combat-profile-v72-sustained-cycle");
   const freshSnapshotKey = createSnapshotCacheKey(request, "테스트", "fresh");
   const staleSnapshotKey = createSnapshotCacheKey(request, "테스트", "stale");
   assert.equal(characterSnapshotCacheVersion, "character-snapshot-v2");
@@ -1327,7 +1327,7 @@ test("개인 연무장 조회 없이 직업 공통 연무장 프로필을 적용
   );
   assert.match(
     body.profiles.fullBoss.details.classDamageProfile,
-    /^블래스터-raw-cycle-[a-f0-9]{12}$/u,
+    /^블래스터-sustained-cycle-[a-f0-9]{12}$/u,
   );
   assert.match(
     body.profiles.fullBoss.details.classDamageProfileHash,
