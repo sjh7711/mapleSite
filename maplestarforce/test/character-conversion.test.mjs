@@ -438,7 +438,7 @@ test("환산 계약 버전으로 이전 단일 부스탯 캐시와 키를 분리
     versionedUrl.searchParams.get("conversionVersion"),
     characterConversionCacheVersion,
   );
-  assert.equal(characterConversionCacheVersion, "combat-profile-v77-aura-weapon");
+  assert.equal(characterConversionCacheVersion, "combat-profile-v78-useful-sharp-eyes");
   const freshSnapshotKey = createSnapshotCacheKey(request, "테스트", "fresh");
   const staleSnapshotKey = createSnapshotCacheKey(request, "테스트", "stale");
   assert.equal(characterSnapshotCacheVersion, "character-snapshot-v2");
@@ -551,10 +551,73 @@ test("펫 자동버프 등록과 오라 웨폰 비교용 스탯을 반환한다"
   assert.match(off.auraWeapon.basis, /^[0-9a-f]{64}$/u);
   assert.deepEqual(on.auraWeapon, {
     basis: off.auraWeapon.basis,
+    legacyBasis: off.auraWeapon.legacyBasis,
     ignoreDefense: 98.12,
     finalDamage: 94.03,
     effect: { ignoreDefense: 16, finalDamage: 6 },
   });
+});
+
+test("같은 세팅에서 쓸만한 샤프 아이즈가 확인되면 풀 보스 계산에 한 번 적용한다", async () => {
+  const cache = new MemoryCache();
+  let sharpEyesOn = false;
+  let attackChanged = false;
+  const fetchConversion = async (reference) => {
+    const request = apiRequest();
+    if (reference) request.headers.set("X-Sharp-Eyes-Off-Reference", JSON.stringify(reference));
+    const writes = [];
+    const response = await handleCharacterConversion(createContext(request, writes), {
+      cache: sharpEyesOn && !attackChanged ? cache : null,
+      sleep: async () => {},
+      fetchImpl: async (input) => {
+        const url = new URL(input);
+        const payload = nexonPayload(url, { className: "렌" });
+        if (url.pathname.endsWith("/pet-equipment")) {
+          payload.world_share_pet_1_auto_skill = {
+            skill_1: "쓸만한 홀리 심볼",
+            skill_2: sharpEyesOn ? "쓸만한 샤프 아이즈" : null,
+          };
+        }
+        if (url.pathname.endsWith("/skill") && url.searchParams.get("character_skill_grade") === "5") {
+          payload.character_skill = [{
+            skill_name: "쓸만한 샤프 아이즈", skill_level: 30,
+            skill_effect: "270초 동안 크리티컬 확률 10%, 크리티컬 데미지 8% 증가\n재사용 대기시간 180초\n[패시브 효과 : 올스탯 6 증가]",
+          }];
+        }
+        if (url.pathname.endsWith("/stat")) {
+          payload.final_stat.find((row) => row.stat_name === "크리티컬 데미지").stat_value =
+            sharpEyesOn ? "114.6" : "106.6";
+          payload.final_stat.push({
+            stat_name: "크리티컬 확률",
+            stat_value: sharpEyesOn ? "105" : "95",
+          });
+          if (attackChanged) payload.final_stat.find((row) => row.stat_name === "공격력").stat_value = "2050";
+        }
+        return Response.json(payload);
+      },
+    });
+    await Promise.all(writes);
+    assert.equal(response.status, 200);
+    if (reference) assert.equal(response.headers.get("cache-control"), "private, no-store");
+    return (await response.json()).profiles;
+  };
+  const off = await fetchConversion();
+  const reference = off.fullBoss.details.temporaryBuffs.sharpEyes;
+  sharpEyesOn = true;
+  const uncorrected = await fetchConversion();
+  const corrected = await fetchConversion(reference);
+  assert.equal(uncorrected.fullBoss.details.dopedCriticalRate, 115);
+  assert.equal(corrected.base.details.currentCriticalRate, 105);
+  assert.equal(corrected.base.details.currentCriticalDamage, 114.6);
+  assert.equal(corrected.fullBoss.details.dopedCriticalRate, 105);
+  assert.equal(corrected.fullBoss.details.sharpEyesNormalization, true);
+  assert.equal(corrected.fullBoss.details.dopedCriticalDamage, off.fullBoss.details.dopedCriticalDamage);
+  assert.deepEqual(corrected.fullBoss.statEquivalence, off.fullBoss.statEquivalence);
+  assert.deepEqual(await fetchConversion(), uncorrected);
+  attackChanged = true;
+  const differentSetup = await fetchConversion(reference);
+  assert.equal(differentSetup.fullBoss.details.sharpEyesNormalization, false);
+  assert.equal(differentSetup.fullBoss.details.dopedCriticalRate, 115);
 });
 
 test("manual 정책을 적용하고 선택 장비의 환산 요약만 응답한다", async () => {

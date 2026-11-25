@@ -19,7 +19,11 @@ import {
   type CharacterPotentialData,
   type NexonRequestDependencies,
 } from "../_lib/nexon";
-import { characterTemporaryBuffs } from "../_lib/temporary-buffs";
+import {
+  characterTemporaryBuffs,
+  parseSharpEyesReference,
+  restoreSharpEyesOffStats,
+} from "../_lib/temporary-buffs";
 
 export type Bindings = {
   NEXON_API_KEY: string;
@@ -440,8 +444,9 @@ export async function handleCharacterConversion(
 
     const cache =
       dependencies.cache === undefined ? caches.default : dependencies.cache;
+    const sharpEyesReference = parseSharpEyesReference(request.headers.get("X-Sharp-Eyes-Off-Reference"));
     const cacheKey = createCacheKey(request, characterName, presetPolicy);
-    if (cache && !refresh) {
+    if (cache && !refresh && !sharpEyesReference) {
       try {
         const cachedResponse = await cache.match(cacheKey);
         if (cachedResponse) {
@@ -514,13 +519,22 @@ export async function handleCharacterConversion(
       }
     }
 
+    const temporaryBuffs = await characterTemporaryBuffs(envelope.data);
+    const sharpEyesOffStatData = restoreSharpEyesOffStats(
+      envelope.data.snapshot.statData,
+      temporaryBuffs.sharpEyes,
+      sharpEyesReference,
+    );
     const result = buildCharacterConversionFromData(
       envelope.data,
       presetPolicy,
+      sharpEyesOffStatData,
     );
     result.profiles.fullBoss.details = {
       ...result.profiles.fullBoss.details,
-      temporaryBuffs: await characterTemporaryBuffs(envelope.data),
+      temporaryBuffs,
+      sharpEyesNormalization: Boolean(sharpEyesOffStatData) &&
+        result.profiles.fullBoss.statModel !== "demon-avenger",
     };
     result.dataFreshness = {
       source: usedStaleSnapshot
@@ -541,7 +555,7 @@ export async function handleCharacterConversion(
     const response = jsonResponse(result, {
       status: 200,
       headers: {
-        "Cache-Control": usedStaleSnapshot
+        "Cache-Control": usedStaleSnapshot || sharpEyesReference
           ? "private, no-store"
           : `public, max-age=${CACHE_SECONDS}`,
         "X-Conversion-Version": CHARACTER_CONVERSION_CACHE_VERSION,
@@ -549,11 +563,12 @@ export async function handleCharacterConversion(
     });
 
     if (cache && !usedStaleSnapshot) {
-      const writes: Promise<unknown>[] = [
-        cache.put(cacheKey, response.clone()).catch((error) => {
+      const writes: Promise<unknown>[] = [];
+      if (!sharpEyesReference) {
+        writes.push(cache.put(cacheKey, response.clone()).catch((error) => {
           logFailure("character_conversion_cache_put_failed", error);
-        }),
-      ];
+        }));
+      }
       if (fetchedFromUpstream) {
         writes.push(
           cache.put(
@@ -570,7 +585,7 @@ export async function handleCharacterConversion(
           }),
         );
       }
-      context.waitUntil(Promise.all(writes));
+      if (writes.length) context.waitUntil(Promise.all(writes));
     }
     return withSameOriginCors(response, request);
   } catch (error) {

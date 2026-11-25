@@ -111,7 +111,7 @@ test("이전 장비 요약의 정보 갱신 버튼은 캐시를 건너뛰는 재
     source,
     /searchCharacter\(activeName, presetRequest, \{ refresh: true \}\)/u,
   );
-  assert.match(source, /cache: refresh \? "no-store" : "default"/u);
+  assert.match(source, /cache: refresh \|\| sharpEyesOff \|\| withoutSharpEyesReference \? "no-store" : "default"/u);
 });
 
 test("프리셋 응답은 별칭과 실제 유니온 available 번호를 보존한다", () => {

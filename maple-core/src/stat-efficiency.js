@@ -3844,7 +3844,8 @@ function ignoreDefenseGainComponents(currentIgnoreDefense, enemyDefense, channel
 }
 
 export function auraWeaponSnapshotState(current, reference) {
-  if (!current?.basis || current.basis !== reference?.basis) return "unknown";
+  if (!reference?.basis || !current?.basis ||
+    ![current.basis, current.legacyBasis].includes(reference.basis)) return "unknown";
   const { ignoreDefense, finalDamage, effect } = current;
   const { ignoreDefense: offIgnore, finalDamage: offDamage } = reference;
   if (

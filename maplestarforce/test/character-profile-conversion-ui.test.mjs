@@ -198,7 +198,7 @@ test("원본 툴팁이 없는 구형 장비 저장본만 자동 갱신 대상으
   assert.doesNotMatch(migration, /refresh:\s*true/u);
   assert.match(
     source,
-    /if \(!refresh && equipmentTooltipUpgrade\) requestOptions\.cache = "reload"/u,
+    /if \(requestOptions\.cache === "default" && equipmentTooltipUpgrade\) requestOptions\.cache = "reload"/u,
   );
 });
 
