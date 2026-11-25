@@ -8,7 +8,7 @@ import {
 import {
   calculatePotentialExpected,
 } from "maple-core/potential";
-import { calculateIgnoreDefenseEquivalent } from "maple-core/stat-efficiency";
+import { calculateCharacterIgnoreDefenseEquivalent } from "maple-core/stat-efficiency";
 import { element, formatMeso } from "./calculator-ui.js";
 import { loadPotentialTables } from "./potential-tables.js";
 
@@ -585,12 +585,10 @@ function potentialEquivalentTarget(summary, profile) {
   }
   target += attack * attackCoefficient + (boss + damage) * bossCoefficient;
   if (ignoreDefense > 0) {
-    const ignoreDefenseEquivalent = calculateIgnoreDefenseEquivalent({
-      currentIgnoreDefense: Number(equivalence?.currentIgnoreDefense),
+    const ignoreDefenseEquivalent = calculateCharacterIgnoreDefenseEquivalent({
+      statEquivalence: equivalence,
       addedIgnoreDefense: ignoreDefense / 100,
-      enemyDefense:
-        3.8 * Number(equivalence?.targetDefenseRemaining ?? 1),
-      oneMainPercentRelative: Number(equivalence?.oneMainPercentRelative),
+      enemyDefense: 380,
     });
     if (!Number.isFinite(ignoreDefenseEquivalent)) {
       return { unavailable: true };

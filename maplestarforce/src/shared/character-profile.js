@@ -6,7 +6,7 @@ import {
 } from "maple-core/stat-profile";
 import {
   CHARACTER_BASELINE_SKILL_SUMMARY_VERSION,
-  calculateIgnoreDefenseEquivalent,
+  calculateCharacterIgnoreDefenseEquivalent,
 } from "maple-core/stat-efficiency";
 import {
   cardWithHead,
@@ -1366,11 +1366,10 @@ export function characterProfileCard({
       const toDamageEquivalent = (mainPercentEquivalent) =>
         xenonMainPercentToDamagePercent(mainPercentEquivalent, eq, direct);
       const ignoreDefenseDamageEquivalent = (amount) => {
-        const value = calculateIgnoreDefenseEquivalent({
-          currentIgnoreDefense: Number(eq.currentIgnoreDefense),
+        const value = calculateCharacterIgnoreDefenseEquivalent({
+          statEquivalence: eq,
           addedIgnoreDefense: Math.max(0, Math.min(100, amount)) / 100,
-          enemyDefense: 3.8 * Number(eq.targetDefenseRemaining ?? 1),
-          oneMainPercentRelative: Number(eq.oneMainPercentRelative),
+          enemyDefense: 380,
         });
         return toDamageEquivalent(value);
       };
@@ -1523,11 +1522,10 @@ export function characterProfileCard({
           standardCoefficient("보공 +1%", eq.bossDamageToMainPercent),
           standardCoefficient(`${attackLabel} +1%`, eq.attackPercentToMainPercent),
           standardCoefficient("방무 +40% (380)", eq.ied40Against380ToMainPercent, {
-            valueForAmount: (amount) => calculateIgnoreDefenseEquivalent({
-              currentIgnoreDefense: Number(eq.currentIgnoreDefense),
+            valueForAmount: (amount) => calculateCharacterIgnoreDefenseEquivalent({
+              statEquivalence: eq,
               addedIgnoreDefense: Math.max(0, Math.min(100, amount)) / 100,
-              enemyDefense: 3.8 * Number(eq.targetDefenseRemaining ?? 1),
-              oneMainPercentRelative: Number(eq.oneMainPercentRelative),
+              enemyDefense: 380,
             }),
           }),
           standardCoefficient("크리티컬 데미지 +1%", eq.criticalDamageToMainPercent),

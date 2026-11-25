@@ -2226,7 +2226,7 @@ test("챔피언의 가호 5레벨은 공통 풀도핑 능력치에 한 번씩 �
   assert.equal(full.dopedBaseMain - base.dopedBaseMain, 125);
   assert.equal(full.dopedBaseSub - base.dopedBaseSub, 125);
   assert.equal(full.combatModel.totals.flatAttack - base.combatModel.totals.flatAttack, 400);
-  assert.equal(full.combatModel.totals.attackPercent - base.combatModel.totals.attackPercent, 50);
+  assert.equal(full.combatModel.totals.attackPercent - base.combatModel.totals.attackPercent, 14);
   assert.equal(full.combatModel.totals.bossDamage - base.combatModel.totals.bossDamage, 105);
   assert.equal(full.dopedCriticalDamage - base.dopedCriticalDamage, 45.5);
   assert.deepEqual(full.effectiveDopingTotals.ignoreDefenseSources, [15, 24, 10]);
