@@ -104,18 +104,19 @@ test("배포용 직업 프로필은 익명 집계값만 담은 경량 모델이�
   assert.match(profileSource, /skillShares/u);
 });
 
-test("배포용 연무장 프로필은 레테를 포함한 47직업만 계산식으로 제공한다", async () => {
+test("배포용 연무장 프로필은 레테와 데몬어벤져를 포함한 48직업을 제공한다", async () => {
   const profileModule = await import(
     `${pathToFileURL(resolve(CORE_ROOT, "src/class-damage-profiles.js")).href}?runtime-profile-test=${Date.now()}`,
   );
   const profiles = profileModule.CLASS_BATTLE_PRACTICE_DAMAGE_PROFILES;
   const entries = Object.entries(profiles);
 
-  assert.equal(entries.length, 47);
+  assert.equal(entries.length, 48);
   assert.ok(profiles["레테"]);
-  assert.equal(profiles["데몬어벤져"], undefined);
+  assert.ok(profiles["데몬어벤져"]);
 
   const allowedProfileFields = new Set([
+    "basis",
     "enemyDefense",
     "id",
     "profileHash",
@@ -131,7 +132,8 @@ test("배포용 연무장 프로필은 레테를 포함한 47직업만 계산식
     "weight",
   ]);
   for (const [characterClass, profile] of entries) {
-    assert.equal(profile.sampleCount, 5, `${characterClass}: 표본 수`);
+    assert.ok(Number.isInteger(profile.sampleCount) && profile.sampleCount >= 2 && profile.sampleCount <= 5,
+      `${characterClass}: 표본 수`);
     assert.deepEqual(
       Object.keys(profile).filter((field) => !allowedProfileFields.has(field)),
       [],

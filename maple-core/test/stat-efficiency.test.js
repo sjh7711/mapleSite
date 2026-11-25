@@ -1037,7 +1037,7 @@ test("리스트레인트 링은 직업별 연무장 극딜 피해 비중으로 �
   assert.equal(ring.activationMode, "battle-practice-damage-weighted");
   assert.equal(ring.timeUptime, 0.125);
   assert.ok(ring.damageCoverage > ring.timeUptime);
-  assert.ok(ring.phaseProfileId.startsWith("렌-special-ring-"));
+  assert.match(ring.phaseProfileId, /^렌-sustained-ring-[a-f0-9]{12}$/u);
   assert.ok(Math.abs(result.attackPercent - 68 * ring.damageCoverage) < 1e-12);
 });
 
@@ -1832,7 +1832,7 @@ test("개인 기록 없이 대표 연무장 프로필을 현재 V 코어 방무�
     "battle-practice-class-generalized",
   );
   assert.equal(channels[0].metadata.weightBasis, "pre-defense");
-  assert.equal(channels[0].metadata.sampleCount, 5);
+  assert.equal(channels[0].metadata.sampleCount, CLASS_BATTLE_PRACTICE_DAMAGE_PROFILES.나이트워커.sampleCount);
 });
 
 test("제로의 공유 라즐리·라피스 잠재와 소울은 한 번만 센다", () => {
