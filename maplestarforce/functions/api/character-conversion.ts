@@ -21,7 +21,9 @@ import {
 } from "../_lib/nexon";
 import {
   characterTemporaryBuffs,
+  parseContinuousRingReference,
   parseSharpEyesReference,
+  restoreContinuousRingOffStats,
   restoreSharpEyesOffStats,
 } from "../_lib/temporary-buffs";
 
@@ -445,8 +447,12 @@ export async function handleCharacterConversion(
     const cache =
       dependencies.cache === undefined ? caches.default : dependencies.cache;
     const sharpEyesReference = parseSharpEyesReference(request.headers.get("X-Sharp-Eyes-Off-Reference"));
+    const continuousRingReference = parseContinuousRingReference(
+      request.headers.get("X-Continuous-Ring-Off-Reference"),
+    );
+    const hasBuffReference = Boolean(sharpEyesReference || continuousRingReference);
     const cacheKey = createCacheKey(request, characterName, presetPolicy);
-    if (cache && !refresh && !sharpEyesReference) {
+    if (cache && !refresh && !hasBuffReference) {
       try {
         const cachedResponse = await cache.match(cacheKey);
         if (cachedResponse) {
@@ -520,20 +526,36 @@ export async function handleCharacterConversion(
     }
 
     const temporaryBuffs = await characterTemporaryBuffs(envelope.data);
+    const statData = envelope.data.snapshot.statData;
+    const continuousRingOffStatData = restoreContinuousRingOffStats(
+      statData,
+      temporaryBuffs.continuousRing,
+      continuousRingReference,
+    );
+    // 컨티 OFF로 저장했던 샤프 아이즈 기준은 컨티 수치를 복구한 뒤에도 비교한다.
+    const sharpEyesAtRingOff = continuousRingOffStatData && sharpEyesReference &&
+        temporaryBuffs.sharpEyes?.basis !== sharpEyesReference.basis
+      ? (await characterTemporaryBuffs({
+          ...envelope.data,
+          snapshot: { ...envelope.data.snapshot, statData: continuousRingOffStatData },
+        })).sharpEyes
+      : temporaryBuffs.sharpEyes;
     const sharpEyesOffStatData = restoreSharpEyesOffStats(
-      envelope.data.snapshot.statData,
-      temporaryBuffs.sharpEyes,
+      continuousRingOffStatData ?? statData,
+      sharpEyesAtRingOff,
       sharpEyesReference,
     );
     const result = buildCharacterConversionFromData(
       envelope.data,
       presetPolicy,
-      sharpEyesOffStatData,
+      sharpEyesOffStatData ?? continuousRingOffStatData,
     );
     result.profiles.fullBoss.details = {
       ...result.profiles.fullBoss.details,
       temporaryBuffs,
       sharpEyesNormalization: Boolean(sharpEyesOffStatData) &&
+        result.profiles.fullBoss.statModel !== "demon-avenger",
+      continuousRingNormalization: Boolean(continuousRingOffStatData) &&
         result.profiles.fullBoss.statModel !== "demon-avenger",
     };
     result.dataFreshness = {
@@ -555,7 +577,7 @@ export async function handleCharacterConversion(
     const response = jsonResponse(result, {
       status: 200,
       headers: {
-        "Cache-Control": usedStaleSnapshot || sharpEyesReference
+        "Cache-Control": usedStaleSnapshot || hasBuffReference
           ? "private, no-store"
           : `public, max-age=${CACHE_SECONDS}`,
         "X-Conversion-Version": CHARACTER_CONVERSION_CACHE_VERSION,
@@ -564,7 +586,7 @@ export async function handleCharacterConversion(
 
     if (cache && !usedStaleSnapshot) {
       const writes: Promise<unknown>[] = [];
-      if (!sharpEyesReference) {
+      if (!hasBuffReference) {
         writes.push(cache.put(cacheKey, response.clone()).catch((error) => {
           logFailure("character_conversion_cache_put_failed", error);
         }));

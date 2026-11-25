@@ -101,7 +101,7 @@ test("제논은 STR·DEX·LUK를 모두 쓰고 INT·HP·마력은 제외한다",
     assert.equal(full.dopedBase[stat] - result.details.dopedBase[stat], 125);
   }
   assert.equal(full.combatModel.totals.flatAttack - result.details.combatModel.totals.flatAttack, 400);
-  assert.equal(full.dopedCriticalDamage - result.details.dopedCriticalDamage, 45.5);
+  assert.equal(full.dopedCriticalDamage - result.details.dopedCriticalDamage, 53.5);
   assert.ok(Math.abs(full.dopedIgnoreDefense - 0.235) < 1e-12);
 });
 

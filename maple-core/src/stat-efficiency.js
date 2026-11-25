@@ -2132,6 +2132,7 @@ function conditionalDamageFromLink(linkSkillData) {
 export function calculateConditionalLinkCycleBonuses(
   linkSkillData,
   buffDurationPercent = 0,
+  targetLevelIsLower = false,
 ) {
   const result = {
     damage: 0,
@@ -2181,10 +2182,10 @@ export function calculateConditionalLinkCycleBonuses(
       );
       uptime = cooldown > 0 ? Math.min(1, duration / cooldown) : 0;
       damage = percentFromEffect(effect, /데미지\s*(\d+(?:\.\d+)?)%\s*증가/u) * uptime;
-    } else if (name === "인텐시브 인썰트") {
+    } else if (name === "인텐시브 인썰트" && targetLevelIsLower) {
       // 상태 이상 대상 수치는 Open API의 `상태이상 추가 데미지`에
       // 반영된다. 보스보다 캐릭터 레벨이 높은 일반적인 상황의 별도
-      // 조건만 더해 중복을 피한다.
+      // 조건을 확인한 경우에만 별도로 더한다.
       damage = percentFromEffect(
         effect,
         /캐릭터보다 레벨이 낮은 몬스터 공격 시 데미지\s*(\d+(?:\.\d+)?)%/u,
@@ -2318,7 +2319,9 @@ function titleFlatAttack(equipmentData, attackType) {
 }
 
 function equipmentPresetData(equipmentData, presetNumber) {
-  if (!presetNumber) return equipmentData;
+  if (!presetNumber || presetNumber === number(equipmentData?.preset_no)) {
+    return equipmentData;
+  }
   // KMS 실응답의 top-level 키와 문서/SDK에서 쓰는 중첩 키를 모두
   // 받아 프리셋을 바꿔도 칭호 스탯이 빠지지 않게 한다.
   const title =
@@ -2862,11 +2865,10 @@ function setEffectDataForEquipment(setEffectData, activeData, selectedData) {
   };
 }
 
-function applyPresetSelection(data, selected) {
-  const equipmentData = equipmentPresetData(
-    data.equipmentData,
-    selected.equipment,
-  );
+function applyPresetSelection(data, selected, activeEquipmentPreset) {
+  const equipmentData = selected.equipment === activeEquipmentPreset
+    ? data.equipmentData
+    : equipmentPresetData(data.equipmentData, selected.equipment);
   const setEffects = setEffectDataForEquipment(
     data.setEffectData,
     data.equipmentData,
@@ -3249,7 +3251,7 @@ function selectJointBossPreset({
     return null;
   }
   const stats = finalStats(statData);
-  const activeSnapshot = applyPresetSelection(data, active);
+  const activeSnapshot = applyPresetSelection(data, active, active.equipment);
   const activeVector = presetDependentVector(
     { ...data, ...activeSnapshot },
     mainStat,
@@ -3269,7 +3271,7 @@ function selectJointBossPreset({
       component,
       new Map(choices[component].map((candidate) => {
         const selected = { ...active, [component]: candidate };
-        const selectedSnapshot = applyPresetSelection(data, selected);
+        const selectedSnapshot = applyPresetSelection(data, selected, active.equipment);
         return [
           candidate,
           presetDependentVector(
@@ -3474,7 +3476,7 @@ export function resolveCharacterPresetSnapshot({
     );
   }
 
-  const selectedPresetData = applyPresetSelection(data, selected);
+  const selectedPresetData = applyPresetSelection(data, selected, active.equipment);
   if (selectedPresetData.setEffectResolution?.unresolvedSets?.length) {
     warnings.push(
       `장비 프리셋 변경 시 분류되지 않은 세트는 현재 적용 단계를 유지합니다: ${
@@ -4654,7 +4656,7 @@ export function calculateCharacterPotentialConversion({
     number(classDopingAdjustment.criticalDamage) +
     number(classAlwaysOnAdjustment.criticalDamage) +
     (doping ? activeSkillCycle.criticalDamage : 0) +
-    combatOrdersSharpEyesBonus;
+    (doping?.sayramElixir ? 0 : combatOrdersSharpEyesBonus);
   const sharpEyesHyperCriticalRateBonus = sharpEyesHyperCriticalRate(skillData);
   // 크리티컬 확률은 세이람의 영약·이벤트 버프 같은 외부 도핑을
   // 의도적으로 배제한다. 선택한 보스 세팅과 직업 스킬 보정만 사용한다.

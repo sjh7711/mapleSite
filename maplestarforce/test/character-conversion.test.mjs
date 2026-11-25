@@ -438,7 +438,7 @@ test("환산 계약 버전으로 이전 단일 부스탯 캐시와 키를 분리
     versionedUrl.searchParams.get("conversionVersion"),
     characterConversionCacheVersion,
   );
-  assert.equal(characterConversionCacheVersion, "combat-profile-v80-boss-ied");
+  assert.equal(characterConversionCacheVersion, "combat-profile-v81-buff-sources");
   const freshSnapshotKey = createSnapshotCacheKey(request, "테스트", "fresh");
   const staleSnapshotKey = createSnapshotCacheKey(request, "테스트", "stale");
   assert.equal(characterSnapshotCacheVersion, "character-snapshot-v2");
@@ -602,7 +602,8 @@ test("같은 세팅에서 쓸만한 샤프 아이즈가 확인되면 풀 보스 
     return (await response.json()).profiles;
   };
   const off = await fetchConversion();
-  const reference = off.fullBoss.details.temporaryBuffs.sharpEyes;
+  const { basis, criticalRate, criticalDamage } = off.fullBoss.details.temporaryBuffs.sharpEyes;
+  const reference = { basis, criticalRate, criticalDamage };
   sharpEyesOn = true;
   const uncorrected = await fetchConversion();
   const corrected = await fetchConversion(reference);
@@ -618,6 +619,102 @@ test("같은 세팅에서 쓸만한 샤프 아이즈가 확인되면 풀 보스 
   const differentSetup = await fetchConversion(reference);
   assert.equal(differentSetup.fullBoss.details.sharpEyesNormalization, false);
   assert.equal(differentSetup.fullBoss.details.dopedCriticalRate, 115);
+});
+
+test("컨티와 샤프 아이즈가 함께 켜진 응답에서 각 OFF 기준을 적용한다", async () => {
+  const cache = new MemoryCache();
+  let buffed = false;
+  const fetchConversion = async (references = {}, refresh = false) => {
+    const request = apiRequest();
+    const url = new URL(request.url);
+    url.searchParams.set("presetMode", "active");
+    if (refresh) url.searchParams.set("refresh", "1");
+    const headers = new Headers(request.headers);
+    for (const [header, reference] of Object.entries(references)) {
+      headers.set(header, JSON.stringify(reference));
+    }
+    const writes = [];
+    const response = await handleCharacterConversion(
+      createContext(new Request(url, { headers }), writes),
+      {
+        cache,
+        sleep: async () => {},
+        fetchImpl: async (input) => {
+          const upstream = new URL(input);
+          const payload = nexonPayload(upstream, { className: "렌" });
+          if (upstream.pathname.endsWith("/item-equipment")) {
+            payload.preset_no = 2;
+            payload.item_equipment.push({
+              item_equipment_slot: "예비 특수 반지",
+              item_name: "컨티뉴어스 링",
+              special_ring_level: 5,
+              item_total_option: {},
+            });
+            payload.item_equipment_preset_2 = payload.item_equipment;
+            payload.title = {
+              title_name: "붉은 눈의 유랑자",
+              title_description: "보스 몬스터 공격 시 데미지+10%",
+            };
+            payload.title_preset2 = null;
+          }
+          if (upstream.pathname.endsWith("/skill") && upstream.searchParams.get("character_skill_grade") === "5") {
+            payload.character_skill = [{
+              skill_name: "쓸만한 샤프 아이즈", skill_level: 30,
+              skill_effect: "270초 동안 크리티컬 확률 10%, 크리티컬 데미지 8% 증가",
+            }];
+          }
+          if (upstream.pathname.endsWith("/stat")) {
+            const stats = {
+              공격력: buffed ? 9618 : 9145,
+              마력: buffed ? 2254 : 2013,
+              "보스 몬스터 데미지": buffed ? 529 : 484,
+              "크리티컬 데미지": buffed ? 114.6 : 106.6,
+              "크리티컬 확률": buffed ? 105 : 95,
+            };
+            payload.final_stat = payload.final_stat.filter(({ stat_name }) => !Object.hasOwn(stats, stat_name));
+            payload.final_stat.push(...Object.entries(stats).map(([stat_name, value]) => ({
+              stat_name, stat_value: String(value),
+            })));
+          }
+          return Response.json(payload);
+        },
+      },
+    );
+    await Promise.all(writes);
+    assert.equal(response.status, 200);
+    if (Object.keys(references).length) assert.equal(response.headers.get("cache-control"), "private, no-store");
+    return (await response.json()).profiles;
+  };
+
+  const off = await fetchConversion({}, true);
+  const { continuousRing, sharpEyes } = off.fullBoss.details.temporaryBuffs;
+  assert.equal(off.fullBoss.details.currentBossDamage, 484);
+  assert.equal(off.fullBoss.details.dopedCriticalDamage, 130.1);
+  assert.equal(continuousRing.effect.bossDamage, 45);
+  buffed = true;
+  const on = await fetchConversion({}, true);
+  assert.equal(on.fullBoss.details.currentBossDamage, 529);
+  const references = {
+    "X-Continuous-Ring-Off-Reference": {
+      basis: continuousRing.basis, attack: continuousRing.attack,
+      magic: continuousRing.magic, bossDamage: continuousRing.bossDamage,
+    },
+    "X-Sharp-Eyes-Off-Reference": {
+      basis: sharpEyes.basis, criticalRate: sharpEyes.criticalRate, criticalDamage: sharpEyes.criticalDamage,
+    },
+  };
+  const corrected = await fetchConversion(references);
+  assert.equal(corrected.base.details.currentBossDamage, 529);
+  assert.equal(corrected.fullBoss.details.currentBossDamage, 484);
+  assert.equal(corrected.fullBoss.details.continuousRingNormalization, true);
+  assert.equal(corrected.fullBoss.details.sharpEyesNormalization, true);
+  assert.deepEqual(corrected.fullBoss.statEquivalence, off.fullBoss.statEquivalence);
+  assert.deepEqual(await fetchConversion(), on);
+
+  const wrongSetup = await fetchConversion({
+    "X-Continuous-Ring-Off-Reference": { ...references["X-Continuous-Ring-Off-Reference"], bossDamage: 475 },
+  });
+  assert.equal(wrongSetup.fullBoss.details.continuousRingNormalization, false);
 });
 
 test("manual 정책을 적용하고 선택 장비의 환산 요약만 응답한다", async () => {

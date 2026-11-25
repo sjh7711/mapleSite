@@ -615,8 +615,8 @@ test("자동 보스는 조건부 링크 방무 및 상태이상 데미지를 프
   for (const { conditional, steady, ignore, status, expected } of [
     { conditional: conditionalIgnore, steady: 12, ignore: 95, status: 0, expected: 1 },
     { conditional: conditionalIgnore, steady: 12, ignore: 99.9, status: 0, expected: 2 },
-    { conditional: abnormalDamage, steady: 15, ignore: 98, status: 9, expected: 1 },
-    { conditional: abnormalDamage, steady: 20, ignore: 98, status: 9, expected: 2 },
+    { conditional: abnormalDamage, steady: 8, ignore: 98, status: 9, expected: 1 },
+    { conditional: abnormalDamage, steady: 15, ignore: 98, status: 9, expected: 2 },
   ]) {
     const link1 = [conditional];
     const result = resolveCharacterPresetSnapshot({
@@ -1786,6 +1786,34 @@ test("VI 방무 상속·대체와 하이퍼 패시브를 출처별로 결합한�
   );
 });
 
+test("렌 하이퍼의 방무 대상과 오라 웨폰의 전역 방무를 구분한다", () => {
+  const channels = skillLocalIgnoreDefenseChannelsFromSkills([{
+    character_skill: [
+      {
+        skill_name: "망혼검 절기 : 심검",
+        skill_effect: "1200%의 데미지로 10번 공격\n몬스터 방어율 20% 추가 무시",
+      },
+      {
+        skill_name: "망혼강림-이그노어 가드",
+        skill_level: 1,
+        skill_description: "[마스터 레벨 : 1]\r\n망혼검 절기 : 열지, 망혼검 절기 : 망탄, 망혼검 절기 : 무량겁, 망혼검 절기 : 심검의 방어율 무시 수치를 증가시킨다.",
+        skill_effect: "방어율 무시 20% 증가",
+      },
+      {
+        skill_name: "오라 웨폰",
+        skill_level: 30,
+        skill_effect: "HP 100 소비, 130초 동안 몬스터 방어율 무시 16%, 최종 데미지 6% 증가\n1100%의 데미지로 6번 공격하는 오라 파동 발사",
+      },
+    ],
+  }]);
+  const byName = new Map(channels.map(({ source, ignoreDefenseSources }) => [source, ignoreDefenseSources]));
+  assert.deepEqual(byName.get("망혼검 절기 : 심검"), [20, 20]);
+  for (const skill of ["열지", "망탄", "무량겁"]) {
+    assert.deepEqual(byName.get(`망혼검 절기 : ${skill}`), [20]);
+  }
+  assert.equal(byName.has("오라 웨폰"), false);
+});
+
 test("같은 수치의 스킬 방무와 V 강화 코어 방무를 각각 적용한다", () => {
   const channels = generalizedBattlePracticeDamageChannelsFromSkills({
     skillData: [{
@@ -2361,7 +2389,7 @@ test("챔피언의 가호 5레벨은 공통 풀도핑 능력치에 한 번씩 �
   assert.equal(full.combatModel.totals.flatAttack - base.combatModel.totals.flatAttack, 400);
   assert.equal(full.combatModel.totals.attackPercent - base.combatModel.totals.attackPercent, 14);
   assert.equal(full.combatModel.totals.bossDamage - base.combatModel.totals.bossDamage, 105);
-  assert.equal(full.dopedCriticalDamage - base.dopedCriticalDamage, 45.5);
+  assert.equal(full.dopedCriticalDamage - base.dopedCriticalDamage, 53.5);
   assert.deepEqual(full.effectiveDopingTotals.ignoreDefenseSources, [15, 10]);
   assert.ok(Math.abs(full.dopedIgnoreDefense - 23.5) < 1e-9);
 });
@@ -2421,7 +2449,7 @@ test("풀보스 크확은 공용·보스·조건부 보정을 구분하고 100%�
   assert.equal(bowmaster.details.dopedCriticalRate, 105);
   assert.equal(bowmaster.details.sharpEyesHyperCriticalRateBonus, 5);
   assert.equal(bowmaster.details.criticalReinforceAverageCriticalDamage, 13.125);
-  assert.equal(bowmaster.details.dopedCriticalDamage, 145.625);
+  assert.equal(bowmaster.details.dopedCriticalDamage, 146.625);
   assert.equal(hero.statEquivalence.criticalRateToMainPercent, undefined);
   assert.equal(
     bowmaster.statEquivalence.criticalRateToMainPercent,
@@ -2550,7 +2578,7 @@ test("배틀메이지는 배틀 레이지와 다크 오라를 기본 전투 상�
       ],
     },
   ]);
-  assert.equal(fullBoss.details.dopedCriticalDamage, 135.5);
+  assert.equal(fullBoss.details.dopedCriticalDamage, 143.5);
   assert.equal(fullBoss.details.dopedDamageTotal, 656);
 });
 

@@ -1018,7 +1018,7 @@ export async function buildCharacterConversion(
 export function buildCharacterConversionFromData(
   data: CharacterPotentialData,
   presetPolicy: PresetPolicy = { mode: "auto" },
-  sharpEyesOffStatData?: JsonObject,
+  normalizedBossStatData?: JsonObject,
 ): CharacterConversionSuccess {
   const { character, snapshot } = data;
   const className = requiredString(character, "character_class", "직업");
@@ -1029,7 +1029,7 @@ export function buildCharacterConversionFromData(
   const model = inferredProfile.model ?? "standard";
   const fullBossStatData = model === "demon-avenger"
     ? snapshot.statData
-    : sharpEyesOffStatData ?? snapshot.statData;
+    : normalizedBossStatData ?? snapshot.statData;
 
   const subStats = [
     ...new Set(

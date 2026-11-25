@@ -474,7 +474,7 @@ function parsedSkillLocalIgnoreDefenseChannels(skillData) {
       if (
         timedSkillEffect &&
         !requiredLevelMatch &&
-        /(?:몬스터|적)?\s*방어율 무시(?:가)?\s*\d+(?:\.\d+)?%\s*증가/u
+        /(?:몬스터|적)?\s*방어율 무시(?:가)?\s*\d+(?:\.\d+)?%\s*증가|\d+(?:\.\d+)?초\s*동안\s*(?:몬스터\s*)?방어율 무시\s*\d+(?:\.\d+)?%\s*[,·]/u
           .test(line) &&
         !/(?:해당|이|각)\s*(?:공격|스킬)[^\n]*방어율/u.test(line)
       ) {
@@ -537,13 +537,14 @@ function hyperPassiveLocalIgnoreDefenseChannels(skillData) {
     (grade) => grade?.character_skill ?? [],
   );
   for (const skill of rawSkills) {
+    if (skill?.skill_level != null && !(number(skill.skill_level) > 0)) continue;
     const description = String(skill?.skill_description ?? "");
     const effect = String(skill?.skill_effect ?? "");
     const targetsMatch = description.match(
-      /^(.+?)의\s*몬스터\s*방어율\s*무시\s*수치를\s*증가/u,
+      /^([^\r\n]+?)의\s*(?:몬스터\s*)?방어율\s*무시\s*수치를\s*증가/mu,
     );
     const valueMatch = effect.match(
-      /몬스터\s*방어율\s*무시\s*(\d+(?:\.\d+)?)%\s*(?:추가\s*)?증가/u,
+      /(?:몬스터\s*)?방어율\s*무시\s*(\d+(?:\.\d+)?)%\s*(?:추가\s*)?증가/u,
     );
     if (!targetsMatch || !valueMatch) continue;
     const value = number(valueMatch[1]);
