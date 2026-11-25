@@ -1893,12 +1893,14 @@ function skillBonuses(skillData) {
 
 // 공개 API에서 확인한 공용 패시브와 이벤트 스킬의 표시용 내역이다.
 // 실제 환산은 final_stat을 기준으로 하므로 이 값을 다시 더하지 않는다.
+export const CHARACTER_BASELINE_SKILL_SUMMARY_VERSION = 2;
+
 export function characterBaselineSkillSummary(skillData) {
   const commonPassives = new Set([
     "스파이더 인 미러", "크레스트 오브 더 솔라",
     "에르다 퍼미에이션", "쓸만한 홀리 파운틴",
   ]);
-  const eventSkills = new Set(["훈련 일지", "아르고 호의 가호"]);
+  const eventSkills = new Set(["훈련 일지", "아르고 호의 가호", "윈터 파워업"]);
   return allCharacterSkills(skillData).flatMap((skill) => {
     const name = String(skill?.skill_name ?? "").trim();
     const event = eventSkills.has(name);

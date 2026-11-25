@@ -438,7 +438,7 @@ test("환산 계약 버전으로 이전 단일 부스탯 캐시와 키를 분리
     versionedUrl.searchParams.get("conversionVersion"),
     characterConversionCacheVersion,
   );
-  assert.equal(characterConversionCacheVersion, "combat-profile-v72-sustained-cycle");
+  assert.equal(characterConversionCacheVersion, "combat-profile-v73-winter-powerup");
   const freshSnapshotKey = createSnapshotCacheKey(request, "테스트", "fresh");
   const staleSnapshotKey = createSnapshotCacheKey(request, "테스트", "stale");
   assert.equal(characterSnapshotCacheVersion, "character-snapshot-v2");
@@ -1544,27 +1544,47 @@ test('공식 API의 새 소울 필드를 장비 툴팁에 전달한다', async (
 });
 
 
-test("현재 이벤트 두 개와 신규 공용 패시브 내역을 기본·풀도핑 응답에 함께 전달한다", async () => {
-  const fixture = JSON.parse(await readFile(new URL('../../maple-core/test/fixtures/skills-20260919.json', import.meta.url), 'utf8'));
-  const wanted = ['훈련 일지', '아르고 호의 가호', '스파이더 인 미러', '크레스트 오브 더 솔라', '쓸만한 홀리 파운틴'];
+test("윈터 파워업과 중첩 이벤트를 표시하고 기본 보공을 중복 합산하지 않는다", async () => {
+  const fixture = JSON.parse(await readFile(
+    new URL("../../maple-core/test/fixtures/skills-20260919.json", import.meta.url),
+    "utf8",
+  ));
+  const expectedEvents = { "훈련 일지": 40, "아르고 호의 가호": 20, "윈터 파워업": 20 };
+  const commonPassives = ["스파이더 인 미러", "크레스트 오브 더 솔라", "쓸만한 홀리 파운틴"];
+  const skills = fixture.skills.filter(({ skill_name }) =>
+    Object.hasOwn(expectedEvents, skill_name) || commonPassives.includes(skill_name)
+  );
+  skills.push({
+    grade: "0",
+    skill_name: "윈터 파워업",
+    skill_level: 1,
+    skill_effect: "보스 몬스터 공격 시 데미지 20% 증가\r\n몬스터파크 클리어 경험치 25% 증가",
+  });
   const response = await handleCharacterConversion(createContext(apiRequest()), {
     cache: null,
-    fetchImpl: async input => {
+    fetchImpl: async (input) => {
       const url = new URL(input);
-      if (url.pathname.endsWith('/character/skill')) {
-        const grade = url.searchParams.get('character_skill_grade');
-        return Response.json({character_skill: fixture.skills.filter(s=>wanted.includes(s.skill_name) && s.grade===grade)});
+      if (url.pathname.endsWith("/character/skill")) {
+        const grade = url.searchParams.get("character_skill_grade");
+        return Response.json({ character_skill: skills.filter((skill) => skill.grade === grade) });
       }
       return Response.json(nexonPayload(url));
     },
     sleep: async () => {},
   });
   const body = await response.json();
-  assert.equal(response.status,200,JSON.stringify(body));
-  for (const profile of [body.profiles.base,body.profiles.fullBoss]) {
-    const entries=profile.details.baselineSkills;
-    assert.equal(entries.length,5);
-    assert.deepEqual(entries.filter(s=>s.kind==='event').map(s=>s.effects.bossDamage),[40,20]);
-    assert.ok(entries.every(s=>s.includedInBaseline));
+  assert.equal(response.status, 200, JSON.stringify(body));
+  for (const { details } of [body.profiles.base, body.profiles.fullBoss]) {
+    assert.equal(details.baselineSkillSummaryVersion, 2);
+    const entries = details.baselineSkills;
+    const events = entries.filter(({ kind }) => kind === "event");
+    assert.equal(events.length, Object.keys(expectedEvents).length);
+    assert.deepEqual(Object.fromEntries(events.map(({ name, effects }) =>
+      [name, effects.bossDamage]
+    )), expectedEvents);
+    assert.deepEqual(entries.filter(({ kind }) => kind === "common-passive").map(({ name }) => name).sort(),
+      [...commonPassives].sort());
+    assert.ok(entries.every(({ includedInBaseline }) => includedInBaseline));
+    assert.equal(details.currentBossDamage, 300);
   }
 });

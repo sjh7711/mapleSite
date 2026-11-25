@@ -1,7 +1,10 @@
 import { calculatorStorage, isSharedResult, registerResultShareProfile } from "./result-share-state.js";
 import { STAT_EQUIVALENCE } from "maple-core/potential";
 import { FULL_BOSS_DOPING } from "maple-core/stat-profile";
-import { calculateIgnoreDefenseEquivalent } from "maple-core/stat-efficiency";
+import {
+  CHARACTER_BASELINE_SKILL_SUMMARY_VERSION,
+  calculateIgnoreDefenseEquivalent,
+} from "maple-core/stat-efficiency";
 import {
   cardWithHead,
   element,
@@ -119,7 +122,10 @@ export function needsCashEquipmentDisplayRefresh(profile) {
 }
 
 export function needsBaselineSkillRefresh(profile) {
-  return Boolean(profile && !Array.isArray(profile.details?.baselineSkills));
+  return Boolean(profile && (
+    !Array.isArray(profile.details?.baselineSkills) ||
+    profile.details.baselineSkillSummaryVersion !== CHARACTER_BASELINE_SKILL_SUMMARY_VERSION
+  ));
 }
 
 export function shouldShowCharacterProfileWarning(warning) {
@@ -861,9 +867,11 @@ async function searchCharacter(
     const upgradesEquipmentTooltip =
       needsEquipmentTooltipRefresh(saved?.equipmentSummary) &&
       hasCurrentEquipmentTooltipData(payload.equipmentSummary);
-    if (equipmentTooltipUpgrade && !hasCurrentEquipmentTooltipData(
-      payload.equipmentSummary,
-    )) {
+    if (
+      equipmentTooltipUpgrade &&
+      needsEquipmentTooltipRefresh(saved?.equipmentSummary) &&
+      !hasCurrentEquipmentTooltipData(payload.equipmentSummary)
+    ) {
       throw new Error(
         "원본 장비 정보를 불러오지 못했습니다. 잠시 후 정보 갱신을 눌러 주세요.",
       );

@@ -36,7 +36,7 @@ export type CharacterConversionDependencies = NexonRequestDependencies & {
 
 const CACHE_SECONDS = 10 * 60;
 const SNAPSHOT_STALE_SECONDS = 6 * 60 * 60;
-export const CHARACTER_CONVERSION_CACHE_VERSION = "combat-profile-v72-sustained-cycle";
+export const CHARACTER_CONVERSION_CACHE_VERSION = "combat-profile-v73-winter-powerup";
 // 응답에서 사용하지 않는 장비 변경 전용 정보를 제거했다.
 // 이전 응답과 10분 캐시를 분리한다.
 export const CHARACTER_SNAPSHOT_CACHE_VERSION = "character-snapshot-v2";
