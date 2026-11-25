@@ -49,6 +49,11 @@ const SNAPSHOT_BUFF_REFERENCES = {
     header: "X-Continuous-Ring-Off-Reference",
     fields: { attack: "공격력", magic: "마력", bossDamage: "보공" },
   },
+  conditionalLinks: {
+    prefix: "maplestarforce:conditional-links-off:v1:",
+    header: "X-Conditional-Links-Off-Reference",
+    fields: { damage: "데미지" },
+  },
 };
 const EQUIPMENT_TOOLTIP_SUMMARY_VERSION = 12;
 const HIDDEN_CHARACTER_WARNING_PREFIXES = Object.freeze([
@@ -598,6 +603,15 @@ function dynamicCombatSummary(profile) {
         details.conditionalLinkDamage,
       ).toFixed(2)}%`,
     );
+  }
+  for (const effect of details.combatModel?.effects ?? []) {
+    if (!effect.applied) continue;
+    if (effect.kind === "special-core") {
+      parts.push(`${effect.source} 평균 데미지 +${coefficient(effect.averagedModifiers.damage)}%`);
+    }
+    if (effect.kind === "boss-symbol") {
+      parts.push(`${effect.source} Lv.${effect.metadata.level} · ${effect.metadata.targetBoss} 대상 +${coefficient(effect.averagedModifiers.bossDamage)}%`);
+    }
   }
   if (Number(details.combatOrdersSharpEyesBonus) > 0) {
     parts.push("쓸만한 컴뱃 오더스 샤프 아이즈 +1레벨");

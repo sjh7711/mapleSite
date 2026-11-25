@@ -2388,7 +2388,8 @@ test("챔피언의 가호 5레벨은 공통 풀도핑 능력치에 한 번씩 �
   assert.equal(full.dopedBaseSub - base.dopedBaseSub, 125);
   assert.equal(full.combatModel.totals.flatAttack - base.combatModel.totals.flatAttack, 400);
   assert.equal(full.combatModel.totals.attackPercent - base.combatModel.totals.attackPercent, 14);
-  assert.equal(full.combatModel.totals.bossDamage - base.combatModel.totals.bossDamage, 105);
+  assert.equal(full.combatModel.totals.bossDamage - base.combatModel.totals.bossDamage, 85);
+  assert.equal(full.combatModel.totals.damage - base.combatModel.totals.damage, 31);
   assert.equal(full.dopedCriticalDamage - base.dopedCriticalDamage, 53.5);
   assert.deepEqual(full.effectiveDopingTotals.ignoreDefenseSources, [15, 10]);
   assert.ok(Math.abs(full.dopedIgnoreDefense - 23.5) < 1e-9);
@@ -2579,7 +2580,7 @@ test("배틀메이지는 배틀 레이지와 다크 오라를 기본 전투 상�
     },
   ]);
   assert.equal(fullBoss.details.dopedCriticalDamage, 143.5);
-  assert.equal(fullBoss.details.dopedDamageTotal, 656);
+  assert.equal(fullBoss.details.dopedDamageTotal, 556);
 });
 
 test("심볼·하이퍼·HEXA를 제외한 기본 스탯을 최종 스탯에서 역산한다", () => {
@@ -2761,6 +2762,7 @@ test("레테는 기존 참조 도핑으로 기존 효율 표를 재현한다", (
         subStat: 75,
         hp: 1_500,
         bossDamage: 95,
+        damage: 111,
         criticalDamage: 43,
         ignoreDefenseSources: [15, 24],
       },

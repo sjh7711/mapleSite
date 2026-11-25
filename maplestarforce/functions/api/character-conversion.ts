@@ -21,9 +21,11 @@ import {
 } from "../_lib/nexon";
 import {
   characterTemporaryBuffs,
+  parseConditionalLinkReference,
   parseContinuousRingReference,
   parseSharpEyesReference,
   restoreContinuousRingOffStats,
+  restoreConditionalLinkOffStats,
   restoreSharpEyesOffStats,
 } from "../_lib/temporary-buffs";
 
@@ -450,7 +452,10 @@ export async function handleCharacterConversion(
     const continuousRingReference = parseContinuousRingReference(
       request.headers.get("X-Continuous-Ring-Off-Reference"),
     );
-    const hasBuffReference = Boolean(sharpEyesReference || continuousRingReference);
+    const conditionalLinkReference = parseConditionalLinkReference(
+      request.headers.get("X-Conditional-Links-Off-Reference"),
+    );
+    const hasBuffReference = Boolean(sharpEyesReference || continuousRingReference || conditionalLinkReference);
     const cacheKey = createCacheKey(request, characterName, presetPolicy);
     if (cache && !refresh && !hasBuffReference) {
       try {
@@ -527,32 +532,44 @@ export async function handleCharacterConversion(
 
     const temporaryBuffs = await characterTemporaryBuffs(envelope.data);
     const statData = envelope.data.snapshot.statData;
+    const conditionalLinkOffStatData = restoreConditionalLinkOffStats(
+      statData, temporaryBuffs.conditionalLinks, conditionalLinkReference,
+    );
+    const linkNormalizedStats = conditionalLinkOffStatData ?? statData;
+    const buffsAtLinkOff = conditionalLinkOffStatData
+      ? await characterTemporaryBuffs({
+        ...envelope.data,
+        snapshot: { ...envelope.data.snapshot, statData: linkNormalizedStats },
+      })
+      : temporaryBuffs;
     const continuousRingOffStatData = restoreContinuousRingOffStats(
-      statData,
-      temporaryBuffs.continuousRing,
+      linkNormalizedStats,
+      buffsAtLinkOff.continuousRing,
       continuousRingReference,
     );
     // 컨티 OFF로 저장했던 샤프 아이즈 기준은 컨티 수치를 복구한 뒤에도 비교한다.
     const sharpEyesAtRingOff = continuousRingOffStatData && sharpEyesReference &&
-        temporaryBuffs.sharpEyes?.basis !== sharpEyesReference.basis
+        buffsAtLinkOff.sharpEyes?.basis !== sharpEyesReference.basis
       ? (await characterTemporaryBuffs({
           ...envelope.data,
           snapshot: { ...envelope.data.snapshot, statData: continuousRingOffStatData },
         })).sharpEyes
-      : temporaryBuffs.sharpEyes;
+      : buffsAtLinkOff.sharpEyes;
     const sharpEyesOffStatData = restoreSharpEyesOffStats(
-      continuousRingOffStatData ?? statData,
+      continuousRingOffStatData ?? linkNormalizedStats,
       sharpEyesAtRingOff,
       sharpEyesReference,
     );
     const result = buildCharacterConversionFromData(
       envelope.data,
       presetPolicy,
-      sharpEyesOffStatData ?? continuousRingOffStatData,
+      sharpEyesOffStatData ?? continuousRingOffStatData ?? conditionalLinkOffStatData,
     );
     result.profiles.fullBoss.details = {
       ...result.profiles.fullBoss.details,
-      temporaryBuffs,
+      temporaryBuffs: { ...buffsAtLinkOff, conditionalLinks: temporaryBuffs.conditionalLinks },
+      conditionalLinksNormalization: Boolean(conditionalLinkOffStatData) &&
+        result.profiles.fullBoss.statModel !== "demon-avenger",
       sharpEyesNormalization: Boolean(sharpEyesOffStatData) &&
         result.profiles.fullBoss.statModel !== "demon-avenger",
       continuousRingNormalization: Boolean(continuousRingOffStatData) &&

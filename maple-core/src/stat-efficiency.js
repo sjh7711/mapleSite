@@ -13,9 +13,15 @@ import {
 } from "./combat-model.js";
 import { classBattlePracticeDamageProfile } from "./class-damage-profiles.js";
 import {
+  calculateBossItemCombatEffects,
+  renConditionalLinkDamageCoverage,
+} from "./boss-combat-effects.js";
+import {
   classSpecialRingPhaseProfile,
   specialRingBurstDamageShare,
 } from "./special-ring-phase-profiles.js";
+
+export { calculateBossItemCombatEffects };
 
 const STAT_NAMES = ["STR", "DEX", "INT", "LUK"];
 const KOREAN_STAT_NAMES = {
@@ -2133,6 +2139,7 @@ export function calculateConditionalLinkCycleBonuses(
   linkSkillData,
   buffDurationPercent = 0,
   targetLevelIsLower = false,
+  characterClass,
 ) {
   const result = {
     damage: 0,
@@ -2181,6 +2188,9 @@ export function calculateConditionalLinkCycleBonuses(
         /재(?:발동|사용) 대기시간\s*(\d+(?:\.\d+)?)초/u,
       );
       uptime = cooldown > 0 ? Math.min(1, duration / cooldown) : 0;
+      if (characterClass === "렌") {
+        uptime = renConditionalLinkDamageCoverage(name, duration, cooldown) ?? uptime;
+      }
       damage = percentFromEffect(effect, /데미지\s*(\d+(?:\.\d+)?)%\s*증가/u) * uptime;
     } else if (name === "인텐시브 인썰트" && targetLevelIsLower) {
       // 상태 이상 대상 수치는 Open API의 `상태이상 추가 데미지`에
@@ -2959,12 +2969,15 @@ function selectBossLinkPreset(
   subStats,
   attackType,
   buffDurationPercent,
+  characterClass,
 ) {
   return selectScoredPreset(candidates, activePreset, (candidate) => {
     const preset = linkPresetData(linkSkillData, candidate);
     const conditional = calculateConditionalLinkCycleBonuses(
       preset,
       buffDurationPercent,
+      false,
+      characterClass,
     );
     return presetCombatScore(
       linkSkills(preset).map((skill) => skill.skill_effect),
@@ -3323,6 +3336,8 @@ function selectJointBossPreset({
           conditionalLinks: calculateConditionalLinkCycleBonuses(
             trialSnapshot.linkSkillData,
             buffDuration,
+            false,
+            characterClass,
           ),
           statusAilmentDamage: selectedStatusAilmentDamage(
             stats["상태이상 추가 데미지"],
@@ -3447,7 +3462,7 @@ export function resolveCharacterPresetSnapshot({
         union,
         link: selectBossLinkPreset(
           linkSkillData, available.link, active.link, mainStat, subStats, attackType,
-          buffDuration,
+          buffDuration, characterClass,
         ),
         ability,
       };
@@ -4063,7 +4078,15 @@ export function calculateCharacterPotentialConversion({
   const conditionalLinks = calculateConditionalLinkCycleBonuses(
     selectedLinkSkillData,
     buffDurationPercent,
+    false,
+    character.character_class,
   );
+  const bossItemEffects = doping ? calculateBossItemCombatEffects({
+    symbolData,
+    vMatrixData,
+    targetBoss: doping.targetBoss,
+    characterClass: character.character_class,
+  }) : [];
   const guildNoblesse = calculateGuildNoblesseBonuses(guildData);
   const supplemental = mergeBonuses(
     title,
@@ -4704,6 +4727,8 @@ export function calculateCharacterPotentialConversion({
     number(classDopingAdjustment.bossDamage) +
     number(classAlwaysOnAdjustment.damage) +
     number(classAlwaysOnAdjustment.bossDamage) +
+    bossItemEffects.reduce((sum, effect) => sum + effect.uptime *
+      (effect.modifiers.damage + effect.modifiers.bossDamage), 0) +
     (doping ? conditionalLinks.damage + conditionalLinks.bossDamage : 0);
   const criticalReinforceUptime =
     doping && CRITICAL_REINFORCE_CLASSES.has(character.character_class)
@@ -4745,7 +4770,7 @@ export function calculateCharacterPotentialConversion({
     { abilityData, linkSkillData },
     { abilityData: selectedAbilityData, linkSkillData: selectedLinkSkillData },
   );
-  const combatEffects = [];
+  const combatEffects = [...bossItemEffects];
   if (doping) {
     combatEffects.push(createCombatEffect({
       layer: "general",

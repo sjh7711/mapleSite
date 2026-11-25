@@ -1,6 +1,7 @@
 import type { CharacterPotentialSnapshot, JsonObject } from "./nexon";
 import {
   calculateActiveSkillCycleBonuses,
+  calculateBossItemCombatEffects,
   calculateCombatRingBonuses,
   calculateConditionalLinkCycleBonuses,
   calculateGuildNoblesseBonuses,
@@ -756,7 +757,12 @@ function calculateXenon(
     1,
     Math.max(0, number(stats["방어율 무시"]) / 100),
   );
-  const combatEffects = [];
+  const combatEffects = input.doping ? calculateBossItemCombatEffects({
+    symbolData: snapshot.symbolData,
+    vMatrixData: snapshot.vMatrixData,
+    targetBoss: text(doping?.targetBoss),
+    characterClass: text(input.character.character_class),
+  }) : [];
   if (input.doping) {
     combatEffects.push(createCombatEffect({
       layer: "general",
