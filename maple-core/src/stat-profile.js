@@ -3,7 +3,7 @@
  * Node, Discord, DOM에 의존하지 않아 브라우저와 Worker에서도 그대로 쓴다.
  */
 
-export const CHARACTER_CONVERSION_CACHE_VERSION = "combat-profile-v88-selected-preset-sources";
+export const CHARACTER_CONVERSION_CACHE_VERSION = "combat-profile-v89-direct-stat-sources";
 
 // 넥슨 유니온 챔피언 가이드의 전투 능력치 5레벨 기준.
 // https://maplestory.nexon.com/Guide/N23GameInformation/Articles/409
@@ -26,7 +26,7 @@ export const FULL_BOSS_DOPING = {
   label: "풀도핑 (고급 무기 제련·이벤트 버프 포함)",
   targetBoss: "선택받은 세렌",
   championBlessingLevel: CHAMPION_BLESSING_LEVEL_5.level,
-  sayramElixir: true,
+  sayramCriticalDamage: 16,
   items: [
     "익스트림 레드/블루",
     "마슈르의 선물 기상 효과",
@@ -56,9 +56,9 @@ export const FULL_BOSS_DOPING = {
     // 아래 guildBaseline을 통해 캐릭터의 실제 노블레스 수치로 교체한다.
     bossDamage: 75 + CHAMPION_BLESSING_LEVEL_5.bossDamage,
     damage: 31,
-    // 노블레스 30%, 무기 제련 5%, 세이람 16%. 세이람과 샤프
-    // 아이즈 계열의 크뎀은 더 높은 효과만 적용된다.
-    criticalDamage: 30 + 5 + 16 + CHAMPION_BLESSING_LEVEL_5.criticalDamage,
+    // 노블레스 30%, 무기 제련 5%, 챔피언의 가호. 세이람/샤프는
+    // 중첩 제한이 있는 효과로 전투 조건에서 선택한다.
+    criticalDamage: 30 + 5 + CHAMPION_BLESSING_LEVEL_5.criticalDamage,
     ignoreDefense: 15,
     ignoreDefenseSources: [15, CHAMPION_BLESSING_LEVEL_5.ignoreDefense],
     // 보스 효율은 짧은 극딜 한 번이 아니라 6분 전투로 비교한다.

@@ -1,5 +1,6 @@
 import type { CharacterPotentialSnapshot, JsonObject } from "./nexon";
 import {
+  bossCriticalEffects,
   calculateActiveSkillCycleBonuses,
   calculateBossItemCombatEffects,
   calculateCombatRingBonuses,
@@ -558,7 +559,7 @@ function calculateXenon(
   const activeSnapshot = input.activeSnapshot
     ? resolvedSnapshot({ ...input, snapshot: input.activeSnapshot })
     : snapshot;
-  const buffDurationPercent = selectedBuffDurationPercent(
+  const buffDurationPercent = source?.computed["버프 지속시간"] ?? selectedBuffDurationPercent(
     stats["버프 지속시간"],
     activeSnapshot,
     snapshot,
@@ -614,6 +615,7 @@ function calculateXenon(
   ) as Record<(typeof XENON_STATS)[number], Record<string, number>>;
   const { totals, adjustment } = dopingRecords(input);
   const doping = object(input.doping);
+  const criticalBuffs = bossCriticalEffects(snapshot.skillData, doping);
   const classAlwaysOnCombat = resolveClassAlwaysOnCombatAdjustment(
     text(input.character.character_class),
     snapshot.skillData,
@@ -685,7 +687,7 @@ function calculateXenon(
     const attribute = source?.attributes[stat];
     const unreflectedValue = attribute?.fixed ?? unreflected[stat].total;
     const activeUnreflectedValue = activeUnreflected[stat].total;
-    if (!(final > activeUnreflectedValue)) {
+    if (!attribute && !(final > activeUnreflectedValue)) {
       throw new Error(`NEXON API에서 제논의 ${stat} 환산 기준을 계산하지 못했습니다.`);
     }
     const activeBase = Math.ceil(
@@ -727,7 +729,7 @@ function calculateXenon(
   if (!(statTerm > 0)) throw new Error("제논의 합스탯 환산 기준을 계산하지 못했습니다.");
 
   const apiAttack = stats["공격력"];
-  if (!(apiAttack > 0)) throw new Error("NEXON API에서 제논의 공격력을 확인하지 못했습니다.");
+  if (!sourceAttack && !(apiAttack > 0)) throw new Error("NEXON API에서 제논의 공격력을 확인하지 못했습니다.");
   const activeRawAttack = Math.ceil(apiAttack / (1 + activePercent.attack / 100));
   const activeCombat = snapshotCombatTotals(
     activeSnapshot,
@@ -744,7 +746,7 @@ function calculateXenon(
     coreBonusFlatAttack(selectedPet.selected) -
     coreBonusFlatAttack(activePet.active));
 
-  const conditionalDamage = Math.max(
+  const conditionalDamage = source?.computed["상태이상 추가 데미지"] ?? Math.max(
     0,
     number(stats["상태이상 추가 데미지"]) +
       conditionalDamageFromAbility(snapshot.abilityData) -
@@ -765,6 +767,7 @@ function calculateXenon(
     characterClass: text(input.character.character_class),
   }) : [];
   if (input.doping) {
+    combatEffects.push(...criticalBuffs.effects);
     combatEffects.push(createCombatEffect({
       layer: "general",
       source: text(object(input.doping)?.label) || "공통 보스 전투 기준",
@@ -1012,6 +1015,12 @@ function calculateXenon(
       damageTotal,
       dopedCriticalDamage,
       dopedIgnoreDefense,
+      effectiveDopingTotals: input.doping ? {
+        ...totals,
+        damage: number(totals.damage) + guildDifference.damage,
+        bossDamage: number(totals.bossDamage) + guildDifference.bossDamage,
+        criticalDamage: number(totals.criticalDamage) + guildDifference.criticalDamage + criticalBuffs.criticalDamage,
+      } : null,
       targetDefenseRemaining: combatModel.targetDefenseRemaining,
       combatModel,
       classDamageProfile,

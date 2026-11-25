@@ -438,7 +438,7 @@ test("환산 계약 버전으로 이전 단일 부스탯 캐시와 키를 분리
     versionedUrl.searchParams.get("conversionVersion"),
     characterConversionCacheVersion,
   );
-  assert.equal(characterConversionCacheVersion, "combat-profile-v88-selected-preset-sources");
+  assert.equal(characterConversionCacheVersion, "combat-profile-v89-direct-stat-sources");
   const freshSnapshotKey = createSnapshotCacheKey(request, "테스트", "fresh");
   const staleSnapshotKey = createSnapshotCacheKey(request, "테스트", "stale");
   assert.equal(characterSnapshotCacheVersion, "character-snapshot-v4");
@@ -509,7 +509,7 @@ test("프리셋 쿼리를 검증하고 정책 전체를 캐시 키에서 분리�
   );
 });
 
-test("출처 합산과 API로 오라 웨폰·쓸만한 샤프 아이즈·컨티 중복을 자동 확인한다", async () => {
+test("활성 API 버프와 별개로 공통 출처를 합산하고 보스 조건을 한 번 적용한다", async () => {
   const active = {
     STR: 1312, DEX: 214, 데미지: 54, 공격력: 2120, 마력: 710,
     "방어율 무시": 77.32, "최종 데미지": 27.2, "보스 몬스터 데미지": 175,
@@ -575,7 +575,7 @@ test("출처 합산과 API로 오라 웨폰·쓸만한 샤프 아이즈·컨티 
             petite_luna_pet_skill: isBow ? [luna] : [],
           });
         }
-        if (apiPath.endsWith("/propensity")) return Response.json({ charisma_level: 100 });
+        if (apiPath.endsWith("/propensity")) return Response.json({ charisma_level: 100, sensibility_level: 100 });
         if (apiPath.endsWith("/skill") && isBow) {
           const grade = request.searchParams.get("character_skill_grade");
           if (grade === "0") payload.character_skill = [luna];
@@ -662,35 +662,42 @@ test("출처 합산과 API로 오라 웨폰·쓸만한 샤프 아이즈·컨티 
   };
 
   const off = await fetchConversion(buffsOff);
-  const on = await fetchConversion(active);
+  const on = await fetchConversion({
+    ...active,
+    "버프 지속시간": 999,
+    "상태이상 추가 데미지": 90,
+  });
   assert.deepEqual(on.fullBoss.details.registeredPetSkills, ["오라 웨폰", "쓸만한 샤프 아이즈"]);
   const checks = Object.fromEntries(on.fullBoss.details.statVerification.map((row) => [row.name, row]));
-  assert.deepEqual(checks.STR, { name: "STR", calculated: 1312, api: 1312, matched: true, buff: null });
-  assert.equal(checks["방어율 무시"].buff, "오라 웨폰");
-  assert.equal(checks["최종 데미지"].buff, "오라 웨폰");
-  assert.equal(checks["크리티컬 데미지"].buff, "쓸만한 샤프 아이즈");
-  assert.equal(checks["보스 몬스터 데미지"].buff, "컨티뉴어스 링");
-  assert.deepEqual(checks.데미지, { name: "데미지", calculated: 33, api: 54, matched: false, buff: null });
-  assert.equal(on.base.details.currentBossDamage, 175);
+  assert.deepEqual(checks.STR, { name: "STR", calculated: 1312, api: 1312, matched: true });
+  assert.deepEqual(checks.데미지, { name: "데미지", calculated: 33, api: 54, matched: false });
+  assert.equal(checks["방어율 무시"].matched, false);
+  assert.equal(checks["최종 데미지"].matched, false);
+  assert.equal(checks["크리티컬 데미지"].matched, false);
+  assert.equal(checks["보스 몬스터 데미지"].matched, false);
+  assert.equal(checks["버프 지속시간"].calculated, 10);
+  assert.equal(checks["상태이상 추가 데미지"].calculated, 0);
+  assert.equal(on.base.details.currentBossDamage, 130);
   assert.equal(on.fullBoss.details.currentBossDamage, 130);
-  assert.equal(on.fullBoss.details.currentDamage, 54);
-  assert.equal(on.fullBoss.details.currentIgnoreDefense, off.fullBoss.details.currentIgnoreDefense);
-  assert.equal(on.fullBoss.details.dopedCriticalRate, off.fullBoss.details.dopedCriticalRate);
-  assert.equal(on.fullBoss.statEquivalence.ied40Against380ToMainPercent,
-    off.fullBoss.statEquivalence.ied40Against380ToMainPercent);
+  assert.equal(on.fullBoss.details.currentDamage, 33);
+  assert.equal(on.fullBoss.details.currentCriticalRate, 95);
+  assert.equal(on.fullBoss.details.dopedCriticalRate, 105);
+  assert.deepEqual(on.base.statEquivalence, off.base.statEquivalence);
+  assert.deepEqual(on.fullBoss.statEquivalence, off.fullBoss.statEquivalence);
 
-  const different = await fetchConversion({ ...active, 마력: 720, "크리티컬 확률": 106, "최종 데미지": 26 });
-  assert.equal(different.fullBoss.details.currentBossDamage, 175);
-  assert.equal(different.fullBoss.details.currentCriticalRate, 106);
-  assert.equal(different.fullBoss.details.currentIgnoreDefense, 77.32);
+  const applied = (profile, name) => profile.details.combatModel.effects
+    .filter((effect) => effect.source === name && effect.applied);
+  assert.equal(applied(on.base, "오라 웨폰").length, 0);
+  assert.equal(applied(on.fullBoss, "오라 웨폰").length, 1);
+  assert.deepEqual(applied(on.fullBoss, "오라 웨폰")[0].averagedModifiers.ignoreDefenseSources, [16]);
+  assert.equal(applied(on.fullBoss, "컨티뉴어스 링").length, 1);
+  assert.equal(applied(on.fullBoss, "쓸만한 샤프 아이즈")[0].averagedModifiers.criticalRate, 10);
+  assert.equal(applied(on.fullBoss, "쓸만한 샤프 아이즈")[0].averagedModifiers.criticalDamage, 0);
+  assert.equal(applied(on.fullBoss, "세이람의 영약")[0].averagedModifiers.criticalDamage, 16);
 
-  for (const [observed, calculated] of [[33, 33], [41, 41], [54, 33]]) {
-    const conversion = await fetchConversion({ ...buffsOff, 데미지: observed }, "렌", true);
-    const damage = conversion.fullBoss.details.statVerification.find(({ name }) => name === "데미지");
-    assert.equal(damage.calculated, calculated);
-    assert.equal(damage.matched, observed === calculated);
-    assert.equal(conversion.fullBoss.details.currentDamage, observed);
-  }
+  const covenant = await fetchConversion({ ...buffsOff, 데미지: 41 }, "렌", true);
+  assert.equal(covenant.fullBoss.details.currentDamage, 33);
+  assert.equal(covenant.fullBoss.details.statVerification.find(({ name }) => name === "데미지").matched, false);
 
   const bow = await fetchConversion({
     ...buffsOff,
@@ -700,35 +707,25 @@ test("출처 합산과 API로 오라 웨폰·쓸만한 샤프 아이즈·컨티 
     "크리티컬 확률": 120,
     "크리티컬 데미지": 121.6,
   }, "보우마스터");
-  for (const name of ["공격력", "마력", "DEX", "최종 데미지", "방어율 무시", "크리티컬 확률", "크리티컬 데미지"]) {
-    assert.equal(bow.fullBoss.details.statVerification.find((row) => row.name === name).matched, true, name);
-  }
-  assert.equal(bow.fullBoss.details.includedNativeSharpEyesDamage, 15);
+  assert.equal(bow.fullBoss.details.currentCriticalRate, 95);
   assert.equal(bow.fullBoss.details.dopedCriticalRate, 120);
-  assert.equal(bow.fullBoss.details.usefulSharpEyesCriticalRateBonus, 0);
+  assert.equal(applied(bow.fullBoss, "샤프 아이즈").length, 1);
+  assert.equal(applied(bow.fullBoss, "쓸만한 샤프 아이즈").length, 0);
 
   const diceEffect = (profile) => profile.details.activeSkillCycles
     .find(({ name }) => name === "로디드 다이스");
   const diceReading = { ...buffsOff, 공격력: 2080, LUK: 383, "AP 배분 LUK": 300 };
   const xenon = await fetchConversion({ ...diceReading, 데미지: 53 }, "제논");
-  const xenonChecks = Object.fromEntries(xenon.fullBoss.details.statVerification.map((row) => [row.name, row]));
-  assert.equal(xenonChecks.LUK.matched, true);
-  assert.equal(xenonChecks.데미지.buff, "럭키 다이스 5");
-  assert.equal(xenon.fullBoss.details.loadedDiceSnapshotState, "included");
   assert.equal(diceEffect(xenon.fullBoss).damage, 20);
   const xenonBase = await fetchConversion(diceReading, "제논");
-  assert.equal(xenonBase.fullBoss.details.loadedDiceSnapshotState, "base-matched");
   assert.deepEqual(xenon.fullBoss.statEquivalence, xenonBase.fullBoss.statEquivalence);
 
   const viper = await fetchConversion({ ...diceReading, "방어율 무시": 78.4 }, "바이퍼");
-  const ied = viper.fullBoss.details.statVerification.find(({ name }) => name === "방어율 무시");
-  assert.equal(ied.buff, "럭키 다이스 7");
   assert.equal(viper.fullBoss.details.currentIgnoreDefense, 73);
   assert.equal(diceEffect(viper.fullBoss).damage, 30);
-  const viperUnknown = await fetchConversion({ ...diceReading, 데미지: 49 }, "바이퍼");
-  assert.equal(viperUnknown.fullBoss.details.loadedDiceSnapshotState, "unresolved");
-  assert.equal(viperUnknown.fullBoss.details.currentDamage, 49);
-  assert.equal(diceEffect(viperUnknown.fullBoss), undefined);
+  const viperOtherReading = await fetchConversion({ ...diceReading, 데미지: 49 }, "바이퍼");
+  assert.equal(viperOtherReading.fullBoss.details.currentDamage, 33);
+  assert.deepEqual(viperOtherReading.fullBoss.statEquivalence, viper.fullBoss.statEquivalence);
 });
 
 test("manual 정책을 적용하고 선택 장비의 환산 요약만 응답한다", async () => {
@@ -844,7 +841,7 @@ test("보스 프리셋을 고르면 활성 사냥 스탯의 버프와 별개로 
   const clean = await getConversion(0);
   const hunting = await getConversion(30);
   assert.deepEqual(hunting.profiles.fullBoss.statEquivalence, clean.profiles.fullBoss.statEquivalence);
-  assert.notEqual(hunting.profiles.base.details.currentDamage, clean.profiles.base.details.currentDamage);
+  assert.deepEqual(hunting.profiles.base.statEquivalence, clean.profiles.base.statEquivalence);
   const { details } = hunting.profiles.fullBoss;
   assert.equal(details.selectedStatTotals.데미지, 5);
   assert.equal(details.currentDamage, 5);
@@ -1872,7 +1869,7 @@ test("윈터 파워업과 중첩 이벤트를 표시하고 기본 보공을 중�
       [...commonPassives].sort());
     assert.ok(entries.every(({ includedInBaseline }) => includedInBaseline));
   }
-  assert.equal(body.profiles.base.details.currentBossDamage, 300);
   // 출처로 제공된 장비 보공 80과 이벤트 보공 80을 한 번씩 합산한다.
+  assert.equal(body.profiles.base.details.currentBossDamage, 160);
   assert.equal(body.profiles.fullBoss.details.currentBossDamage, 160);
 });
