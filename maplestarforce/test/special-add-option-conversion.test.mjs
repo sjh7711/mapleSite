@@ -105,6 +105,37 @@ test("제논은 STR·DEX·LUK를 모두 쓰고 INT·HP·마력은 제외한다",
   assert.ok(Math.abs(full.dopedIgnoreDefense - 0.4186) < 1e-12);
 });
 
+test("제논은 패치 시점의 HEXA, 공격대원 스탯, 하이브리드 로직을 세 주스탯에 적용한다", () => {
+  const snapshot = emptySnapshot({ STR: 2_244, DEX: 2_206, LUK: 2_206, 공격력: 1_000 });
+  snapshot.linkSkillData.character_owned_link_skill = {
+    skill_name: "하이브리드 로직",
+    skill_effect: "모든 능력치 10% 증가",
+  };
+  snapshot.hexaStatData = {
+    date: "2026-09-17",
+    character_hexa_stat_core: [{ main_stat_name: "주력 스탯 증가", main_stat_level: 9 }],
+  };
+  snapshot.unionRaiderData = {
+    union_raider_stat: ["ALLSTAT 50, 최대 HP 2500 증가"],
+    union_state_stat: ["STR 35 증가"],
+  };
+  const input = { character: { character_class: "제논" }, snapshot, statModel: "xenon" };
+  const { details } = calculateSpecialAddOptionConversion(input);
+  assert.deepEqual(details.base, { STR: 1_035, DEX: 1_000, LUK: 1_000 });
+  assert.deepEqual(details.statPercent, { STR: 10, DEX: 10, LUK: 10 });
+  assert.equal(details.unreflected.STR.hexa, 1_056);
+  assert.equal(details.unreflected.STR.union, 50);
+
+  const historical = structuredClone(input);
+  historical.snapshot.hexaStatData.date = "2026-09-16";
+  historical.snapshot.statData.final_stat.slice(0, 3).forEach((stat) => {
+    stat.stat_value = String(Number(stat.stat_value) - 288);
+  });
+  const previous = calculateSpecialAddOptionConversion(historical).details;
+  assert.equal(previous.unreflected.STR.hexa, 768);
+  assert.deepEqual(previous.base, details.base);
+});
+
 test("제논도 공통 기준·공용 스킬·직업 스킬·대상 효과 파이프라인을 쓴다", () => {
   const snapshot = emptySnapshot({
     STR: 1_000,
