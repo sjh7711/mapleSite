@@ -115,6 +115,40 @@ test("공통 패시브를 한 번씩 합산하고 HEXA 공격력과 마력을 �
   assert.deepEqual(reconstructCharacterStats({ ...input, snapshot: { ...snapshot, petEquipmentData: {} } }).computed, computed);
 });
 
+test("VI 강화 후 유지되는 전역 패시브와 파이렛 블레스를 출처에서 합산한다", () => {
+  const skill = (skill_name, skill_effect) => ({ skill_name, skill_level: 30, skill_effect });
+  const cases = [
+    ["레테", "임펠", "최종 데미지 15% 증가", "", 15, 0],
+    ["루미너스", "트와일라잇 노바", "최종 데미지 37% 증가, 보스 공격 시 데미지 15% 증가", "", 37, 15],
+    ["섀도어", "크루얼 스탭", "최종 데미지 22% 증가", "암살 VI 데미지 100%p 증가", 22, 0],
+    ["캐논마스터", "몽키 퓨리어스", "데미지 40% 증가", "데미지 15% 증가", 0, 0],
+  ];
+  for (const [characterClass, name, base, enhanced, finalDamage, bossDamage] of cases) {
+    const snapshot = {
+      statData: statData({ "AP 배분 LUK": 4 }),
+      equipmentData: { item_equipment: [{ item_equipment_slot: "무기" }] },
+      skillData: [
+        { character_skill_grade: "4", character_skill: [skill(name, `[패시브 효과 : ${base}]`)] },
+        { character_skill_grade: "6", character_skill: [
+          skill(`${name} VI`, enhanced ? `[패시브 효과 : ${enhanced}]` : "MP 80 소비"),
+        ] },
+      ],
+      linkSkillData: {
+        character_link_skill: [skill("파이렛 블레스", "힘 70, 민첩 70, 지력 70, 운 70 증가")],
+        character_owned_link_skill: skill("커버넌트", "소환수 소환 시 데미지 8% 증가"),
+      },
+    };
+    const { computed, summonedLinkDamage } = reconstructCharacterStats({
+      character: { character_class: characterClass }, snapshot, mainStat: "LUK",
+    });
+    assert.equal(computed.LUK, 74, name);
+    assert.ok(Math.abs(computed["최종 데미지"] - finalDamage) < 1e-9, name);
+    assert.equal(computed["보스 몬스터 데미지"], bossDamage, name);
+    assert.equal(computed.데미지, characterClass === "캐논마스터" ? 15 : 0, name);
+    assert.equal(summonedLinkDamage, 8, name);
+  }
+});
+
 test("직접 방무와 설명에 표시된 오리진 강화 방무를 해당 스킬에만 적용한다", () => {
   const channels = skillLocalIgnoreDefenseChannelsFromSkills([{
     character_skill_grade: "6",

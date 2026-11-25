@@ -226,7 +226,7 @@ function parseSetEffects(setEffectData) {
 function parseTextBonuses(texts) {
   const result = emptyBonuses();
   for (const rawText of texts.filter(Boolean)) {
-    const text = String(rawText);
+    const text = String(rawText).replace(/(^|[,\n]\s*)운(?=\s*\d)/gu, "$1행운");
     for (const match of text.matchAll(
       /(?:올스탯|ALLSTAT|(?:^|[,\n])\s*모든\s*능력치)(?:가|이)?\s*:?\s*\+?\s*(\d+(?:\.\d+)?)\s*(%)?/g,
     )) {
@@ -526,7 +526,7 @@ function normalizedSpecialRingName(value) {
     .replace(/\s*-\s*/gu, " - ");
 }
 
-function allCharacterSkills(skillData) {
+function allCharacterSkills(skillData, retainStatPassives = false) {
   const skills = (skillData ?? []).flatMap(
     (grade) => grade.character_skill ?? [],
   ).filter((skill) => skill?.skill_level == null || number(skill.skill_level) > 0);
@@ -542,6 +542,8 @@ function allCharacterSkills(skillData) {
   return skills.filter((skill) => {
     const name = String(skill?.skill_name ?? "").trim();
     return isSixthMasterySkillName(name) ||
+      (retainStatPassives && RETAINED_BASE_STAT_PASSIVES.has(name) &&
+        /\[패시브 효과\s*:/u.test(String(skill.skill_effect ?? ""))) ||
       !viBaseNames.has(withoutSixthMasteryMarker(name));
   });
 }
@@ -3905,6 +3907,8 @@ const STAT_WINDOW_CONDITIONAL_SKILLS = new Set([
   "샤프 아이즈-크리티컬 레이트", "샤프 아이즈-이그노어 가드",
 ]);
 const MUTUALLY_EXCLUSIVE_BLESSINGS = new Set(["정령의 축복", "여제의 축복"]);
+// These base passives remain in the stat window after learning the VI skill.
+const RETAINED_BASE_STAT_PASSIVES = new Set(["임펠", "트와일라잇 노바", "크루얼 스탭"]);
 const GLOBAL_REVERSE_DEFENSE_SKILLS = new Set([
   "마크맨쉽", "컴뱃 마스터리", "어드밴스드 차지 마스터리",
   "디펜스 브레이크", "가드 크러쉬", "언포시어블", "언플리칭 커리지",
@@ -3914,6 +3918,7 @@ const GLOBAL_REVERSE_DEFENSE_SKILLS = new Set([
 function normalizeStatWindowText(value) {
   return value.trim()
     .replace(STAT_WINDOW_PERMANENT_LEAD, "")
+    .replace(/보스 공격 시 데미지/gu, "보스 몬스터 공격 시 데미지")
     .replace(/민첩성/g, "민첩")
     .replace(/지능/g, "지력");
 }
@@ -3923,7 +3928,7 @@ function statWindowSkillTexts(skillData, equipmentData, petEquipmentData, active
     /^(?:5|6|ascent)$/iu.test(String(character_skill_grade))).flatMap(({ character_skill }) =>
     character_skill ?? []));
   const unique = new Map();
-  for (const skill of allCharacterSkills(skillData)) {
+  for (const skill of allCharacterSkills(skillData, true)) {
     const previous = unique.get(skill.skill_name);
     if (!previous || number(skill.skill_level) > number(previous.skill_level)) {
       unique.set(skill.skill_name, skill);
@@ -3983,7 +3988,7 @@ function guildPassiveBonuses(guildData) {
   const effects = (guildData?.guild_skill ?? []).flatMap(({ skill_name, skill_level, skill_effect }) =>
     number(skill_level) > 0 &&
     /^길드의 노하우\s*(?:I|II|IV|V|VI)$/u.test(String(skill_name).normalize("NFKC"))
-      ? [normalizeStatWindowText(String(skill_effect ?? "")).replace(/(^|,\s*)운(?=\s*\d)/gu, "$1행운")]
+      ? [normalizeStatWindowText(String(skill_effect ?? ""))]
       : []);
   return parseTextBonuses(effects);
 }
@@ -4022,7 +4027,11 @@ export function reconstructCharacterStats({ character, snapshot, mainStat, activ
       set.total_set_count == null || number(entry.set_count) <= number(set.total_set_count)),
   }));
   const skillTexts = statWindowSkillTexts(skillData, equipmentData, petEquipmentData, activeSkillNames);
-  const linkTexts = linkSkills(linkSkillData).map(({ skill_effect }) => skill_effect)
+  const equippedLinks = linkSkills(linkSkillData);
+  const summonedLinkDamage = Math.max(0, ...equippedLinks.flatMap(({ skill_name, skill_effect }) =>
+    skill_name === "커버넌트" ? [number(String(skill_effect ?? "")
+      .match(/소환수 소환 시 데미지\s*(\d+(?:\.\d+)?)%\s*증가/u)?.[1])] : []));
+  const linkTexts = equippedLinks.map(({ skill_effect }) => skill_effect)
     .filter((text) => text &&
       !/\d+\s*초|공격하면|상태 이상|파티원|적에게|약점|재발동|재사용|공격할 때|소환 시|전투 상태/u.test(text));
   const abilityTexts = (abilityData?.ability_info ?? []).map(({ ability_value }) => ability_value)
@@ -4098,7 +4107,7 @@ export function reconstructCharacterStats({ character, snapshot, mainStat, activ
         unreflected.main - unreflected.hexaMain + statHexa;
     }
   }
-  return { computed, attack };
+  return { computed, attack, summonedLinkDamage };
 }
 
 function ensurePositive(value, label) {

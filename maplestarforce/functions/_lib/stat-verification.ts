@@ -60,6 +60,10 @@ export function verifyCharacterStats(
     }
   }
   const computed = source?.computed ?? {};
+  if (source && source.summonedLinkDamage > 0) {
+    const withSummon = computed["데미지"] + source.summonedLinkDamage;
+    if (agrees("데미지", withSummon, observed["데미지"])) computed["데미지"] = withSummon;
+  }
   const verified: StatValues = {};
   const buffs = new Map<string, string>();
   const knownBuff = (predicted: StatValues) => {
