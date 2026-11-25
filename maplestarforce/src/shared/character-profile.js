@@ -617,12 +617,11 @@ export function baselineSkillSummary(skill) {
   return `${skill.name}${parts.length ? ` (${parts.join(", ")})` : ""}`;
 }
 
-function statVerificationDetails(rows) {
-  if (!Array.isArray(rows) || !rows.length) return null;
+function characterStatTable(columns, rows) {
   const table = element("table", "profile-stat-verification__table");
   const head = element("thead");
   const header = element("tr");
-  for (const label of ["스탯", "출처 합산", "API", "확인 결과"]) {
+  for (const label of columns) {
     const cell = element("th", "", label);
     cell.scope = "col";
     header.append(cell);
@@ -630,31 +629,57 @@ function statVerificationDetails(rows) {
   head.append(header);
   table.append(head);
   const body = element("tbody");
-  for (const { name, calculated, api, buff, matched } of rows) {
+  for (const [name, ...values] of rows) {
     const row = element("tr");
     const label = element("th", "", name);
     label.scope = "row";
-    const suffix = /^(?:STR|DEX|INT|LUK|HP|공격력|마력)$/u.test(name) ? "" : "%";
-    const digits = suffix ? 2 : 0;
-    const value = (amount) => `${coefficient(amount, digits)}${suffix}`;
-    const delta = api - calculated;
-    const deltaText = `${delta > 0 ? "+" : ""}${coefficient(delta, digits)}${suffix ? "%p" : ""}`;
-    const status = buff ? `${buff} 중복 보정`
-      : calculated === null ? "자료 부족" : matched ? "일치" : `차이 ${deltaText}`;
-    row.append(label,
-      element("td", "", calculated === null ? "—" : value(calculated)),
-      element("td", "", value(api)),
-      element("td", "", status));
+    row.append(label, ...values.map((value) => element("td", "", value)));
     body.append(row);
   }
   table.append(body);
+  return table;
+}
+
+function formatCharacterStat(name, amount, difference = false) {
+  const percent = !/^(?:STR|DEX|INT|LUK|HP|공격력|마력)$/u.test(name);
+  const prefix = difference && amount > 0 ? "+" : "";
+  return `${prefix}${coefficient(amount, percent ? 2 : 0)}${percent ? (difference ? "%p" : "%") : ""}`;
+}
+
+function selectedPresetStatDetails(totals) {
+  if (!totals || typeof totals !== "object") return null;
+  const rows = Object.entries(totals).filter(([, value]) => Number.isFinite(value))
+    .map(([name, value]) => [name, formatCharacterStat(name, value)]);
+  if (!rows.length) return null;
+  const panel = element("details", "profile-stat-verification");
+  panel.append(
+    element("summary", "", "선택 프리셋 출처 합산"),
+    element("p", "profile-doping__class", "선택한 프리셋의 도핑 적용 전 수치입니다."),
+    characterStatTable(["스탯", "선택 프리셋"], rows),
+  );
+  return panel;
+}
+
+function statVerificationDetails(rows) {
+  if (!Array.isArray(rows) || !rows.length) return null;
+  const values = rows.map(({ name, calculated, api, buff, matched }) => {
+    const status = buff ? `${buff} 중복 보정`
+      : calculated === null ? "자료 부족" : matched ? "일치"
+        : `차이 ${formatCharacterStat(name, api - calculated, true)}`;
+    return [
+      name,
+      calculated === null ? "—" : formatCharacterStat(name, calculated),
+      formatCharacterStat(name, api),
+      status,
+    ];
+  });
   const panel = element("details", "profile-stat-verification");
   const verified = rows.filter(({ matched, buff }) => matched || buff).length;
   panel.append(
     element("summary", "", `API 스탯 검증 · ${verified}/${rows.length}개 확인`),
     element("p", "profile-doping__class",
-      "현재 활성 프리셋의 공개 출처를 합산합니다. 차이를 확인할 수 없는 항목은 API값을 사용합니다."),
-    table,
+      "현재 활성 프리셋의 출처 합산과 넥슨 API를 비교합니다."),
+    characterStatTable(["스탯", "출처 합산", "API", "확인 결과"], values),
   );
   return panel;
 }
@@ -677,6 +702,8 @@ function fullBossDopingDetails(profile, conventionalAddOption, collapsed = false
     content.append(element("p", "profile-doping__class",
       `펫 자동버프 등록 · ${petSkills.join(" · ")}`));
   }
+  const selectedStats = selectedPresetStatDetails(profile.details?.selectedStatTotals);
+  if (selectedStats) content.append(selectedStats);
   const verification = statVerificationDetails(profile.details?.statVerification);
   if (verification) content.append(verification);
   if (profile.details?.loadedDiceSnapshotState === "unresolved") {

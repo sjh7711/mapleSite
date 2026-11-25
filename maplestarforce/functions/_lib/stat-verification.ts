@@ -3,6 +3,7 @@ import {
   calculateCombatRingBonuses,
   loadedDiceOutcomes,
   reconstructCharacterStats,
+  type PresetPolicy,
 } from "maple-core/stat-efficiency";
 import type { CharacterPotentialData, JsonObject } from "./nexon";
 
@@ -11,6 +12,15 @@ const DEFAULT_SHARP_EYES = { rate: 20, damage: 15 };
 
 type StatRow = { stat_name: string; stat_value: string };
 type StatValues = Record<string, number>;
+
+export function statDataWithValues(statData: JsonObject, values?: StatValues) {
+  if (!values || !Array.isArray(statData.final_stat)) return statData;
+  return {
+    ...statData,
+    final_stat: (statData.final_stat as StatRow[]).map((row) => Object.hasOwn(values, row.stat_name)
+      ? { ...row, stat_value: String(values[row.stat_name]) } : row),
+  };
+}
 
 function agrees(name: string, computed: number, observed: number) {
   // NEXON displays fractional combat stats to two decimals, and final
@@ -30,6 +40,49 @@ function sharpEyesEffect(text: string) {
   return match ? { rate: Number(match[1]), damage: Number(match[2]) } : null;
 }
 
+function learnedSkillEffects(snapshot: CharacterPotentialData["snapshot"]) {
+  return (snapshot.skillData ?? []).flatMap((grade) =>
+    Array.isArray(grade.character_skill) ? grade.character_skill as JsonObject[] : [])
+    .filter((skill) => Number(skill.skill_level) > 0);
+}
+
+export function reconstructBossPresetStats(
+  data: CharacterPotentialData,
+  mainStat: string,
+  attackType: "attack" | "magic",
+  presetMode: PresetPolicy["mode"],
+) {
+  const { character, snapshot } = data;
+  const source = reconstructCharacterStats({
+    character, snapshot, mainStat, attackType, presetMode,
+    activeSkillNames: ["익스트림 아쳐리 : 활", "익스트림 아쳐리 : 석궁"],
+  });
+  if (!source) return { source, includedNativeSharpEyesDamage: null };
+
+  // Lete maintains their own summons in a boss fight. An equipped Covenant
+  // on another class does not establish that the summon condition is met.
+  if (character.character_class === "레테") source.computed["데미지"] += source.summonedLinkDamage;
+
+  const learnedSkills = learnedSkillEffects(snapshot);
+  const effect = (name: string) => String(
+    learnedSkills.find(({ skill_name }) => skill_name === name)?.skill_effect ?? "",
+  );
+  const sharpEyes = sharpEyesEffect(effect("샤프 아이즈"));
+  if (!sharpEyes) return { source, includedNativeSharpEyesDamage: null };
+
+  // For the selected boss build, use the learned native buff and its Hyper
+  // enhancements independently of the current character's buff uptime.
+  const hyperRate = Number(effect("샤프 아이즈-크리티컬 레이트")
+    .match(/크리티컬 확률\s*(\d+)%/u)?.[1]) || 0;
+  const hyperIed = Number(effect("샤프 아이즈-이그노어 가드")
+    .match(/방어율 무시 효과\s*(\d+)%/u)?.[1]) || 0;
+  source.computed["크리티컬 확률"] += sharpEyes.rate + hyperRate;
+  source.computed["크리티컬 데미지"] += sharpEyes.damage;
+  source.computed["방어율 무시"] = 100 -
+    (100 - source.computed["방어율 무시"]) * (1 - hyperIed / 100);
+  return { source, includedNativeSharpEyesDamage: sharpEyes.damage };
+}
+
 export function verifyCharacterStats(
   data: CharacterPotentialData,
   mainStat?: string,
@@ -45,9 +98,7 @@ export function verifyCharacterStats(
   }));
   const input = { character, snapshot, mainStat };
   let source = reconstructCharacterStats(input);
-  const learnedSkills = (snapshot.skillData ?? []).flatMap((grade) =>
-    Array.isArray(grade.character_skill) ? grade.character_skill as JsonObject[] : [])
-    .filter((skill) => Number(skill.skill_level) > 0);
+  const learnedSkills = learnedSkillEffects(snapshot);
   const skill = (name: string) =>
     learnedSkills.find(({ skill_name }) => skill_name === name);
   const skillEffect = (name: string) => String(skill(name)?.skill_effect ?? "");
@@ -208,10 +259,6 @@ export function verifyCharacterStats(
       buff: buffs.get(name) ?? null,
       matched: Object.hasOwn(verified, name) && !buffs.has(name),
     }));
-  const statData = {
-    ...original,
-    final_stat: rows.map((row) => Object.hasOwn(verified, row.stat_name)
-      ? { ...row, stat_value: String(verified[row.stat_name]) } : row),
-  };
+  const statData = statDataWithValues(original, verified);
   return { stats: statData, comparison, registeredPetSkills, diceState, includedNativeSharpEyesDamage };
 }

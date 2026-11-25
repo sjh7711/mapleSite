@@ -25,7 +25,11 @@ import {
   type NexonRequestDependencies,
 } from "./nexon";
 import { NEXON_ATTRIBUTION } from "./http";
-import { verifyCharacterStats } from "./stat-verification";
+import {
+  reconstructBossPresetStats,
+  statDataWithValues,
+  verifyCharacterStats,
+} from "./stat-verification";
 import {
   calculateSpecialAddOptionConversion,
   type SpecialAddOptionConversionResult,
@@ -1035,6 +1039,9 @@ export function buildCharacterConversionFromData(
   const fullBossStatData = model === "demon-avenger"
     ? snapshot.statData
     : verification.stats;
+  const rankingStats = presetPolicy.mode === "auto" && model !== "demon-avenger"
+    ? reconstructBossPresetStats(data, inferredProfile.mainStat, inferredProfile.attackType, "active")
+    : null;
 
   const subStats = [
     ...new Set(
@@ -1060,14 +1067,17 @@ export function buildCharacterConversionFromData(
   try {
     resolvedPresets = resolveCharacterPresetSnapshot({
       ...snapshot,
-      statData: fullBossStatData,
+      statData: statDataWithValues(fullBossStatData, rankingStats?.source?.computed),
       mainStat: inferredProfile.mainStat,
       subStats,
       attackType: inferredProfile.attackType,
       characterLevel: characterLevel(character),
       characterClass: className,
       presetPolicy,
-      includedNativeSharpEyesDamage: verification.includedNativeSharpEyesDamage,
+      includedNativeSharpEyesDamage: rankingStats?.source
+        ? rankingStats.includedNativeSharpEyesDamage
+        : verification.includedNativeSharpEyesDamage,
+      includeUsefulSharpEyes: Boolean(rankingStats?.source),
     });
   } catch (error) {
     throw new ConversionUnavailableError(
@@ -1085,6 +1095,15 @@ export function buildCharacterConversionFromData(
     ...resolvedPresets.selectedSnapshot,
     statData: fullBossStatData,
   };
+  const selectedStats = presetPolicy.mode === "active" || model === "demon-avenger"
+    ? null
+    : reconstructBossPresetStats(
+        { character, snapshot: selectedPresetSnapshot },
+        inferredProfile.mainStat,
+        inferredProfile.attackType,
+        presetPolicy.mode,
+      );
+  const selectedStatSources = selectedStats?.source ?? null;
   const basePresetSelection: PresetSelection = {
     ...resolvedPresets.selection,
     mode: "active",
@@ -1118,10 +1137,13 @@ export function buildCharacterConversionFromData(
         ...calculationInput,
         statData: fullBossStatData,
         doping: FULL_BOSS_DOPING,
-        includeLoadedDice: verification.diceState !== "unresolved",
-        includedNativeSharpEyesDamage: verification.includedNativeSharpEyesDamage,
+        includeLoadedDice: selectedStatSources !== null || verification.diceState !== "unresolved",
+        includedNativeSharpEyesDamage: selectedStats?.source
+          ? selectedStats.includedNativeSharpEyesDamage
+          : verification.includedNativeSharpEyesDamage,
         presetPolicy,
         resolvedPresetSnapshot: resolvedPresets,
+        selectedStatSources,
       });
     } catch {
       throw new ConversionUnavailableError(
@@ -1182,7 +1204,8 @@ export function buildCharacterConversionFromData(
         presetSelection: resolvedPresets.selection,
         statModel: model,
         doping: FULL_BOSS_DOPING,
-        includeLoadedDice: verification.diceState !== "unresolved",
+        includeLoadedDice: selectedStatSources !== null || verification.diceState !== "unresolved",
+        selectedStatSources,
       });
     } catch {
       throw new ConversionUnavailableError(
@@ -1245,6 +1268,7 @@ export function buildCharacterConversionFromData(
   }
   profiles.fullBoss.details = {
     ...profiles.fullBoss.details,
+    selectedStatTotals: selectedStatSources?.computed ?? null,
     statVerification: verification.comparison,
     registeredPetSkills: verification.registeredPetSkills,
     loadedDiceSnapshotState: verification.diceState,

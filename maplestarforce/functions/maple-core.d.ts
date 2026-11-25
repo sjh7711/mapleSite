@@ -35,16 +35,20 @@ declare module "maple-core/stat-efficiency" {
   export function linkSkillBonuses(data: Record<string, unknown>): Record<string, unknown>;
   export function unionAllocatedStat(data: Record<string, unknown>, stat: string): number;
   export function unionUnreflectedStat(data: Record<string, unknown>, stat: string): number;
+  export type CharacterStatSources = {
+    computed: Record<string, number>;
+    attack: Record<"공격력" | "마력", { flat: number; percent: number }>;
+    attributes: Partial<Record<string, { base: number; percent: number; fixed: number }>>;
+    summonedLinkDamage: number;
+  };
   export function reconstructCharacterStats(data: {
     character: Record<string, unknown>;
     snapshot: Record<string, unknown>;
     mainStat?: string;
     activeSkillNames?: string[];
-  }): {
-    computed: Record<string, number>;
-    attack: Record<"공격력" | "마력", { flat: number; percent: number }>;
-    summonedLinkDamage: number;
-  } | null;
+    presetMode?: PresetPolicy["mode"];
+    attackType?: "attack" | "magic";
+  }): CharacterStatSources | null;
   export function equipmentSoulOptionLines(item: Record<string, unknown>): string[];
   export function characterBaselineSkillSummary(
     skillData: Array<Record<string, unknown>>,
