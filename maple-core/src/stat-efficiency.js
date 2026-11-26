@@ -14,6 +14,7 @@ import {
   targetDefenseEffectsFromSkills,
 } from "./combat-model.js";
 import { classBattlePracticeDamageProfile } from "./class-damage-profiles.js";
+import { effectiveSkillCooldown, skillCooldown } from "./combat-cooldown.js";
 import { ABILITY_PASSIVE_LEVEL_EFFECTS } from "./ability-passive-level-effects.js";
 import { knownEquipmentSetOptions } from "./equipment-set-options.js";
 import {
@@ -180,6 +181,34 @@ function equipmentOptionLines(equipmentData, characterClass = "") {
     }
     return lines;
   });
+}
+
+export function resolveCombatCooldownReduction(
+  statData,
+  equipmentData,
+  unionRaiderData,
+  characterClass = "",
+) {
+  const stats = finalStats(statData ?? {});
+  const equipmentSeconds = Array.isArray(equipmentData?.item_equipment)
+    ? equipmentOptionLines(equipmentData, characterClass).reduce((sum, line) =>
+      sum + percentFromEffect(
+        line,
+        /^(?:(?:모든\s*)?스킬(?:의)?\s*)?재사용 대기시간\s*-\s*(\d+(?:\.\d+)?)초/u,
+      ), 0)
+    : stats["재사용 대기시간 감소 (초)"];
+  // 공격대원 효과는 배치 프리셋을 바꿔도 유지된다.
+  const unionPercent = Array.isArray(unionRaiderData?.union_raider_stat)
+    ? unionRaiderData.union_raider_stat.reduce((sum, line) =>
+      sum + percentFromEffect(
+        line,
+        /^스킬 재사용 대기시간\s*(\d+(?:\.\d+)?)%\s*감소$/u,
+      ), 0)
+    : stats["재사용 대기시간 감소 (%)"];
+  return {
+    equipmentSeconds: Math.max(0, number(equipmentSeconds)),
+    unionPercent: Math.max(0, number(unionPercent)),
+  };
 }
 
 function parseEquipmentOptions(lines, characterLevel) {
@@ -1110,10 +1139,7 @@ function grandisGoddessEvent({
   attackType,
 }) {
   const duration = percentFromEffect(effect, /(\d+(?:\.\d+)?)초 동안 지속/u);
-  const cooldown = percentFromEffect(
-    effect,
-    /재사용 대기시간\s*:?\s*(\d+(?:\.\d+)?)초/u,
-  );
+  const cooldown = skillCooldown(effect);
   const modifiers = emptyCycleModifiers();
   const race = GRANDIS_NOVA_CLASSES.has(characterClass) ? "노바"
     : GRANDIS_LEF_CLASSES.has(characterClass) ? "레프"
@@ -1196,10 +1222,7 @@ function specialCycleEvents({
 }) {
   const name = String(skill?.skill_name ?? "").trim();
   const effect = String(skill?.skill_effect ?? "");
-  const cooldown = percentFromEffect(
-    effect,
-    /재사용 대기시간\s*:?\s*(\d+(?:\.\d+)?)초/u,
-  );
+  const cooldown = skillCooldown(effect);
 
   if (name === "그란디스 여신의 축복") {
     const event = grandisGoddessEvent({
@@ -1609,6 +1632,7 @@ export function calculateActiveSkillCycleBonuses(
     loadedDiceRolls,
     collectorCoverage = null,
     includeHowling = true,
+    cooldownReduction,
   } = {},
 ) {
   const result = {
@@ -1665,7 +1689,10 @@ export function calculateActiveSkillCycleBonuses(
     });
     if (specialEvents !== null) {
       for (const event of specialEvents) {
-        addCycleEvent(result, event, combatDuration);
+        addCycleEvent(result, {
+          ...event,
+          cooldown: effectiveSkillCooldown(skill, event.cooldown, cooldownReduction),
+        }, combatDuration);
       }
       continue;
     }
@@ -1707,10 +1734,7 @@ export function calculateActiveSkillCycleBonuses(
 
     if (!VERIFIED_TIMED_SELF_BUFF_SKILLS.has(name)) continue;
     const duration = percentFromEffect(effect, /(\d+(?:\.\d+)?)초 동안/u);
-    const cooldown = percentFromEffect(
-      effect,
-      /재사용 대기시간\s*:?\s*(\d+(?:\.\d+)?)초/u,
-    );
+    const cooldown = effectiveSkillCooldown(skill, skillCooldown(effect), cooldownReduction);
     if (!(duration > 0) || !(cooldown > 0)) continue;
     const modifiers = directCycleSkillModifiers(effect, attackType);
     const goddessMultiplier = percentFromEffect(
@@ -1842,6 +1866,7 @@ export function calculateCombatRingBonuses(
   attackType,
   combatDuration,
   characterClass = null,
+  cooldownReduction,
 ) {
   const result = {
     ...emptyBonuses(),
@@ -1888,9 +1913,10 @@ export function calculateCombatRingBonuses(
         effect,
         /(\d+(?:\.\d+)?)초 동안/u,
       );
-      cooldown = number(configured?.cooldown) || percentFromEffect(
-        effect,
-        /재사용 대기시간\s*(\d+(?:\.\d+)?)초/u,
+      cooldown = effectiveSkillCooldown(
+        skill,
+        number(configured?.cooldown) || skillCooldown(effect),
+        cooldownReduction,
       );
       timeUptime = activeRingUptime(duration, cooldown, combatDuration);
       damageCoverage = specialRingBurstDamageShare(
@@ -2246,14 +2272,12 @@ export function bossDopingTotals(doping, skillData, attackType, hasSourceSum) {
   return result;
 }
 
-function skillAverageUptime(skillData, skillName, fallback = 0) {
-  const effect = String(learnedSkill(skillData, skillName)?.skill_effect ?? "");
+function skillAverageUptime(skillData, skillName, fallback = 0, cooldownReduction) {
+  const skill = learnedSkill(skillData, skillName);
+  const effect = String(skill?.skill_effect ?? "");
   if (!effect) return 0;
   const duration = percentFromEffect(effect, /(\d+(?:\.\d+)?)초 동안/u);
-  const cooldown = percentFromEffect(
-    effect,
-    /재사용 대기시간\s*(\d+(?:\.\d+)?)초/u,
-  );
+  const cooldown = effectiveSkillCooldown(skill, skillCooldown(effect), cooldownReduction);
   return duration > 0 && cooldown > 0
     ? Math.min(1, duration / cooldown)
     : fallback;
@@ -2263,28 +2287,64 @@ function criticalReinforceDamage(criticalRate, uptime) {
   return Math.max(0, criticalRate) * 0.5 * uptime;
 }
 
-function cycleEventActive(event, elapsed) {
+function cycleEventActive(event, elapsed, cooldown = number(event?.cooldown)) {
+  if (event?.activationMode === "boss-entry-maintained") return true;
   const preparation = number(event?.preparation);
   if (preparation > 0) return elapsed >= preparation;
   const offset = number(event?.offset);
   const shiftedElapsed = elapsed - offset;
   if (shiftedElapsed < 0) return false;
   const duration = number(event?.duration);
-  const cooldown = number(event?.cooldown);
   if (!(duration > 0)) return false;
   if (!(cooldown > 0)) return shiftedElapsed < duration;
   return shiftedElapsed % cooldown < duration;
 }
 
-function weightedCriticalReinforceUptime({
+function bowmasterOriginHits(skillData, combatDuration, burstCooldown) {
+  const name = "어센던트 셰이드";
+  const effect = String(learnedSkill(skillData, name)?.skill_effect ?? "");
+  const cooldown = skillCooldown(effect);
+  const initial = effect.match(/(\d+(?:\.\d+)?)%의 데미지로\s*(\d+)번 공격하는 화살 세례가\s*(\d+)회/u);
+  const followUp = effect.match(
+    /화살 세례 후\s*(\d+)초 동안.*?\s*(\d+)초\s*마다.*?(\d+(?:\.\d+)?)%의 데미지로\s*(\d+)번 공격하는 화살 세례\s*(\d+)회/u,
+  );
+  const share = classBattlePracticeDamageProfile("보우마스터")
+    ?.skillShares.find((skill) => skill.source === name)?.weight ?? 0;
+  if (!initial || !followUp || !(cooldown > 0) || !(share > 0 && share < 1)) return [];
+
+  const [, initialDamage, initialLines, initialCount] = initial.map(number);
+  const [, duration, interval, followUpDamage, followUpLines, followUpCount] = followUp.map(number);
+  const initialPower = initialDamage * initialLines * initialCount;
+  const followUpPower = followUpDamage * followUpLines * followUpCount;
+  if (!(interval > 0) || !(initialPower + followUpPower > 0)) return [];
+  const power = initialPower + followUpPower * Math.floor(duration / interval);
+  const damageSeconds = Math.min(cooldown, combatDuration) * share / (1 - share);
+  const hits = [];
+  // 연무장 시전 순서에서 오리진은 보통 첫 리레 직후에 온다.
+  // 스킬 자체 피해는 첫 타격과 이후 주기 타격으로 나누어 겹치는 버프를 확인한다.
+  const originInterval = Math.ceil(cooldown / burstCooldown) * burstCooldown;
+  for (let cast = 1; cast < combatDuration; cast += originInterval) {
+    hits.push({ elapsed: cast, seconds: damageSeconds * initialPower / power });
+    for (let delay = interval; delay <= duration && cast + delay < combatDuration; delay += interval) {
+      hits.push({ elapsed: cast + delay, seconds: damageSeconds * followUpPower / power });
+    }
+  }
+  return hits;
+}
+
+function weightedBurstCoverage({
   skillData,
   activeSkillCycle,
   combatRing,
   combatDuration,
+  cooldownReduction,
+  characterClass,
   attackType,
   baseAttackPercent,
   baseFlatAttack,
   baseDamageTotal,
+  baseCriticalDamage,
+  criticalRate,
   baseStatTerm,
   mainStat,
   subStats,
@@ -2294,23 +2354,47 @@ function weightedCriticalReinforceUptime({
   const skill = learnedSkill(skillData, "크리티컬 리인포스");
   const effect = String(skill?.skill_effect ?? "");
   const duration = percentFromEffect(effect, /(\d+(?:\.\d+)?)초 동안/u);
-  const cooldown = percentFromEffect(
-    effect,
-    /재사용 대기시간\s*:?\s*(\d+(?:\.\d+)?)초/u,
-  );
-  if (!(duration > 0) || !(cooldown > 0) || !(combatDuration > 0)) return 0;
+  const cooldown = effectiveSkillCooldown(skill, skillCooldown(effect), cooldownReduction);
+  if (!(duration > 0) || !(cooldown > 0) || !(combatDuration > 0)) return null;
+
+  const skillEvents = activeSkillCycle?.applied ?? [];
+  const ringEvents = combatRing?.applied ?? [];
+  const quiver = characterClass === "보우마스터"
+    ? skillEvents.find((event) => event.name === "퀴버 풀버스트" && event.cooldown > 0)
+    : null;
+  const restraint = quiver
+    ? ringEvents.find((event) => event.name === "리스트레인트 링" && event.cooldown > 0)
+    : null;
+  const burstCooldown = Math.max(cooldown, quiver?.cooldown ?? 0, restraint?.cooldown ?? 0);
+  const reinforce = { duration, cooldown: burstCooldown };
+  const usesBurstCooldown = (event) => event === quiver || event === restraint;
+  const boundaries = new Set([0, combatDuration]);
+  for (const event of [...skillEvents, ...ringEvents, reinforce]) {
+    if (!event.duration || event.activationMode === "boss-entry-maintained") continue;
+    const interval = (usesBurstCooldown(event) ? burstCooldown : event.cooldown) || combatDuration;
+    for (let start = event.offset ?? 0; start < combatDuration; start += interval) {
+      boundaries.add(start);
+      boundaries.add(Math.min(combatDuration, start + event.duration));
+    }
+  }
+  const times = [...boundaries].sort((a, b) => a - b);
 
   let totalWeight = 0;
   let activeWeight = 0;
-  const step = Math.min(1, combatDuration);
-  for (let elapsed = step / 2; elapsed < combatDuration; elapsed += step) {
+  let attackWeightTotal = 0;
+  let quiverAttackWeight = 0;
+  let restraintAttackWeight = 0;
+  function weighSegment(elapsed, seconds) {
     let attackPercentBonus = 0;
     let flatAttackBonus = 0;
     let damageBonus = 0;
     let statTermBonus = 0;
     let finalDamageMultiplier = 1;
-    for (const event of activeSkillCycle?.applied ?? []) {
-      if (!cycleEventActive(event, elapsed)) continue;
+    let quiverActive = false;
+    let restraintActive = false;
+    for (const event of skillEvents) {
+      if (!cycleEventActive(event, elapsed, usesBurstCooldown(event) ? burstCooldown : undefined)) continue;
+      if (event === quiver) quiverActive = true;
       attackPercentBonus += number(event.attackPercent);
       flatAttackBonus += number(event.flatAttack);
       damageBonus += number(event.damage) + number(event.bossDamage);
@@ -2325,8 +2409,9 @@ function weightedCriticalReinforceUptime({
           0,
         );
     }
-    for (const event of combatRing?.applied ?? []) {
-      if (!cycleEventActive(event, elapsed)) continue;
+    for (const event of ringEvents) {
+      if (!cycleEventActive(event, elapsed, usesBurstCooldown(event) ? burstCooldown : undefined)) continue;
+      if (event === restraint) restraintActive = true;
       attackPercentBonus += attackType === "magic"
         ? number(event.magicPercent)
         : number(event.attackPercent);
@@ -2347,16 +2432,38 @@ function weightedCriticalReinforceUptime({
       Math.max(1, 100 + baseDamageTotal);
     const statWeight = (baseStatTerm + statTermBonus) /
       Math.max(1, baseStatTerm);
-    const weight =
-      attackWeight *
+    const otherWeight =
+      seconds *
       flatAttackWeight *
       damageWeight *
       statWeight *
       finalDamageMultiplier;
-    totalWeight += weight;
-    if (elapsed % cooldown < duration) activeWeight += weight;
+    const reinforceActive = cycleEventActive(reinforce, elapsed);
+    totalWeight += otherWeight * attackWeight;
+    if (reinforceActive) activeWeight += otherWeight * attackWeight;
+    if (quiver) {
+      const criticalWeight = 1 + (reinforceActive
+        ? criticalReinforceDamage(criticalRate, 1) / Math.max(1, 135 + baseCriticalDamage)
+        : 0);
+      // 공격력%의 한계 가치를 구할 때 공격력% 자체는 가중치에서 제외한다.
+      const weight = otherWeight * criticalWeight;
+      attackWeightTotal += weight;
+      if (quiverActive) quiverAttackWeight += weight;
+      if (restraintActive) restraintAttackWeight += weight;
+    }
   }
-  return totalWeight > 0 ? activeWeight / totalWeight : duration / cooldown;
+  for (let i = 1; i < times.length; i++) {
+    weighSegment((times[i - 1] + times[i]) / 2, times[i] - times[i - 1]);
+  }
+  const originHits = quiver ? bowmasterOriginHits(skillData, combatDuration, burstCooldown) : [];
+  for (const { elapsed, seconds } of originHits) weighSegment(elapsed, seconds);
+  return {
+    reinforceUptime: totalWeight > 0 ? activeWeight / totalWeight : duration / burstCooldown,
+    quiverAttackUptime: attackWeightTotal > 0 ? quiverAttackWeight / attackWeightTotal : null,
+    restraintAttackUptime: attackWeightTotal > 0 ? restraintAttackWeight / attackWeightTotal : null,
+    burstCooldown,
+    originFirstCast: originHits[0]?.elapsed ?? null,
+  };
 }
 
 export function linkSkillBonuses(linkSkillData) {
@@ -2409,6 +2516,7 @@ export function calculateConditionalLinkCycleBonuses(
   targetLevelIsLower = false,
   characterClass,
   maintainsSummon = false,
+  cooldownReduction,
 ) {
   const result = {
     damage: 0,
@@ -2452,13 +2560,17 @@ export function calculateConditionalLinkCycleBonuses(
       const duration = name === "소울 컨트랙트"
         ? baseDuration * (1 + Math.max(0, number(buffDurationPercent)) / 100)
         : baseDuration;
-      const cooldown = percentFromEffect(
-        effect,
-        /재(?:발동|사용) 대기시간\s*(\d+(?:\.\d+)?)초/u,
-      );
+      // 시프 커닝과 프라이어 프리퍼레이션은 자동 발동 간격이다.
+      const baseCooldown = name === "소울 컨트랙트"
+        ? skillCooldown(effect)
+        : percentFromEffect(effect, /재(?:발동|사용) 대기시간\s*(\d+(?:\.\d+)?)초/u);
+      const cooldown = name === "소울 컨트랙트"
+        ? effectiveSkillCooldown(skill, baseCooldown, cooldownReduction)
+        : baseCooldown;
       uptime = cooldown > 0 ? Math.min(1, duration / cooldown) : 0;
-      if (characterClass === "렌") {
-        uptime = renConditionalLinkDamageCoverage(name, duration, cooldown) ?? uptime;
+      if (characterClass === "렌" && cooldown > 0) {
+        const damageCoverage = renConditionalLinkDamageCoverage(name, duration, baseCooldown);
+        if (damageCoverage !== null) uptime = Math.min(1, damageCoverage * baseCooldown / cooldown);
       }
       damage = percentFromEffect(effect, /데미지\s*(\d+(?:\.\d+)?)%\s*증가/u) * uptime;
     } else if (name === "인텐시브 인썰트" && targetLevelIsLower) {
@@ -3749,11 +3861,8 @@ function selectJointBossPreset({
   }
   // 일반 크리티컬 확률은 100%에서 포화되지만 크리티컬 리인포스는
   // 초과분을 포함한다. 자동 선택에서는 스킬의 시간 가동률로 근사한다.
-  const criticalReinforceUptime = CRITICAL_REINFORCE_CLASSES.has(characterClass)
-    ? skillAverageUptime(skillData, "크리티컬 리인포스", 30 / 120)
-    : 0;
-  const criticalReinforceExtraRate = criticalReinforceUptime > 0 &&
-    !includeBossCriticalBuffs
+  const hasCriticalReinforce = CRITICAL_REINFORCE_CLASSES.has(characterClass);
+  const criticalReinforceExtraRate = hasCriticalReinforce && !includeBossCriticalBuffs
     ? sharpEyesHyperCriticalRate(skillData) +
       (criticalBuff.name === "쓸만한 샤프 아이즈" ? criticalBuff.criticalRate : 0)
     : 0;
@@ -3773,6 +3882,15 @@ function selectJointBossPreset({
       orderedPresetCandidates(available[component], active[component]),
     ]),
   );
+  const cooldownByEquipment = new Map(choices.equipment.map((candidate) => [
+    candidate,
+    resolveCombatCooldownReduction(
+      statData,
+      equipmentPresetData(data.equipmentData, candidate),
+      data.unionRaiderData,
+      characterClass,
+    ),
+  ]));
   const componentVectors = Object.fromEntries(
     PRESET_COMPONENTS.map((component) => [
       component,
@@ -3831,6 +3949,7 @@ function selectJointBossPreset({
           data,
           trialSnapshot,
         ) + passiveCombat.buffDuration;
+        const cooldownReduction = cooldownByEquipment.get(trial.equipment);
         const score = jointBossPresetScore({
           stats,
           activeVector,
@@ -3844,6 +3963,7 @@ function selectJointBossPreset({
             false,
             characterClass,
             maintainsSummon,
+            cooldownReduction,
           ),
           passiveCombat,
           statusAilmentDamage: selectedStatusAilmentDamage(
@@ -3852,7 +3972,9 @@ function selectJointBossPreset({
             trialSnapshot,
           ),
           externalCriticalRate,
-          criticalReinforceUptime,
+          criticalReinforceUptime: hasCriticalReinforce
+            ? skillAverageUptime(skillData, "크리티컬 리인포스", 30 / 120, cooldownReduction)
+            : 0,
           criticalReinforceExtraRate,
           dopingTotals,
         });
@@ -4730,6 +4852,12 @@ export function calculateCharacterPotentialConversion({
   const classAlwaysOnAdjustment = classAlwaysOnCombat.adjustment;
   const activeEquipmentData = equipmentData;
   const selectedEquipmentData = resolvedPresets.selectedSnapshot.equipmentData;
+  const cooldownReduction = resolveCombatCooldownReduction(
+    statData,
+    selectedEquipmentData,
+    selectedUnionRaiderData,
+    character.character_class,
+  );
   const activeEquipmentOptions = parseEquipmentOptions(
     equipmentOptionLines(activeEquipmentData, character.character_class),
     characterLevel,
@@ -4767,6 +4895,7 @@ export function calculateCharacterPotentialConversion({
     attackType,
     combatDurationSeconds,
     character.character_class,
+    cooldownReduction,
   );
   const conditionalLinks = calculateConditionalLinkCycleBonuses(
     selectedLinkSkillData,
@@ -4775,6 +4904,7 @@ export function calculateCharacterPotentialConversion({
     character.character_class,
     !selectedStatSources?.maintainedCovenantDamage &&
       maintainsBossSummon(selectedSkillData, character.character_class),
+    cooldownReduction,
   );
   const bossItemEffects = doping ? calculateBossItemCombatEffects({
     symbolData,
@@ -4824,6 +4954,7 @@ export function calculateCharacterPotentialConversion({
       loadedDiceRolls: doping?.loadedDiceRolls,
       collectorCoverage: doping?.collectorCoverage,
       includeHowling: doping?.sayramCoverage == null,
+      cooldownReduction,
     },
   );
   const enumeratedBaseMain = ensurePositive(
@@ -5318,11 +5449,6 @@ export function calculateCharacterPotentialConversion({
     4 * dopedMain +
     Object.values(dopedSubs).reduce((sum, value) => sum + value, 0);
 
-  const combatRingAttackPercent = doping && includeEquippedRing
-    ? attackType === "magic"
-      ? combatRing.magicPercent
-      : combatRing.attackPercent
-    : 0;
   const combatRingBossDamage =
     doping && includeEquippedRing ? combatRing.bossDamage : 0;
   const criticalDamageBeforeReinforce =
@@ -5381,28 +5507,63 @@ export function calculateCharacterPotentialConversion({
       (effect.modifiers.damage + effect.modifiers.bossDamage), 0) +
     (doping ? conditionalLinks.damage + conditionalLinks.bossDamage : 0) +
     (wildHunter ? wildHunter.modifiers.damage * wildHunter.uptime : 0);
-  const criticalReinforceUptime =
+  const burstCoverage =
     doping && CRITICAL_REINFORCE_CLASSES.has(character.character_class)
-      ? weightedCriticalReinforceUptime({
+      ? weightedBurstCoverage({
           skillData: selectedSkillData,
           activeSkillCycle,
-          combatRing,
+          combatRing: includeEquippedRing ? combatRing : null,
           combatDuration: combatDurationSeconds,
+          cooldownReduction,
+          characterClass: character.character_class,
           attackType,
           baseAttackPercent: baseCycleAttackPercent,
           baseFlatAttack: baseCycleFlatAttack,
           baseDamageTotal: baseCycleDamageTotal,
+          baseCriticalDamage: criticalDamageBeforeReinforce,
+          criticalRate: dopedCriticalRate,
           baseStatTerm: baseCycleStatTerm,
           mainStat,
           subStats: resolvedSubStats,
           mainPercent,
           subPercents,
-        }) || skillAverageUptime(
+        })
+      : null;
+  const criticalReinforceUptime =
+    doping && CRITICAL_REINFORCE_CLASSES.has(character.character_class)
+      ? burstCoverage?.reinforceUptime ?? skillAverageUptime(
           selectedSkillData,
           "크리티컬 리인포스",
           30 / 120,
+          cooldownReduction,
         )
       : 0;
+  const quiver = burstCoverage?.quiverAttackUptime != null
+    ? activeSkillCycle.applied.find((event) => event.name === "퀴버 풀버스트")
+    : null;
+  if (quiver) {
+    quiver.attackPercentUptime = burstCoverage.quiverAttackUptime;
+    activeSkillCycle.attackPercent += quiver.attackPercent * (quiver.attackPercentUptime - quiver.uptime);
+  }
+  const restraint = quiver && includeEquippedRing
+    ? combatRing.applied.find((ring) => ring.name === "리스트레인트 링")
+    : null;
+  if (restraint && burstCoverage.restraintAttackUptime != null) {
+    restraint.uptime = burstCoverage.restraintAttackUptime;
+    restraint.timeUptime = activeRingUptime(restraint.duration, burstCoverage.burstCooldown, combatDurationSeconds);
+    restraint.damageCoverage = null;
+    restraint.activationMode = "boss-burst-attack-weighted";
+    restraint.phaseProfileId = null;
+    combatRing.attackPercent += restraint.attackPercent * restraint.uptime - restraint.averageAttackPercent;
+    combatRing.magicPercent += restraint.magicPercent * restraint.uptime - restraint.averageMagicPercent;
+    restraint.averageAttackPercent = restraint.attackPercent * restraint.uptime;
+    restraint.averageMagicPercent = restraint.magicPercent * restraint.uptime;
+  }
+  const combatRingAttackPercent = doping && includeEquippedRing
+    ? attackType === "magic"
+      ? combatRing.magicPercent
+      : combatRing.attackPercent
+    : 0;
   const criticalReinforceAverageCriticalDamage =
     dopedCriticalRate === null
       ? 0
@@ -5498,7 +5659,8 @@ export function calculateCharacterPotentialConversion({
         sourceKey: `special-ring:${ring.slot}:${normalizedSpecialRingName(ring.name)}`,
         activation: {
           mode: ring.activationMode,
-          evidence: ring.phaseProfileId
+          evidence: ring === restraint ? "weighted-skill-cycle"
+            : ring.phaseProfileId
             ? "battle-practice-ring-timeline"
             : "equipped-special-ring",
         },
@@ -5540,7 +5702,9 @@ export function calculateCharacterPotentialConversion({
         uptime: event.uptime,
         modifiers: {
           flatAttack: event.flatAttack,
-          attackPercent: event.attackPercent,
+          attackPercent: event.attackPercentUptime == null
+            ? event.attackPercent
+            : event.attackPercent * event.attackPercentUptime / event.uptime,
           damage: event.damage,
           bossDamage: event.bossDamage,
           criticalRate: event.criticalRate,
@@ -5550,6 +5714,7 @@ export function calculateCharacterPotentialConversion({
         metadata: {
           duration: event.duration,
           cooldown: event.cooldown,
+          attackPercentUptime: event.attackPercentUptime,
           highPoint: event.highPoint,
           enhancement: event.enhancement,
           phase: event.phase ?? null,
@@ -5573,7 +5738,7 @@ export function calculateCharacterPotentialConversion({
       metadata: { sources: conditionalLinks.applied.map(({ name }) => name) },
     }));
     combatEffects.push(
-      ...targetDefenseEffectsFromSkills(selectedSkillData),
+      ...targetDefenseEffectsFromSkills(selectedSkillData, cooldownReduction),
     );
   }
   combatEffects.push(createCombatEffect({
@@ -5886,6 +6051,11 @@ export function calculateCharacterPotentialConversion({
       },
       targetDefenseRemaining,
       combatDurationSeconds,
+      cooldownReduction,
+      bowmasterBurstTiming: quiver ? {
+        intervalSeconds: burstCoverage.burstCooldown,
+        originFirstCastSeconds: burstCoverage.originFirstCast,
+      } : null,
       mapleWarriorPercent,
       equipmentAllStatPercent,
       titleFlatMain: title.flat[mainStat],

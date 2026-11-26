@@ -184,6 +184,15 @@ declare module "maple-core/stat-efficiency" {
     learnedSkillSources: string[];
   };
 
+  type CombatCooldownReduction = { equipmentSeconds: number; unionPercent: number };
+
+  export function resolveCombatCooldownReduction(
+    statData: Record<string, unknown>,
+    equipmentData: Record<string, unknown>,
+    unionRaiderData: Record<string, unknown>,
+    characterClass?: string,
+  ): CombatCooldownReduction;
+
   export function calculateCombatRingBonuses(
     equipmentData: Record<string, unknown>,
     ringReserveData: Record<string, unknown>,
@@ -191,6 +200,7 @@ declare module "maple-core/stat-efficiency" {
     attackType: "attack" | "magic",
     combatDuration: number,
     characterClass?: string | null,
+    cooldownReduction?: CombatCooldownReduction,
   ): {
     flat: Record<string, number>;
     attackPercent: number;
@@ -249,6 +259,7 @@ declare module "maple-core/stat-efficiency" {
     targetLevelIsLower?: boolean,
     characterClass?: string,
     maintainsSummon?: boolean,
+    cooldownReduction?: CombatCooldownReduction,
   ): {
     damage: number;
     bossDamage: number;

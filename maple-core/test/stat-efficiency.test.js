@@ -20,6 +20,7 @@ import {
   calculateIgnoreDefenseEquivalent,
   reconstructCharacterStats,
   resolveClassDamageChannels,
+  resolveCombatCooldownReduction,
   resolveCharacterExternalBonuses,
   resolveCharacterPresetSnapshot,
 } from "maple-core/stat-efficiency";
@@ -1860,6 +1861,42 @@ test("5차·하이퍼 액티브의 직접 버프를 6분 가동률로 환산한�
   );
 });
 
+test("장비·유니온 쿨감은 초기화 불가 스킬에 적용하고 쿨감 불가 스킬은 건너뛴다", () => {
+  const stats = statData({
+    "재사용 대기시간 감소 (초)": 4,
+    "재사용 대기시간 감소 (%)": 5,
+  });
+  const reduction = resolveCombatCooldownReduction(stats, {
+    item_equipment: [{ potential_option_1: "스킬 재사용 대기시간 -2초" }],
+  }, { union_raider_stat: ["스킬 재사용 대기시간 6% 감소"] });
+  assert.deepEqual(reduction, { equipmentSeconds: 2, unionPercent: 6 });
+  assert.deepEqual(resolveCombatCooldownReduction(stats), { equipmentSeconds: 4, unionPercent: 5 });
+  const skills = [{ character_skill: [
+    {
+      skill_name: "퀴버 풀버스트",
+      skill_description: "재사용 대기시간 초기화의 효과를 받지 않는다.",
+      skill_effect: "40초 동안 공격력 20% 증가, 재사용 대기시간 2초 마다 효과 발동\n재사용 대기시간 120초",
+    },
+    {
+      skill_name: "애로우 레인",
+      skill_description: "재사용 대기시간 감소 효과가 적용되지 않는다.",
+      skill_effect: "70초 동안 데미지 30% 증가\n재사용 대기시간 120초",
+    },
+    {
+      skill_name: "다크 서스트",
+      skill_effect: "5초 동안 데미지 10% 증가\n재사용 대기시간 10초",
+    },
+  ] }];
+
+  const { applied } = calculateActiveSkillCycleBonuses(skills, "attack", 360, {
+    cooldownReduction: reduction,
+  });
+  assert.equal(applied[0].cooldown, 110.8);
+  assert.ok(Math.abs(applied[0].uptime - 0.41) < 1e-9);
+  assert.equal(applied[1].cooldown, 120);
+  assert.ok(Math.abs(applied[2].cooldown - 8.46) < 1e-9);
+});
+
 test("전투 효과 모델은 기준 상태·공용 효과·직업 효과·대상 효과를 한 경로로 합성한다", () => {
   const result = composeCombatModel({
     baseline: {
@@ -2798,6 +2835,7 @@ function criticalRateConversion(
   criticalRate,
   skillData,
   doping = FULL_BOSS_DOPING,
+  overrides = {},
 ) {
   return calculateCharacterPotentialConversion({
     character: { character_level: 280, character_class: characterClass },
@@ -2818,8 +2856,66 @@ function criticalRateConversion(
     equipmentData: { item_equipment: [] },
     setEffectData: { set_effect: [] },
     skillData,
+    ...overrides,
   });
 }
+
+test("보스 프리셋의 모자 쿨감으로 보우마스터의 리레·오리진 극딜을 계산한다", () => {
+  const farmingHat = { item_equipment_slot: "모자", item_name: "사냥용 모자" };
+  const equipmentData = {
+    preset_no: 1,
+    item_equipment: [farmingHat],
+    item_equipment_preset_1: [farmingHat],
+    item_equipment_preset_2: [
+      { item_equipment_slot: "모자", item_name: "보스용 모자", potential_option_1: "스킬 재사용 대기시간 -2초" },
+      { item_equipment_slot: "반지4", item_name: "리스트레인트 링", special_ring_level: 4 },
+    ],
+  };
+  const origin = {
+    skill_name: "어센던트 셰이드",
+    skill_effect: "897%의 데미지로 14번 공격하는 화살 세례가 39회 발생\n" +
+      "마지막 화살 세례 후 30초 동안 공격 적중 시 3초 마다 최대 15명의 적을 971%의 데미지로 8번 공격하는 화살 세례 7회 발동\n" +
+      "재사용 대기시간 360초",
+  };
+  const generalSkills = [
+    { skill_name: "크리티컬 리인포스", skill_effect: "30초 동안 크리티컬 데미지 증가\n재사용 대기시간 120초" },
+    { skill_name: "퀴버 풀버스트", skill_effect: "40초 동안 최종 데미지 15%, 공격력 20% 증가\n재사용 대기시간 120초" },
+  ];
+  const calculate = (character_skill) => criticalRateConversion(
+    "보우마스터",
+    150,
+    [{ character_skill }],
+    FULL_BOSS_DOPING,
+    {
+      equipmentData,
+      hyperStatData: {
+        use_preset_no: 1,
+        hyper_stat_preset_1: [{ stat_type: "DEX", stat_level: 1, stat_increase: "DEX 30 증가" }],
+      },
+      unionRaiderData: {
+        use_preset_no: 1,
+        union_raider_stat: ["스킬 재사용 대기시간 6% 감소"],
+        union_state_stat_preset: [{ preset_no: 1, union_state_stat: ["크리티컬 확률 1% 증가"] }],
+      },
+      linkSkillData: {
+        character_link_skill_preset_1: [{ skill_name: "테스트 링크", skill_level: 1 }],
+      },
+      abilityData: {
+        preset_no: 1,
+        ability_preset_1: { ability_info: [{ ability_value: "공격력 1 증가" }] },
+      },
+      presetPolicy: { mode: "manual", manual: { equipment: 2, hyper: 1, union: 1, link: 1, ability: 1 } },
+    },
+  ).details;
+
+  const withoutOrigin = calculate(generalSkills);
+  const withOrigin = calculate([...generalSkills, origin]);
+  assert.deepEqual(withOrigin.cooldownReduction, { equipmentSeconds: 2, unionPercent: 6 });
+  assert.deepEqual(withOrigin.bowmasterBurstTiming, { intervalSeconds: 110.8, originFirstCastSeconds: 1 });
+  assert.equal(withOrigin.combatRings[0].timeUptime, 60 / 360);
+  assert.ok(withOrigin.combatRings[0].uptime > withoutOrigin.combatRings[0].uptime);
+  assert.ok(withOrigin.criticalReinforceUptime > withoutOrigin.criticalReinforceUptime);
+});
 
 test("챔피언의 가호 5레벨은 공통 풀도핑 능력치에 한 번씩 합산된다", () => {
   const base = criticalRateConversion("히어로", 80, undefined, null).details;
