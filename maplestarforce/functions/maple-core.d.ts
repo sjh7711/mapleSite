@@ -253,13 +253,26 @@ declare module "maple-core/stat-efficiency" {
     unionRaiderData: Record<string, unknown>,
   ): ReturnType<typeof import("maple-core/combat-model").createCombatEffect> | null;
 
+  export function calculateCombatReuse(input: Record<string, unknown>): {
+    percent: number;
+    weightMultipliers: Map<string, number>;
+    damageMultiplier: number;
+    sources: Array<{ source: string; skill: string; referencePercent: number; multiplier: number }>;
+  };
+
+  export function resolveClassDamageChannels(input: Record<string, unknown>): Array<{
+    source: string;
+    weight: number;
+    ignoreDefenseSources: number[];
+  }>;
+
   export function calculateConditionalLinkCycleBonuses(
     linkSkillData: Record<string, unknown>,
     buffDurationPercent?: number,
     targetLevelIsLower?: boolean,
     characterClass?: string,
     maintainsSummon?: boolean,
-    cooldownReduction?: CombatCooldownReduction,
+    combatDuration?: number,
   ): {
     damage: number;
     bossDamage: number;

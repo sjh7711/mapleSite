@@ -1033,7 +1033,8 @@ function bossPresetPower(
   const defenseFactor = fullDefenseGain > 0
     ? 1 / (1 + fullDefenseGain)
     : Math.max(0, 1 - defense * (1 - ignoreDefense));
-  return statTerm * Number(details.dopedAttack) *
+  const reuseMultiplier = Number(objectField(details.combatReuse)?.damageMultiplier ?? 1);
+  return statTerm * Number(details.dopedAttack) * reuseMultiplier *
     (1 + Number(details.dopedDamageTotal) / 100) *
     (1 + criticalRate * (0.35 + Number(details.dopedCriticalDamage) / 100)) *
     defenseFactor * (1 + Number(details.fullBossSkillFinalDamage ?? sources.computed["최종 데미지"]) / 100);
