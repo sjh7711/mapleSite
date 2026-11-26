@@ -44,12 +44,14 @@ test("반지 피해 비중·시간 가동률·상시 유지를 구별해 표시�
       { name: "리스트레인트 링", level: 6, activationMode: "battle-practice-damage-weighted", damageCoverage: 0.186534642788, timeUptime: 1 / 6, uptime: 0.186534642788, averageAttackPercent: 15.85544463698 },
       { name: "컨티뉴어스 링", level: 6, activationMode: "boss-entry-maintained", uptime: 1, averageAttackPercent: 14, averageBossDamage: 54 },
       { name: "웨폰퍼프 링", activationMode: "cycle-time-fallback", timeUptime: 0.2, uptime: 0.2 },
+      { name: "리스트레인트 링", level: 4, activationMode: "boss-burst-attack-weighted", timeUptime: 1 / 6, uptime: 0.2733, averageAttackPercent: 18.5844 },
     ] },
   };
   const summary = combatRingSummary(profile);
   assert.match(summary, /반지 적용 구간 피해 비중 18\.7% · 공·마 평균 \+15\.86%/u);
   assert.match(summary, /보스전 상시 유지 · 공·마 평균 \+14% · 보공 평균 \+54%/u);
   assert.match(summary, /3분 기준 시간 가동률 20\.0%/u);
+  assert.match(summary, /극딜을 반영한 공·마% 가중치 27\.3% · 공·마 평균 \+18\.58%/u);
   assert.doesNotMatch(summary, /6분 평균 가동/u);
 });
 

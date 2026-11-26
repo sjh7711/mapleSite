@@ -438,7 +438,7 @@ test("환산 계약 버전으로 이전 단일 부스탯 캐시와 키를 분리
     versionedUrl.searchParams.get("conversionVersion"),
     characterConversionCacheVersion,
   );
-  assert.equal(characterConversionCacheVersion, "combat-profile-v99-full-sayram-collector-levels");
+  assert.equal(characterConversionCacheVersion, "combat-profile-v100-combat-cooldown");
   const freshSnapshotKey = createSnapshotCacheKey(request, "테스트", "fresh");
   const staleSnapshotKey = createSnapshotCacheKey(request, "테스트", "stale");
   assert.equal(characterSnapshotCacheVersion, "character-snapshot-v4");

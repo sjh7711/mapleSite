@@ -15,6 +15,7 @@ import {
   resolveCharacterExternalBonuses,
   resolveClassAlwaysOnCombatAdjustment,
   resolveClassDamageChannels,
+  resolveCombatCooldownReduction,
   selectedBuffDurationPercent,
   unionAllocatedStat,
   unionUnreflectedStat,
@@ -633,6 +634,12 @@ function calculateXenon(
     number(totals.combatDurationSeconds) || 360,
   );
   const includeEquippedRing = Boolean(totals.includeEquippedRing) && Boolean(input.doping);
+  const cooldownReduction = resolveCombatCooldownReduction(
+    snapshot.statData,
+    snapshot.equipmentData,
+    snapshot.unionRaiderData,
+    text(input.character.character_class),
+  );
   const combatRing = calculateCombatRingBonuses(
     snapshot.equipmentData,
     snapshot.ringReserveData,
@@ -640,6 +647,7 @@ function calculateXenon(
     "attack",
     combatDuration,
     text(input.character.character_class),
+    cooldownReduction,
   );
   const activeSkillCycle = calculateActiveSkillCycleBonuses(
     snapshot.skillData,
@@ -657,6 +665,7 @@ function calculateXenon(
       loadedDiceRolls: doping?.loadedDiceRolls,
       collectorCoverage: number(doping?.collectorCoverage),
       includeHowling: doping?.sayramCoverage == null,
+      cooldownReduction,
     },
   );
   const conditionalLinks = calculateConditionalLinkCycleBonuses(
@@ -666,6 +675,7 @@ function calculateXenon(
     text(input.character.character_class),
     !source?.maintainedCovenantDamage &&
       maintainsBossSummon(snapshot.skillData, text(input.character.character_class)),
+    cooldownReduction,
   );
   const guildNoblesse = calculateGuildNoblesseBonuses(snapshot.guildData);
   const guildBaseline = object(doping?.guildBaseline) ?? {};
@@ -913,7 +923,7 @@ function calculateXenon(
       },
       metadata: { sources: conditionalLinks.applied.map(({ name }) => name) },
     }));
-    combatEffects.push(...targetDefenseEffectsFromSkills(snapshot.skillData));
+    combatEffects.push(...targetDefenseEffectsFromSkills(snapshot.skillData, cooldownReduction));
   }
   combatEffects.push(createCombatEffect({
     layer: "general",
@@ -1040,6 +1050,7 @@ function calculateXenon(
       combatModel,
       classDamageProfile,
       combatRings: includeEquippedRing ? combatRing.applied : [],
+      cooldownReduction,
       activeSkillCycles: input.doping ? activeSkillCycle.applied : [],
       conditionalLinkSources: input.doping ? conditionalLinks.applied : [],
       guildNoblesseSkills: guildNoblesse.available

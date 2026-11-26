@@ -484,11 +484,14 @@ export function combatRingSummary(profile) {
       );
     }
     const minutes = format((Number(profile.details?.combatDurationSeconds) || 360) / 60);
-    const coverage = ring.activationMode === "battle-practice-damage-weighted"
-      ? `반지 적용 구간 피해 비중 ${(Number(ring.damageCoverage) * 100).toFixed(1)}%`
-      : ring.activationMode === "boss-entry-maintained"
-        ? "보스전 상시 유지"
-        : `${minutes}분 기준 시간 가동률 ${(Number(ring.timeUptime ?? ring.uptime) * 100).toFixed(1)}%`;
+    let coverage = `${minutes}분 기준 시간 가동률 ${(Number(ring.timeUptime ?? ring.uptime) * 100).toFixed(1)}%`;
+    if (ring.activationMode === "battle-practice-damage-weighted") {
+      coverage = `반지 적용 구간 피해 비중 ${(Number(ring.damageCoverage) * 100).toFixed(1)}%`;
+    } else if (ring.activationMode === "boss-burst-attack-weighted") {
+      coverage = `극딜을 반영한 공·마% 가중치 ${(Number(ring.uptime) * 100).toFixed(1)}%`;
+    } else if (ring.activationMode === "boss-entry-maintained") {
+      coverage = "보스전 상시 유지";
+    }
     return `${ring.name}${ring.level ? ` Lv.${ring.level}` : ""} · ` +
       coverage +
       (effects.length ? ` · ${effects.join(" · ")}` : "");

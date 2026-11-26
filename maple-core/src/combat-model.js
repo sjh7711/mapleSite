@@ -1,4 +1,5 @@
 import { resolveCombatSourceLedger } from "./combat-source-ledger.js";
+import { effectiveSkillCooldown, skillCooldown } from "./combat-cooldown.js";
 
 const COMBAT_NUMERIC_FIELDS = Object.freeze([
   "flatAttack",
@@ -327,7 +328,7 @@ export function isBaselineReflectedSkill(skill) {
  * 보스에게 계속 유지되는 방어율 감소 디버프를 공식 스킬 설명에서 읽는다.
  * `아머 스플릿`처럼 중첩형이면 한 줄 수치 × 최대 중첩으로 계산한다.
  */
-export function targetDefenseEffectsFromSkills(skillData) {
+export function targetDefenseEffectsFromSkills(skillData, cooldownReduction) {
   const result = [];
   const rawSkills = (skillData ?? []).flatMap(
     (grade) => grade?.character_skill ?? [],
@@ -390,14 +391,13 @@ export function targetDefenseEffectsFromSkills(skillData) {
       /최대\s*(\d+(?:\.\d+)?)번(?:까지)?\s*(?:중첩|누적)/u,
     );
     const durationMatch = bossApplicableEffect.match(/(\d+(?:\.\d+)?)초 동안/u);
-    const cooldownMatch = effect.match(/재사용 대기시간\s*(\d+(?:\.\d+)?)초/u);
     const perStack = number(
       reductionMatch?.[1] ?? listedReductionMatch?.[1] ??
         defenseDebuffMatch?.[1],
     );
     const stacks = Math.max(1, number(stackMatch?.[1]));
     const duration = number(durationMatch?.[1]);
-    const cooldown = number(cooldownMatch?.[1]);
+    const cooldown = effectiveSkillCooldown(skill, skillCooldown(effect), cooldownReduction);
     const uptime = stackMatch || !(duration > 0 && cooldown > 0)
       ? 1
       : Math.min(1, duration / cooldown);
