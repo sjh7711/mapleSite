@@ -5,6 +5,7 @@ import {
   SAYRAM_ELIXIR,
 } from "./stat-profile.js";
 import {
+  bossDamageGainPerPoint,
   calculateDamageChannelIgnoreDefenseGain,
   composeCombatModel,
   createCombatEffect,
@@ -809,10 +810,6 @@ const VERIFIED_TIMED_SELF_BUFF_SKILLS = new Set([
   "무아지경",
   "신뇌합일",
   "불스아이",
-  "스칼렛 차지드라이브",
-  "스칼렛 차지드라이브 VI",
-  "어비스 차지드라이브",
-  "어비스 차지드라이브 VI",
   "매직 서킷 풀드라이브",
   "매직 서킷 풀드라이브 VI",
   "파이널 컨트랙트",
@@ -1218,6 +1215,48 @@ function grandisGoddessEvent({
   };
 }
 
+function strikerLightningStacks(skills) {
+  const lightning = skills.find((skill) => skill.skill_name === "엘리멘트 : 라이트닝");
+  const base = percentFromEffect(lightning?.skill_effect, /뇌전 버프는 최대\s*(\d+)회/u);
+  if (!base) return 0;
+  return base + ["뇌백", "뇌제", "뇌신"].reduce((total, name) => {
+    const upgrade = skills.find((skill) => skill.skill_name === name);
+    return total + percentFromEffect(upgrade?.skill_effect, /최대 누적 횟수 (\d+)회 증가/u);
+  }, 0);
+}
+
+function strikerLightningEvent(skills, combatDuration, cooldownReduction) {
+  const effect = (name) => skills.find((skill) => skill.skill_name === name)?.skill_effect;
+  const stacks = strikerLightningStacks(skills);
+  if (!stacks) return null;
+  const baseIgnore = percentFromEffect(effect("뇌신"), /방어율 무시 (\d+)%로 증가/u) ||
+    percentFromEffect(effect("엘리멘트 : 라이트닝"), /방어율 (\d+)% 무시/u);
+  const baseDamage = percentFromEffect(effect("뇌제"), /1개당 데미지 (\d+)%로 증가/u) ||
+    percentFromEffect(effect("뇌백"), /1개당 데미지 (\d+)% 증가/u);
+  const surge = skills.find((skill) => skill.skill_name === "천지개벽");
+  const surgeUptime = activeRingUptime(
+    percentFromEffect(surge?.skill_effect, /(\d+)초 동안 지속/u),
+    effectiveSkillCooldown(surge, skillCooldown(surge?.skill_effect), cooldownReduction),
+    combatDuration,
+  );
+  const surgeIgnore = percentFromEffect(surge?.skill_effect, /방어율 무시 (\d+)%로 증가/u) || baseIgnore;
+  const surgeDamage = percentFromEffect(surge?.skill_effect, /1개당 데미지 증가량 (\d+)%/u) || baseDamage;
+  if (!(baseIgnore > 0 || baseDamage > 0 || surgeIgnore > 0 || surgeDamage > 0)) return null;
+  // A consumed stack transfers its stats to the compensation buff until restored.
+  // Heaven and Earth changes the same per-stack source during its uptime.
+  return {
+    name: "뇌전 버프",
+    model: "lightning-stack-cycle",
+    highPoint: true,
+    duration: combatDuration,
+    cooldown: 0,
+    modifiers: {
+      ignoreDefense: stacks * (baseIgnore + (surgeIgnore - baseIgnore) * surgeUptime),
+      damage: stacks * (baseDamage + (surgeDamage - baseDamage) * surgeUptime),
+    },
+  };
+}
+
 function specialCycleEvents({
   skill,
   skills,
@@ -1227,6 +1266,7 @@ function specialCycleEvents({
   apStats,
   equipmentData,
   loadedDiceRolls,
+  buffDurationPercent,
 }) {
   const name = String(skill?.skill_name ?? "").trim();
   const effect = String(skill?.skill_effect ?? "");
@@ -1356,13 +1396,9 @@ function specialCycleEvents({
       (candidate) => candidate?.skill_name === "태풍 VI",
     ) ?? skills.find((candidate) => candidate?.skill_name === "태풍");
     if (name === "질풍" && preferredTyphoon) return [];
-    const lightning = skills.find(
-      (candidate) => candidate?.skill_name === "엘리멘트 : 라이트닝",
-    );
-    const maxStacks = percentFromEffect(
-      lightning?.skill_effect,
-      /뇌전 버프는 최대\s*(\d+(?:\.\d+)?)회/u,
-    ) || 2;
+    const maxStacks = strikerLightningStacks(skills);
+    const duration = percentFromEffect(effect,
+      /데미지\s*\d+(?:\.\d+)?%\s*증가 버프가\s*(\d+(?:\.\d+)?)초/u);
     const perStack = percentFromEffect(
       effect,
       /사용한 뇌전 버프 1개당 데미지\s*(\d+(?:\.\d+)?)%/u,
@@ -1371,12 +1407,52 @@ function specialCycleEvents({
       name,
       model: "typhoon-max-lightning-stack",
       highPoint: true,
-      duration: percentFromEffect(
-        effect,
-        /데미지\s*\d+(?:\.\d+)?%\s*증가 버프가\s*(\d+(?:\.\d+)?)초/u,
-      ),
+      duration: /버프 지속시간 증가 효과를 받는다/u.test(skill.skill_description ?? "")
+        ? duration * (1 + Math.max(0, number(buffDurationPercent)) / 100)
+        : duration,
       cooldown,
       modifiers: { damage: perStack * maxStacks },
+    }];
+  }
+
+  if (characterClass === "플레임위자드" && name === "스피릿 오브 플레임") {
+    const ignoreDefense = percentFromEffect(effect,
+      /화신 소환 중[^\n]*방어율 무시\s*(\d+(?:\.\d+)?)%\s*증가/u);
+    if (!(ignoreDefense > 0)) return [];
+    return [{
+      name,
+      model: "maintained-spirit",
+      highPoint: true,
+      duration: combatDuration,
+      cooldown: 0,
+      modifiers: { ignoreDefense },
+    }];
+  }
+
+  if (characterClass === "신궁" && name === "어드밴스드 인핸스 애로우") {
+    const focus = effect.match(/^포커스 온\s*:\s*인핸스 스킬 적중 시\s*(\d+)초 동안[^\n]+/mu);
+    if (!focus) return [];
+    // Repeated Enhanced Sniping hits refresh Focus On during sustained combat.
+    return [{
+      name: "포커스 온",
+      model: "maintained-enhanced-sniping",
+      highPoint: true,
+      duration: number(focus[1]),
+      cooldown: 0,
+      uptime: 1,
+      modifiers: directCycleSkillModifiers(focus[0], attackType),
+    }];
+  }
+
+  if (characterClass === "아크" && /^(?:스칼렛|어비스) 차지드라이브(?: VI)?$/u.test(name)) {
+    const spellBuff = effect.match(/^(?:스칼렛|어비스) 버프\s*:\s*[^\n]*?적중 시\s*(\d+(?:\.\d+)?)초 동안[^\n]+/mu);
+    if (!spellBuff || !(cooldown > 0)) return [];
+    return [{
+      name,
+      model: "charge-spell-buff",
+      duration: number(spellBuff[1]),
+      cooldown,
+      modifiers: directCycleSkillModifiers(spellBuff[0], attackType),
     }];
   }
 
@@ -1657,6 +1733,10 @@ export function calculateActiveSkillCycleBonuses(
     baselineReflected: [],
   };
   const skills = allCharacterSkills(skillData);
+  if (characterClass === "스트라이커") {
+    const lightning = strikerLightningEvent(skills, combatDuration, cooldownReduction);
+    if (lightning) addCycleEvent(result, lightning, combatDuration);
+  }
   const reusable = reusePercent > 0 ? reuseEligibleSkills(skillData, characterClass) : new Set();
   const cycleCooldown = (skill, duration, baseCooldown) => {
     const cooldown = effectiveSkillCooldown(skill, baseCooldown, cooldownReduction);
@@ -1702,6 +1782,7 @@ export function calculateActiveSkillCycleBonuses(
       apStats,
       equipmentData,
       loadedDiceRolls,
+      buffDurationPercent,
     });
     if (specialEvents !== null) {
       for (const event of specialEvents) {
@@ -5897,8 +5978,12 @@ export function calculateCharacterPotentialConversion({
     : null;
   const attackPercentToPercent =
     (1 / (100 + dopedAttackPercent)) / oneMainPercentRelative;
-  const bossDamageToPercent =
-    (1 / (100 + dopedDamageTotal)) / oneMainPercentRelative;
+  const bossDamageToPercent = bossDamageGainPerPoint({
+    damageBracket: 100 + dopedDamageTotal,
+    currentIgnoreDefense: dopedIgnoreDefense,
+    enemyDefense: 3.8 * targetDefenseRemaining,
+    channels: combatModel.damageChannels,
+  }) / oneMainPercentRelative;
 
   // 스탯별 계수 맵은 이중 부스탯 직업의 DEX와 STR을 서로
   // 다른 잠재 %에 맞춰 환산하기 위해 제공한다.
