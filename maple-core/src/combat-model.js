@@ -69,6 +69,7 @@ export function createDamageChannel({
   source,
   weight = null,
   ignoreDefenseSources = [],
+  localBossDamage = 0,
   metadata = null,
 } = {}) {
   const parsedWeight = Number(weight);
@@ -79,6 +80,7 @@ export function createDamageChannel({
       ? parsedWeight
       : null,
     ignoreDefenseSources: normalizedIgnoreDefenseSources(ignoreDefenseSources),
+    ...(localBossDamage > 0 ? { localBossDamage } : {}),
     metadata,
   };
 }
@@ -170,6 +172,25 @@ export function calculateDamageChannelIgnoreDefenseGain({
   const before = damage(1);
   if (!(before > 0)) return 0;
   return damage(addedRemaining) / before - 1;
+}
+
+export function bossDamageGainPerPoint({ damageBracket, currentIgnoreDefense, enemyDefense, channels = [] }) {
+  if (!(damageBracket > 0)) return 0;
+  if (!channels.some((channel) => channel.weight > 0 && channel.localBossDamage > 0)) {
+    return 1 / damageBracket;
+  }
+  const globalRemaining = 1 - currentIgnoreDefense;
+  let damage = 0;
+  let gain = 0;
+  for (const channel of channels) {
+    if (!(channel.weight > 0)) continue;
+    const afterDefenseWeight = channel.metadata?.weightBasis === "observed-damage"
+      ? channel.weight
+      : channel.weight * channelDamageMultiplier({ channel, defense: enemyDefense, globalRemaining });
+    damage += afterDefenseWeight;
+    gain += afterDefenseWeight / (damageBracket + number(channel.localBossDamage));
+  }
+  return damage > 0 ? gain / damage : 1 / damageBracket;
 }
 
 /**
@@ -438,7 +459,7 @@ function parsedSkillLocalIgnoreDefenseChannels(skillData) {
   );
   for (const { skill, grade } of rawSkills) {
     const name = String(skill?.skill_name ?? "").trim();
-    if (!name) continue;
+    if (!name || (skill?.skill_level != null && !(number(skill.skill_level) > 0))) continue;
     const effect = String(skill?.skill_effect ?? "");
     const description = String(skill?.skill_description ?? "");
     const text = `${description}\n${effect}`;
@@ -532,36 +553,105 @@ function parsedSkillLocalIgnoreDefenseChannels(skillData) {
   return result;
 }
 
-function hyperPassiveLocalIgnoreDefenseChannels(skillData) {
+// Names of the combat families used by the current skill descriptions.
+const HYPER_ATTACK_FAMILIES = {
+  "이딕트": /^이딕트\s*:/u,
+  "얼티메이트": /^얼티메이트\s*[:-]/u,
+  "분출": /^분출\s*:/u,
+  "흡수": /^흡수\s*:/u,
+  "퍼지롭 매스커레이드": /^퍼지롭 매스커레이드(?: VI)?\s*:/u,
+  "헥스 계열": /^헥스\s*:/u,
+  "어시스트": /^어시스트\s*:/u,
+  "부스트 엔드": /^부스트 엔드\s*-/u,
+  "하이퍼 부스트 엔드": /^하이퍼 부스트 엔드\s*-/u,
+};
+
+function hyperAttackTargets(description, skillRows) {
+  if (/제외한 1~4차 아크 공격 스킬 및 6차 마스터리 코어 스킬/u.test(description)) {
+    const excluded = /^(?:스펠 불릿|다가오는 죽음|돌아오는 증오|끝없는 고통)(?: VI)?(?:$|\s*[:(])/u;
+    const fifth = new Set(skillRows.filter(({ grade }) => grade === "5")
+      .map(({ skill }) => normalizedBattleSkillName(skill.skill_name)));
+    return skillRows.flatMap(({ grade, skill }) => {
+      const name = String(skill.skill_name ?? "");
+      const supported = /^[1-4]$/u.test(grade) ||
+        (grade === "6" && isSixthMasterySkillName(name) && !fifth.has(normalizedBattleSkillName(name)));
+      const hit = /\d+(?:\.\d+)?%\s*(?:의\s*)?데미지로/u.test(skill.skill_effect ?? "");
+      return supported && hit && !excluded.test(name) ? [name] : [];
+    });
+  }
+  if (/4차 이하 및 하이퍼 스킬 중 처형 스킬/u.test(description)) {
+    const sixth = new Set(skillRows.filter(({ grade }) => grade === "6")
+      .map(({ skill }) => normalizedBattleSkillName(skill.skill_name)));
+    return skillRows.flatMap(({ grade, skill }) =>
+      (/^[1-4]$/u.test(grade) || grade === "hyperactive") &&
+        /^\[처형\]/u.test(skill.skill_name) && !sixth.has(normalizedBattleSkillName(skill.skill_name))
+        ? [skill.skill_name] : []);
+  }
+  // A name must come before the effect. A list of exclusions must never
+  // become a list of affected skills.
+  if (/제외/u.test(description)) return [];
+  const targets = description.match(
+    /^([^\r\n]+?)(?:의\s*|이\s+|[을를]\s+사용하여\s+)(?:몬스터\s*)?(?:방어율\s*무시|방어무시\s*비율|보스 몬스터 공격 시 데미지)/mu,
+  )?.[1];
+  if (!targets) return [];
+  return targets
+    .replace("에인션트 포스/인챈트 포스", "에인션트 포스, 인챈트 포스")
+    .replace("크래프트:자벨린/글로리 윙:자벨린", "크래프트:자벨린, 글로리 윙:자벨린")
+    .split(/\s*[,·]\s*|(?<=[^\s])[와과]\s+|\s+(?:및|그리고)\s+/u).flatMap((raw) => {
+    const target = raw.trim().replace(/\s+스킬$/u, "");
+    if (!target) return [];
+    if (target === "트리거") {
+      return skillRows.flatMap(({ skill }) =>
+        String(skill.skill_description ?? "").includes("[트리거 스킬]") ? [skill.skill_name] : []);
+    }
+    if (target === "에인션트 포스" || target === "인챈트 포스") {
+      return skillRows.flatMap(({ skill }) =>
+        String(skill.skill_description ?? "").includes(`[${target}]`) ? [skill.skill_name] : []);
+    }
+    if (target.endsWith(" 류")) {
+      return skillRows.flatMap(({ skill }) =>
+        skill.skill_name?.startsWith(`${target.slice(0, -2)} :`) ? [skill.skill_name] : []);
+    }
+    const family = HYPER_ATTACK_FAMILIES[target];
+    if (family) {
+      return skillRows.flatMap(({ skill }) => family.test(skill.skill_name) ? [skill.skill_name] : []);
+    }
+    return [target];
+  });
+}
+
+function hyperPassiveAttackChannels(skillData) {
   const result = [];
-  const rawSkills = (skillData ?? []).flatMap(
-    (grade) => grade?.character_skill ?? [],
+  const skillRows = (skillData ?? []).flatMap((group) =>
+    (group?.character_skill ?? []).filter((skill) =>
+      skill?.skill_level == null || number(skill.skill_level) > 0,
+    ).map((skill) => ({ grade: String(group.character_skill_grade ?? ""), skill })),
   );
-  for (const skill of rawSkills) {
-    if (skill?.skill_level != null && !(number(skill.skill_level) > 0)) continue;
-    const description = String(skill?.skill_description ?? "");
-    const effect = String(skill?.skill_effect ?? "");
-    const targetsMatch = description.match(
-      /^([^\r\n]+?)의\s*(?:몬스터\s*)?방어율\s*무시\s*수치를\s*증가/mu,
-    );
-    const valueMatch = effect.match(
-      /(?:몬스터\s*)?방어율\s*무시\s*(\d+(?:\.\d+)?)%\s*(?:추가\s*)?증가/u,
-    );
-    if (!targetsMatch || !valueMatch) continue;
-    const value = number(valueMatch[1]);
-    if (!(value > 0)) continue;
-    const targets = targetsMatch[1]
-      .split(/\s*[,·]\s*|\s+(?:및|그리고)\s+/u)
-      .map((name) => name.trim())
-      .filter(Boolean);
-    for (const target of new Set(targets)) {
+  for (const { grade, skill } of skillRows) {
+    const name = String(skill.skill_name ?? "");
+    if (grade !== "hyperpassive" && !/이그노어\s*가드/u.test(name)) continue;
+    // Target debuffs and ordinary buffs are resolved by their own models.
+    if (/^(?:트루 사이트|샤프 아이즈|다크 오라|어드밴스드 블레스|어드밴스드 콤보)-/u.test(name)) continue;
+    const description = String(skill.skill_description ?? "");
+    const effect = String(skill.skill_effect ?? "");
+    const ignoreDefense = number(effect.match(
+      /(?:방어율\s*무시|방어무시\s*비율)\s*(\d+(?:\.\d+)?)%\s*(?:추가\s*)?증가|방어율\s*(\d+(?:\.\d+)?)%\s*(?:추가\s*)?무시/u,
+    )?.slice(1).find(Boolean));
+    const localBossDamage = /보스 킬러$/u.test(name) ? number(effect.match(
+      /보스 몬스터 공격 시 데미지\s*(\d+(?:\.\d+)?)%\s*증가/u,
+    )?.[1]) : 0;
+    if (!(ignoreDefense > 0 || localBossDamage > 0)) continue;
+    const targets = new Map(hyperAttackTargets(description, skillRows)
+      .map((target) => [normalizedBattleSkillName(target), target]));
+    for (const source of targets.values()) {
       result.push(createDamageChannel({
-        source: target,
-        ignoreDefenseSources: [value],
+        source,
+        ignoreDefenseSources: [ignoreDefense],
+        localBossDamage,
         metadata: {
           status: "unweighted",
-          reason: "선택한 하이퍼 패시브의 스킬 전용 방무",
-          hyperPassive: String(skill?.skill_name ?? "").trim() || null,
+          reason: "선택한 하이퍼 패시브의 스킬 전용 효과",
+          hyperPassive: name || null,
         },
       }));
     }
@@ -596,6 +686,10 @@ function maintainedTrinityIgnoreDefenseChannels(skillData) {
  * 남긴다. 이를 전역 방무에 합산하지 않는 것이 핵심 안전 규칙이다.
  */
 export function skillLocalIgnoreDefenseChannelsFromSkills(skillData) {
+  return skillLocalAttackChannels(skillData).filter((channel) => channel.ignoreDefenseSources.length);
+}
+
+function skillLocalAttackChannels(skillData) {
   const grouped = new Map();
   for (const channel of parsedSkillLocalIgnoreDefenseChannels(skillData)) {
     const key = normalizedBattleSkillName(channel.source);
@@ -639,8 +733,9 @@ export function skillLocalIgnoreDefenseChannelsFromSkills(skillData) {
   }
 
   for (const channel of [
-    ...hyperPassiveLocalIgnoreDefenseChannels(skillData),
+    ...hyperPassiveAttackChannels(skillData),
     ...maintainedTrinityIgnoreDefenseChannels(skillData),
+    ...leteAscentBossDamageChannel(skillData),
   ]) {
     const key = normalizedBattleSkillName(channel.source);
     const current = selected.find(
@@ -652,9 +747,33 @@ export function skillLocalIgnoreDefenseChannelsFromSkills(skillData) {
     }
     // 스킬 고유 방무와 하이퍼 패시브는 서로 다른 방무 출처로 곱연산된다.
     current.ignoreDefenseSources.push(...channel.ignoreDefenseSources);
+    if (channel.localBossDamage > 0) {
+      current.localBossDamage = number(current.localBossDamage) + channel.localBossDamage;
+    }
     Object.assign(current.metadata, channel.metadata);
   }
   return selected;
+}
+
+function leteAscentBossDamageChannel(skillData) {
+  const skill = (skillData ?? []).flatMap((group) => group.character_skill ?? [])
+    .find((entry) => entry.skill_name === "앱솔루트 레인" && number(entry.skill_level) > 0);
+  if (!skill) return [];
+  // The increase is listed on the attack itself. Its level 10/20 boss
+  // lines are separate additions that unlock with the same Ascent skill.
+  const bossValue = (text) => number(text.match(/보스 몬스터 공격 시 데미지\s*(\d+(?:\.\d+)?)%\s*증가/u)?.[1]);
+  const effectLines = String(skill.skill_effect ?? "").split(/\r?\n/u);
+  const description = String(skill.skill_description ?? "");
+  const base = effectLines.filter((line) => !/^\s*\d+레벨\s*:/u.test(line)).map(bossValue).reduce((a, b) => a + b, 0);
+  const milestones = new Map([...description.split(/\r?\n/u), ...effectLines].flatMap((line) => {
+    const level = line.match(/^\s*(\d+)레벨\s*:/u)?.[1];
+    return level && number(level) <= number(skill.skill_level)
+      ? [[level, bossValue(line)]] : [];
+  }));
+  const localBossDamage = base + [...milestones.values()].reduce((sum, value) => sum + value, 0);
+  return localBossDamage > 0 ? [createDamageChannel({
+    source: skill.skill_name, localBossDamage, metadata: { status: "unweighted" },
+  })] : [];
 }
 
 /** V 강화 코어 40레벨에서 해당 스킬에 붙는 몬스터 방어율 무시 20%. */
@@ -667,7 +786,10 @@ export function boostCoreIgnoreDefenseChannels(vMatrixData) {
     const coreName = String(core?.v_core_name ?? "")
       .replace(/\s*강화\s*$/u, "")
       .trim();
-    for (const skillName of coreName.split("/").map((name) => name.trim())) {
+    const linkedSkills = coreName === "비홀더"
+      ? ["비홀더", "비홀더 도미넌트", "비홀더 쇼크", "비홀더스 리벤지", "비홀더스 퍼니시먼트", "비홀더 임팩트"]
+      : coreName.split("/").map((name) => name.trim());
+    for (const skillName of linkedSkills) {
       if (!skillName) continue;
       result.push(createDamageChannel({
         source: skillName,
@@ -686,6 +808,8 @@ export function boostCoreIgnoreDefenseChannels(vMatrixData) {
 
 function normalizedBattleSkillName(value) {
   return withoutSixthMasteryMarker(value)
+    // These VI mastery skills use an earlier “Ⅱ” name in the V core.
+    .replace(/^((?:크래프트\s*:\s*자벨린|리액션\s*:\s*(?:디스트럭션|도미네이션)))\s*(?:Ⅱ|II)$/u, "$1")
     .normalize("NFKC")
     .replace(/\s+/gu, "")
     .replace(/[()（）\[\]]/gu, "")
@@ -693,28 +817,22 @@ function normalizedBattleSkillName(value) {
 }
 
 function matchingLocalChannel(statisticName, localChannels) {
-  const normalizedStatistic = normalizedBattleSkillName(statisticName);
-  if (!normalizedStatistic) return null;
-  return localChannels
-    .map((channel) => ({
-      channel,
-      normalizedSource: normalizedBattleSkillName(channel.source),
-    }))
-    .filter(({ normalizedSource }) => normalizedSource && (
-      normalizedStatistic === normalizedSource ||
-      (normalizedSource.length >= 3 &&
-        (normalizedStatistic.startsWith(normalizedSource) ||
-          normalizedSource.startsWith(normalizedStatistic)))
-    ))
-    .sort((left, right) =>
-      right.normalizedSource.length - left.normalizedSource.length
-    )[0]?.channel ?? null;
+  const key = normalizedBattleSkillName(statisticName);
+  if (!key) return null;
+  const base = String(statisticName).replace(/\s*\([^()]+\)\s*$/u, "");
+  const form = normalizedBattleSkillName(base);
+  return localChannels.get(key) ??
+    localChannels.get(form) ??
+    [...localChannels.entries()]
+      .filter(([source]) => key.startsWith(`${source}:`) || key.startsWith(`${source}-`))
+      .sort(([left], [right]) => right.length - left.length)[0]?.[1] ??
+    null;
 }
 
 function mergedLocalIgnoreDefenseChannels(skillData, vMatrixData) {
   const merged = new Map();
   for (const channel of [
-    ...skillLocalIgnoreDefenseChannelsFromSkills(skillData),
+    ...skillLocalAttackChannels(skillData),
     ...boostCoreIgnoreDefenseChannels(vMatrixData),
   ]) {
     const key = normalizedBattleSkillName(channel.source);
@@ -722,6 +840,7 @@ function mergedLocalIgnoreDefenseChannels(skillData, vMatrixData) {
     const current = merged.get(key) ?? {
       ...channel,
       ignoreDefenseSources: [],
+      localBossDamage: 0,
       metadata: { sources: [] },
     };
     current.source = isSixthMasterySkillName(channel.source)
@@ -730,13 +849,25 @@ function mergedLocalIgnoreDefenseChannels(skillData, vMatrixData) {
     // 스킬 고유·6차 강화·하이퍼·V코어 방무는 동일한 숫자여도 서로 다른
     // 출처이므로 각각 곱연산한다.
     current.ignoreDefenseSources.push(...channel.ignoreDefenseSources);
+    current.localBossDamage += number(channel.localBossDamage);
     current.metadata.sources.push({
       source: channel.source,
       ...channel.metadata,
     });
     merged.set(key, current);
   }
-  return [...merged.values()];
+  // A V core can name the parent while the individual attack is a named form.
+  // Include the parent there, even if the form has its own exact sources.
+  for (const [key, channel] of merged) {
+    const parent = key.includes(":") ? merged.get(key.slice(0, key.lastIndexOf(":"))) : null;
+    if (!parent) continue;
+    for (const { coreName, coreLevel, source } of parent.metadata.sources) {
+      if (!coreName || channel.metadata.sources.some((item) => item.coreName === coreName)) continue;
+      channel.ignoreDefenseSources.push(20);
+      channel.metadata.sources.push({ coreName, coreLevel, source });
+    }
+  }
+  return merged;
 }
 
 /**
@@ -896,7 +1027,7 @@ export function generalizedBattlePracticeDamageChannelsFromSkills({
       : referenceWeight;
     const weight = hexaAdjustedWeight * (weightMultipliers?.get(entry?.source) ?? 1);
     const localChannel = matchingLocalChannel(entry?.source, localChannels);
-    if (!localChannel?.ignoreDefenseSources?.length) {
+    if (!localChannel?.ignoreDefenseSources?.length && !(localChannel?.localBossDamage > 0)) {
       generalWeight += weight;
       continue;
     }
@@ -904,6 +1035,7 @@ export function generalizedBattlePracticeDamageChannelsFromSkills({
     weighted.push(createDamageChannel({
       source: String(entry?.source ?? localChannel.source),
       weight,
+      localBossDamage: localChannel.localBossDamage,
       ignoreDefenseSources: [
         ...maintainedTargetSources,
         ...localChannel.ignoreDefenseSources,
@@ -929,7 +1061,7 @@ export function generalizedBattlePracticeDamageChannelsFromSkills({
     }),
     ...weighted,
   ];
-  const unmatched = localChannels.filter(
+  const unmatched = [...localChannels.values()].filter(
     (channel) => !matchedSources.has(channel.source),
   );
   return [...result, ...unmatched];
