@@ -23,16 +23,11 @@ export function reconstructPresetSources(
   presetMode: PresetPolicy["mode"],
   boss = false,
 ) {
-  const source = reconstructCharacterStats({
+  return reconstructCharacterStats({
     character, snapshot, mainStat, attackType, presetMode,
     activeSkillNames: boss ? ["익스트림 아쳐리 : 활", "익스트림 아쳐리 : 석궁"] : [],
   });
 
-  // Lete maintains their own summons during the boss rotation.
-  if (source && boss && character.character_class === "레테") {
-    source.computed.데미지 += source.summonedLinkDamage;
-  }
-  return source;
 }
 
 export function verifyCharacterStats(

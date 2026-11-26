@@ -1,10 +1,13 @@
 import {
   CHARACTER_BASELINE_SKILL_SUMMARY_VERSION,
+  activeCashEquipmentItems,
+  bossCriticalEffects,
   calculateCharacterPotentialConversion,
   characterBaselineSkillSummary,
   resolveCharacterPresetSnapshot,
   type PresetPolicy,
   type PresetSelection,
+  type CharacterStatSources,
 } from "maple-core/stat-efficiency";
 
 export type CharacterPresetPolicy = PresetPolicy;
@@ -283,14 +286,8 @@ function summarizeCashEquipmentOptions(options: unknown[]): {
 function cashEquipmentDisplaySummary(
   cashEquipmentData: JsonObject,
 ): CashEquipmentDisplaySummary {
-  const items = [
-    ...(Array.isArray(cashEquipmentData.cash_item_equipment_base)
-      ? cashEquipmentData.cash_item_equipment_base
-      : []),
-    ...(Array.isArray(cashEquipmentData.additional_cash_item_equipment_base)
-      ? cashEquipmentData.additional_cash_item_equipment_base
-      : []),
-  ].map(objectField).filter((item): item is JsonObject => Boolean(item));
+  const items = activeCashEquipmentItems(cashEquipmentData)
+    .map(objectField).filter((item): item is JsonObject => Boolean(item));
   const aggregateOptions = items.flatMap((item) =>
     Array.isArray(item.cash_item_option) ? item.cash_item_option : []
   );
@@ -1015,6 +1012,33 @@ export async function buildCharacterConversion(
   return buildCharacterConversionFromData(data, presetPolicy);
 }
 
+function bossPresetPower(
+  { details }: ReturnType<typeof calculateCharacterPotentialConversion>,
+  sources: CharacterStatSources,
+  extraCriticalRate: number,
+): number {
+  const subStats = objectField(details.dopedSubs) ?? {};
+  const statTerm = 4 * Number(details.dopedMain) +
+    Object.values(subStats).reduce<number>((total, stat) => total + Number(stat), 0);
+  const criticalRate = Math.min(100, Number(details.effectiveBossCriticalRate) + extraCriticalRate) / 100;
+  const ignoreDefense = Number(details.dopedIgnoreDefense);
+  const defense = 3.8 * Number(details.targetDefenseRemaining);
+  const channels = objectField(details.combatModel)?.damageChannels;
+  const fullDefenseGain = calculateDamageChannelIgnoreDefenseGain({
+    currentIgnoreDefense: ignoreDefense,
+    addedIgnoreDefense: 1,
+    enemyDefense: defense,
+    channels: Array.isArray(channels) ? channels : [],
+  });
+  const defenseFactor = fullDefenseGain > 0
+    ? 1 / (1 + fullDefenseGain)
+    : Math.max(0, 1 - defense * (1 - ignoreDefense));
+  return statTerm * Number(details.dopedAttack) *
+    (1 + Number(details.dopedDamageTotal) / 100) *
+    (1 + criticalRate * (0.35 + Number(details.dopedCriticalDamage) / 100)) *
+    defenseFactor * (1 + sources.computed["최종 데미지"] / 100);
+}
+
 /**
  * 이미 조회한 공개 NEXON 스냅샷을 프리셋 정책만 바꿔 다시 계산합니다.
  * 원본 조회와 환산을 분리해 auto/active/manual 전환 시 같은 30~32개
@@ -1059,9 +1083,8 @@ export function buildCharacterConversionFromData(
     subStats,
     attackType: inferredProfile.attackType,
   };
-  let resolvedPresets: ReturnType<typeof resolveCharacterPresetSnapshot>;
-  try {
-    resolvedPresets = resolveCharacterPresetSnapshot({
+  const resolvePresets = (includeExternalBossCriticalRate: boolean) =>
+    resolveCharacterPresetSnapshot({
       ...snapshot,
       statData: statDataWithValues(snapshot.statData, rankingSources?.computed),
       mainStat: inferredProfile.mainStat,
@@ -1071,7 +1094,11 @@ export function buildCharacterConversionFromData(
       characterClass: className,
       presetPolicy,
       includeBossCriticalBuffs: Boolean(rankingSources),
+      includeExternalBossCriticalRate,
     });
+  let resolvedPresets: ReturnType<typeof resolveCharacterPresetSnapshot>;
+  try {
+    resolvedPresets = resolvePresets(true);
   } catch (error) {
     throw new ConversionUnavailableError(
       error instanceof Error
@@ -1083,11 +1110,11 @@ export function buildCharacterConversionFromData(
     ...snapshot,
     ...resolvedPresets.activeSnapshot,
   };
-  const selectedPresetSnapshot = {
+  let selectedPresetSnapshot = {
     ...snapshot,
     ...resolvedPresets.selectedSnapshot,
   };
-  const selectedStatSources = reconstructPresetSources(
+  let selectedStatSources = reconstructPresetSources(
     { character, snapshot: selectedPresetSnapshot },
     inferredProfile.mainStat,
     inferredProfile.attackType,
@@ -1116,6 +1143,17 @@ export function buildCharacterConversionFromData(
   if (model === "standard") {
     let baseResult: ReturnType<typeof calculateCharacterPotentialConversion>;
     let fullBossResult: ReturnType<typeof calculateCharacterPotentialConversion>;
+    const calculateBoss = (
+      preset: typeof resolvedPresets,
+      sources: CharacterStatSources | null,
+    ) => calculateCharacterPotentialConversion({
+      ...calculationInput,
+      doping: FULL_BOSS_DOPING,
+      includeLoadedDice: Boolean(sources),
+      presetPolicy,
+      resolvedPresetSnapshot: preset,
+      selectedStatSources: sources,
+    });
     try {
       baseResult = calculateCharacterPotentialConversion({
         ...calculationInput,
@@ -1124,18 +1162,40 @@ export function buildCharacterConversionFromData(
         resolvedPresetSnapshot: baseResolvedPresets,
         selectedStatSources: activeStatSources,
       });
-      fullBossResult = calculateCharacterPotentialConversion({
-        ...calculationInput,
-        doping: FULL_BOSS_DOPING,
-        includeLoadedDice: Boolean(selectedStatSources),
-        presetPolicy,
-        resolvedPresetSnapshot: resolvedPresets,
-        selectedStatSources,
-      });
+      fullBossResult = calculateBoss(resolvedPresets, selectedStatSources);
     } catch {
       throw new ConversionUnavailableError(
         "캐릭터의 공개 스탯으로 환산값을 계산하지 못했습니다.",
       );
+    }
+    if (rankingSources && selectedStatSources) {
+      const alternate = resolvePresets(false);
+      const picks = resolvedPresets.selection.selected;
+      if (Object.entries(alternate.selection.selected).some(([key, value]) =>
+        picks[key as keyof typeof picks] !== value)) {
+        const alternateSnapshot = { ...snapshot, ...alternate.selectedSnapshot };
+        const sources = reconstructPresetSources(
+          { character, snapshot: alternateSnapshot },
+          inferredProfile.mainStat, inferredProfile.attackType, presetPolicy.mode, true,
+        );
+        if (sources) {
+          let alternateResult;
+          try {
+            alternateResult = calculateBoss(alternate, sources);
+          } catch {
+            // 대안의 외부 데이터가 부족하면 이미 계산한 후보를 유지합니다.
+          }
+          const sharpEyes = bossCriticalEffects(snapshot.skillData, FULL_BOSS_DOPING).sharpEyes;
+          const extraCriticalRate = Math.max(0, FULL_BOSS_DOPING.sayramCriticalRate - sharpEyes.criticalRate);
+          if (alternateResult && bossPresetPower(alternateResult, sources, extraCriticalRate) >
+              bossPresetPower(fullBossResult, selectedStatSources, extraCriticalRate)) {
+            resolvedPresets = alternate;
+            selectedPresetSnapshot = alternateSnapshot;
+            selectedStatSources = sources;
+            fullBossResult = alternateResult;
+          }
+        }
+      }
     }
     assertStatEquivalence(baseResult.statEquivalence);
     assertStatEquivalence(fullBossResult.statEquivalence);

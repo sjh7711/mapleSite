@@ -142,15 +142,73 @@ test("VI 강화 후 유지되는 전역 패시브와 파이렛 블레스를 출�
         character_owned_link_skill: skill("커버넌트", "소환수 소환 시 데미지 8% 증가"),
       },
     };
-    const { computed, summonedLinkDamage } = reconstructCharacterStats({
+    const { computed } = reconstructCharacterStats({
       character: { character_class: characterClass }, snapshot, mainStat: "LUK",
     });
     assert.equal(computed.LUK, 74, name);
     assert.ok(Math.abs(computed["최종 데미지"] - finalDamage) < 1e-9, name);
     assert.equal(computed["보스 몬스터 데미지"], bossDamage, name);
     assert.equal(computed.데미지, characterClass === "캐논마스터" ? 15 : 0, name);
-    assert.equal(summonedLinkDamage, 8, name);
   }
+});
+
+test("익셉셔널 강화와 활성 월드 공유 치장 옵션, 매직 서킷과 노블레스 효과를 합산한다", () => {
+  const cashItem = (slot, name, type, value, item_gender = null) => ({
+    cash_item_equipment_slot: slot, cash_item_name: name, item_gender,
+    cash_item_option: [{ option_type: type, option_value: String(value) }],
+  });
+  const snapshot = {
+    statData: statData({ "AP 배분 STR": 4 }),
+    equipmentData: { item_equipment: [
+      {
+        item_equipment_slot: "무기",
+        item_base_option: { attack_power: "100" },
+        item_total_option: { str: "20", attack_power: "100", magic_power: "200" },
+      },
+      {
+        item_equipment_slot: "펜던트",
+        item_total_option: { str: "10", attack_power: "20", magic_power: "200" },
+        item_exceptional_option: { str: "10", attack_power: "5", magic_power: "5" },
+      },
+    ] },
+    cashEquipmentData: {
+      character_gender: "남",
+      world_share_master_label_activate_flag: "1",
+      cash_item_equipment_base: [
+        cashItem("모자", "캐릭터 모자", "STR", 99),
+        cashItem("장갑", "캐릭터 장갑", "공격력", 3),
+      ],
+      world_share_master_label_base: [
+        cashItem("모자", "공유 모자", "STR", 30),
+        cashItem("무기", "공유 무기", "공격력", 30),
+        cashItem("망토", "여성 전용 망토", "STR", 50, "여"),
+      ],
+    },
+    skillData: [{ character_skill_grade: "0", character_skill: [{
+      skill_name: "매직 서킷", skill_level: 1,
+      skill_effect: "무기를 제외한 착용 중인 장비의 마력 중 35%를 공격력으로 전환\n단, 세트 효과는 적용되지 않고 착용 중인 무기 순수 공격력의 15%까지 전환 가능",
+    }] }],
+    linkSkillData: { character_owned_link_skill: {
+      skill_name: "노블레스",
+      skill_effect: "보스 몬스터 공격 시 데미지 4% 증가\n같은 맵에 있는 자신을 포함한 파티원 1명 당 데미지 2% 증가, 최대 8%까지 증가",
+    } },
+  };
+  const input = { character: { character_class: "아델" }, mainStat: "STR" };
+  const { computed } = reconstructCharacterStats({ ...input, snapshot });
+  assert.equal(computed.STR, 74);
+  assert.equal(computed.공격력, 173);
+  assert.equal(computed.마력, 405);
+  assert.equal(computed.데미지, 2);
+  assert.equal(computed["보스 몬스터 데미지"], 4);
+  const inactive = reconstructCharacterStats({
+    ...input,
+    snapshot: {
+      ...snapshot,
+      cashEquipmentData: { ...snapshot.cashEquipmentData, world_share_master_label_activate_flag: "0" },
+    },
+  }).computed;
+  assert.equal(inactive.STR, 143);
+  assert.equal(inactive.공격력, 143);
 });
 
 test("직접 방무와 설명에 표시된 오리진 강화 방무를 해당 스킬에만 적용한다", () => {
@@ -329,6 +387,38 @@ test("장비 프리셋 변경 시 알려진 세트의 적용 단계를 다시 �
     resolved.selectedSnapshot.setEffectResolution.adjustedSets,
     [{ setName: "여명의 보스 세트", activeCount: 2, selectedCount: 1 }],
   );
+});
+
+test("현재 장비에 없는 마이스터 세트가 선택 프리셋에서 성립한다", () => {
+  const hat = { item_equipment_slot: "모자", item_name: "일반 모자" };
+  const ring = { item_equipment_slot: "반지1", item_name: "마이스터링" };
+  const earring = { item_equipment_slot: "귀고리", item_name: "마이스터 이어링" };
+  const shoulder = { item_equipment_slot: "어깨장식", item_name: "마이스터 숄더" };
+  const active = [hat];
+  const result = resolveCharacterPresetSnapshot({
+    characterClass: "히어로",
+    mainStat: "STR",
+    attackType: "attack",
+    equipmentData: {
+      preset_no: 1,
+      item_equipment: active,
+      item_equipment_preset_1: active,
+      item_equipment_preset_2: [hat, ring, earring, shoulder],
+      item_equipment_preset_3: [hat, ring],
+    },
+    setEffectData: { set_effect: [] },
+    presetPolicy: { mode: "auto" },
+  });
+  assert.equal(result.selection.selected.equipment, 2);
+  assert.deepEqual(result.activeSnapshot.setEffectData.set_effect, []);
+  const [set] = result.selectedSnapshot.setEffectData.set_effect;
+  assert.equal(set.set_name, "마이스터 세트");
+  assert.equal(set.total_set_count, 3);
+  assert.deepEqual(set.set_effect_info.map(({ set_count }) => set_count), [2, 3]);
+  assert.match(set.set_effect_info[1].set_option, /공격력 \+40, 마력 \+40/u);
+  assert.deepEqual(result.selectedSnapshot.setEffectResolution.adjustedSets, [
+    { setName: "마이스터 세트", activeCount: 0, selectedCount: 3 },
+  ]);
 });
 
 test("API 장비와 최종 스탯에서 풀도핑 개인 효율을 계산한다", () => {
@@ -798,6 +888,138 @@ test("자동 보스는 조건부 링크 방무 및 상태이상 데미지를 프
     });
     assert.equal(result.selection.selected.link, expected);
   }
+});
+
+test("자동 보스는 솔 헤카테 습득 여부에 따라 선택 후보의 커버넌트를 평가한다", () => {
+  const active = [{ skill_name: "상시 데미지", skill_effect: "데미지 7% 증가" }];
+  const candidate = [{
+    skill_name: "커버넌트", skill_level: 3, skill_effect: "소환수 소환 시 데미지 12% 증가",
+  }];
+  for (const [skillLevel, expected] of [[1, 2], [0, 1]]) {
+    const { selection } = resolveCharacterPresetSnapshot({
+      characterClass: "히어로",
+      mainStat: "STR",
+      subStats: ["DEX"],
+      attackType: "attack",
+      statData: statData({
+        STR: 50_000, DEX: 5_000, 공격력: 5_000, 데미지: 100,
+        "보스 몬스터 데미지": 500, "방어율 무시": 98, "크리티컬 확률": 100,
+      }),
+      linkSkillData: {
+        character_link_skill: active,
+        character_link_skill_preset_1: active,
+        character_link_skill_preset_2: candidate,
+      },
+      skillData: [{
+        character_skill_grade: "6",
+        character_skill: [{ skill_name: "솔 헤카테", skill_level: skillLevel }],
+      }],
+    });
+    assert.equal(selection.selected.link, expected);
+  }
+});
+
+test("아델 자동 보스는 후보 어빌리티의 패시브와 영약 적용 후 크확을 비교한다", () => {
+  const equipment = [{ item_equipment_slot: "무기", item_name: "튜너" }];
+  const firstAbility = [
+    { ability_value: "스킬 사용 시 20% 확률로 재사용 대기시간이 미적용" },
+    { ability_value: "보스 몬스터 공격 시 데미지 20% 증가" },
+    { ability_value: "패시브 스킬 레벨이 1 증가 (액티브 혼합형, 5차, 6차 스킬 적용안됨)" },
+  ];
+  const thirdAbility = [
+    { ability_value: "보스 몬스터 공격 시 데미지 20% 증가" },
+    { ability_value: "스킬 사용 시 10% 확률로 재사용 대기시간이 미적용" },
+    { ability_value: "상태 이상에 걸린 대상 공격 시 데미지 8% 증가" },
+  ];
+  const firstUnion = ["STR 75 증가", "버프 지속시간 36% 증가", "크리티컬 확률 10% 증가"];
+  const fifthUnion = ["STR 75 증가", "DEX 75 증가", "버프 지속시간 4% 증가", "크리티컬 확률 12% 증가"];
+  const link = [{
+    skill_name: "소울 컨트랙트", skill_effect: "10초 동안 데미지 60% 증가\n재사용 대기시간 60초",
+  }];
+  const input = {
+    characterClass: "아델",
+    mainStat: "STR",
+    subStats: ["DEX"],
+    attackType: "attack",
+    includeBossCriticalBuffs: true,
+    statData: statData({
+      STR: 131551, DEX: 16644, 공격력: 20965, 데미지: 112, "보스 몬스터 데미지": 571,
+      "방어율 무시": 97.83, "크리티컬 확률": 89, "크리티컬 데미지": 145.55,
+      "버프 지속시간": 91, "상태이상 추가 데미지": 9,
+    }),
+    equipmentData: { preset_no: 1, item_equipment: equipment, item_equipment_preset_1: equipment },
+    hyperStatData: {
+      use_preset_no: "1", hyper_stat_preset_1: [{ stat_type: "STR", stat_increase: "STR 30 증가" }],
+    },
+    linkSkillData: { character_link_skill: link, character_link_skill_preset_1: link },
+    unionRaiderData: {
+      use_preset_no: 1,
+      union_state_stat: firstUnion,
+      union_state_stat_preset: [
+        { preset_no: 1, union_state_stat: firstUnion },
+        { preset_no: 5, union_state_stat: fifthUnion },
+      ],
+    },
+    abilityData: {
+      preset_no: 1, ability_info: firstAbility,
+      ability_preset_1: { ability_info: firstAbility },
+      ability_preset_3: { ability_info: thirdAbility },
+    },
+    skillData: [
+      { character_skill_grade: "4", character_skill: [
+        { skill_name: "엑스퍼트", skill_level: 31,
+          skill_effect: "튜너 숙련도 71%로 증가, 공격력 31, 데미지 20% 증가" },
+        { skill_name: "데몰리션", skill_level: 21,
+          skill_effect: "최종 데미지 31%, 방어율 무시 21% 증가" },
+        { skill_name: "어테인", skill_level: 21,
+          skill_effect: "공격력 31, 데미지 14%, 크리티컬 확률 21%, 최대 HP 15% 증가" },
+      ] },
+      { character_skill_grade: "5", character_skill: [{
+        skill_name: "쓸만한 샤프 아이즈", skill_level: 30,
+        skill_effect: "270초 동안 크리티컬 확률 10%, 크리티컬 데미지 8% 증가",
+      }] },
+    ],
+  };
+  const result = resolveCharacterPresetSnapshot(input);
+  assert.equal(result.selection.selected.union, 1);
+  assert.equal(result.selection.selected.ability, 1);
+  const readAbilities = (resolved) => reconstructCharacterStats({
+    character: { character_class: "아델" },
+    snapshot: { ...input, ...resolved.selectedSnapshot },
+    mainStat: "STR",
+  }).computed;
+  const original = readAbilities(result);
+  const switched = resolveCharacterPresetSnapshot({
+    ...input,
+    presetPolicy: { mode: "manual", manual: { ...result.selection.selected, ability: 3 } },
+  });
+  const alternate = readAbilities(switched);
+  assert.equal(original.공격력 - alternate.공격력, 2);
+  assert.equal(original.데미지 - alternate.데미지, 1);
+  assert.equal(original["크리티컬 확률"] - alternate["크리티컬 확률"], 1);
+  assert.ok(Math.abs(original["최종 데미지"] - 31) < 1e-9);
+  assert.ok(Math.abs(alternate["최종 데미지"] - 30) < 1e-9);
+  assert.ok(Math.abs(alternate["방어율 무시"] - 20) < 1e-9);
+  assert.equal(input.skillData[0].character_skill[1].skill_level, 21);
+
+  const bishop = resolveCharacterPresetSnapshot({
+    ...input,
+    characterClass: "비숍",
+    mainStat: "INT",
+    attackType: "magic",
+    presetPolicy: { mode: "manual", manual: { ...result.selection.selected, ability: 3 } },
+    skillData: [{
+      character_skill_grade: "4",
+      character_skill: [{
+        skill_name: "마스터 매직",
+        skill_level: 11,
+        skill_effect: "영구적으로 마력 33, 최종 데미지 11%, 버프 지속시간 55% 증가  \n스탠스 66% 증가",
+      }],
+    }],
+  });
+  const [masterMagic] = bishop.selectedSnapshot.skillData[0].character_skill;
+  assert.equal(masterMagic.skill_level, 10);
+  assert.match(masterMagic.skill_effect, /마력 30.*버프 지속시간 50%/u);
 });
 
 test("어빌리티 프리셋 변경 시 상태이상 데미지를 active 기준 delta로 바꾼다", () => {

@@ -1,6 +1,7 @@
 import {
   CLASS_ALWAYS_ON_COMBAT,
   CRITICAL_REINFORCE_CLASSES,
+  FULL_BOSS_DOPING,
 } from "./stat-profile.js";
 import {
   calculateDamageChannelIgnoreDefenseGain,
@@ -12,6 +13,8 @@ import {
   targetDefenseEffectsFromSkills,
 } from "./combat-model.js";
 import { classBattlePracticeDamageProfile } from "./class-damage-profiles.js";
+import { ABILITY_PASSIVE_LEVEL_EFFECTS } from "./ability-passive-level-effects.js";
+import { knownEquipmentSetOptions } from "./equipment-set-options.js";
 import {
   calculateBossItemCombatEffects,
   renConditionalLinkDamageCoverage,
@@ -355,14 +358,25 @@ function optionEntryBonuses(items, optionField = "item_option") {
   return result;
 }
 
+export function activeCashEquipmentItems(cashEquipmentData) {
+  const items = [
+    ...(cashEquipmentData?.cash_item_equipment_base ?? []),
+    ...(cashEquipmentData?.additional_cash_item_equipment_base ?? []),
+  ];
+  if (String(cashEquipmentData?.world_share_master_label_activate_flag) !== "1") return items;
+  const gender = String(cashEquipmentData.character_gender ?? "").charAt(0);
+  const shared = (cashEquipmentData.world_share_master_label_base ?? []).filter((item) => {
+    const itemGender = String(item?.item_gender ?? "").charAt(0);
+    return item?.cash_item_name &&
+      (!/^[남여]$/u.test(gender) || !/^[남여]$/u.test(itemGender) || gender === itemGender);
+  });
+  const slot = (item) => String(item?.cash_item_equipment_slot ?? "").replace(/^한벌옷$/u, "상의");
+  const sharedSlots = new Set(shared.map(slot).filter(Boolean));
+  return [...items.filter((item) => !sharedSlots.has(slot(item))), ...shared];
+}
+
 function cashEquipmentBonuses(cashEquipmentData) {
-  return optionEntryBonuses(
-    [
-      ...(cashEquipmentData?.cash_item_equipment_base ?? []),
-      ...(cashEquipmentData?.additional_cash_item_equipment_base ?? []),
-    ],
-    "cash_item_option",
-  );
+  return optionEntryBonuses(activeCashEquipmentItems(cashEquipmentData), "cash_item_option");
 }
 
 function lunaPetSkills(petEquipmentData) {
@@ -1048,7 +1062,7 @@ function grandisLefConvertedAttack(equipmentData, attackType) {
   const nonWeaponOppositePower = equipment
     .filter((item) => item?.item_equipment_slot !== "무기")
     .reduce(
-      (sum, item) => sum + number(item?.item_total_option?.[otherKey]),
+      (sum, item) => sum + itemStatValue(item, otherKey),
       0,
     );
   const weapon = equipment.find(
@@ -1058,6 +1072,22 @@ function grandisLefConvertedAttack(equipmentData, attackType) {
   return weaponCap > 0
     ? Math.min(nonWeaponOppositePower, weaponCap)
     : nonWeaponOppositePower;
+}
+
+function magicCircuitAttack(equipmentData, skillData, attackType) {
+  const effect = String(learnedSkill(skillData, "매직 서킷")?.skill_effect ?? "");
+  const conversion = effect.match(/장비의\s*(공격력|마력)\s*중\s*(\d+(?:\.\d+)?)%를\s*(공격력|마력)으로 전환/u);
+  const limit = effect.match(/무기 순수\s*(공격력|마력)의\s*(\d+(?:\.\d+)?)%까지 전환/u);
+  const used = attackType === "magic" ? "마력" : "공격력";
+  if (!conversion || !limit || conversion[3] !== used || limit[1] !== used) return 0;
+  const oppositeKey = conversion[1] === "마력" ? "magic_power" : "attack_power";
+  const usedKey = used === "마력" ? "magic_power" : "attack_power";
+  const items = activeEquipment(equipmentData ?? {});
+  const weapon = items.find((item) => item?.item_equipment_slot === "무기");
+  const source = items.reduce((sum, item) => item?.item_equipment_slot === "무기"
+    ? sum : sum + itemStatValue(item, oppositeKey), 0);
+  const cap = number(weapon?.item_base_option?.[usedKey]) * number(limit[2]) / 100;
+  return Math.floor(Math.min(source * number(conversion[2]) / 100, cap));
 }
 
 function grandisGoddessEvent({
@@ -2253,11 +2283,7 @@ function weightedCriticalReinforceUptime({
 }
 
 export function linkSkillBonuses(linkSkillData) {
-  const skills = [
-    ...(linkSkillData?.character_link_skill ?? []),
-    linkSkillData?.character_owned_link_skill,
-  ].filter(Boolean);
-  return parseTextBonuses(skills.map((skill) => skill.skill_effect));
+  return parseTextBonuses(linkSkills(linkSkillData).flatMap(linkCombatTexts));
 }
 
 function linkSkills(linkSkillData) {
@@ -2265,6 +2291,14 @@ function linkSkills(linkSkillData) {
     ...(linkSkillData?.character_link_skill ?? []),
     linkSkillData?.character_owned_link_skill,
   ].filter(Boolean);
+}
+
+function linkCombatTexts({ skill_name, skill_effect }) {
+  if (skill_name !== "노블레스") return skill_effect ? [skill_effect] : [];
+  // 파티 없이도 자신 1명은 항상 포함되므로 솔로 보스의 수치로 합산한다.
+  const boss = percentFromEffect(skill_effect, /보스 몬스터 공격 시 데미지\s*(\d+(?:\.\d+)?)%/u);
+  const solo = percentFromEffect(skill_effect, /파티원\s*1명\s*당\s*데미지\s*(\d+(?:\.\d+)?)%/u);
+  return [`보스 몬스터 공격 시 데미지 ${boss}% 증가`, `데미지 ${solo}% 증가`];
 }
 
 function conditionalDamageFromLink(linkSkillData) {
@@ -2276,12 +2310,19 @@ function conditionalDamageFromLink(linkSkillData) {
   }, 0);
 }
 
+export function maintainsBossSummon(skillData, characterClass) {
+  // 레테는 고유 소환수를 유지한다. 솔 헤카테는 직업과 관계없이 보스전에서 유지한다.
+  return characterClass === "레테" ||
+    Boolean(learnedSkill(skillData, "솔 헤카테"));
+}
+
 /** 정적 최종 스탯에 남지 않는 링크 스킬을 보스전 평균값으로 환산한다. */
 export function calculateConditionalLinkCycleBonuses(
   linkSkillData,
   buffDurationPercent = 0,
   targetLevelIsLower = false,
   characterClass,
+  maintainsSummon = false,
 ) {
   const result = {
     damage: 0,
@@ -2289,6 +2330,7 @@ export function calculateConditionalLinkCycleBonuses(
     ignoreDefenseSources: [],
     applied: [],
   };
+  let covenantDamage = 0;
   for (const skill of linkSkills(linkSkillData)) {
     const name = String(skill?.skill_name ?? "").trim();
     const effect = String(skill?.skill_effect ?? "");
@@ -2297,7 +2339,12 @@ export function calculateConditionalLinkCycleBonuses(
     let ignoreDefense = 0;
     let uptime = 1;
 
-    if (name === "무아") {
+    if (name === "커버넌트" && maintainsSummon) {
+      covenantDamage = Math.max(covenantDamage, percentFromEffect(
+        effect,
+        /소환수 소환 시 데미지\s*(\d+(?:\.\d+)?)%\s*증가/u,
+      ));
+    } else if (name === "무아") {
       const initial = percentFromEffect(effect, /발동 시 데미지\s*(\d+(?:\.\d+)?)%/u);
       const perStack = percentFromEffect(effect, /중첩당 데미지\s*(\d+(?:\.\d+)?)%/u);
       const stacks = percentFromEffect(effect, /최대\s*(\d+(?:\.\d+)?)회 중첩/u);
@@ -2351,6 +2398,16 @@ export function calculateConditionalLinkCycleBonuses(
       result.applied.push({ name, damage, bossDamage, ignoreDefense, uptime });
     }
   }
+  if (covenantDamage > 0) {
+    result.damage += covenantDamage;
+    result.applied.push({
+      name: "커버넌트",
+      damage: covenantDamage,
+      bossDamage: 0,
+      ignoreDefense: 0,
+      uptime: 1,
+    });
+  }
   return result;
 }
 
@@ -2397,17 +2454,22 @@ export function calculateGuildNoblesseBonuses(guildData) {
   return result;
 }
 
+export function itemStatValue(item, key) {
+  // 장비 합계 응답과 익셉셔널 강화 응답은 서로 다른 옵션이다.
+  return number(item?.item_total_option?.[key]) + number(item?.item_exceptional_option?.[key]);
+}
+
 function sumItemTotal(equipmentData, stat) {
   const key = stat.toLocaleLowerCase("en-US");
   return activeEquipment(equipmentData).reduce(
-    (sum, item) => sum + number(item.item_total_option?.[key]),
+    (sum, item) => sum + itemStatValue(item, key),
     0,
   );
 }
 
 function sumItemAllStatPercent(equipmentData) {
   return activeEquipment(equipmentData).reduce(
-    (sum, item) => sum + number(item.item_total_option?.all_stat),
+    (sum, item) => sum + itemStatValue(item, "all_stat"),
     0,
   );
 }
@@ -2435,22 +2497,22 @@ function equipmentCombatTotals(equipmentData, attackType, characterClass = "") {
   );
   const result = {
     flatAttack: activeEquipment(equipmentData).reduce(
-      (sum, item) => sum + number(item.item_total_option?.[attackKey]),
+      (sum, item) => sum + itemStatValue(item, attackKey),
       0,
     ) + optionBonuses.flatAttack,
     criticalRate: optionBonuses.criticalRate,
     criticalDamage: optionBonuses.criticalDamage,
     damage: activeEquipment(equipmentData).reduce(
-      (sum, item) => sum + number(item.item_total_option?.damage),
+      (sum, item) => sum + itemStatValue(item, "damage"),
       0,
     ) + optionBonuses.damage,
     bossDamage: activeEquipment(equipmentData).reduce(
-      (sum, item) => sum + number(item.item_total_option?.boss_damage),
+      (sum, item) => sum + itemStatValue(item, "boss_damage"),
       0,
     ) + optionBonuses.bossDamage,
     ignoreDefenseSources: [
       ...activeEquipment(equipmentData)
-        .map((item) => number(item.item_total_option?.ignore_monster_armor))
+        .map((item) => itemStatValue(item, "ignore_monster_armor"))
         .filter((value) => value > 0),
       ...optionBonuses.ignoreDefenseSources,
     ],
@@ -2497,6 +2559,7 @@ function farmingOptionCount(equipmentData) {
 
 function selectBossEquipmentPreset(
   equipmentData,
+  setEffectData,
   mainStat,
   subStats,
   attackType,
@@ -2521,14 +2584,17 @@ function selectBossEquipmentPreset(
     );
     const primaryStats =
       mainStat === "ALL" ? ["STR", "DEX", "LUK"] : [mainStat];
+    const sets = parseSetEffects(
+      setEffectDataForEquipment(setEffectData, equipmentData, candidate.data).data,
+    );
     const mainPercent = primaryStats.reduce(
       (sum, stat) =>
-        sum + options.percent[stat] + sumItemAllStatPercent(candidate.data),
+        sum + options.percent[stat] + sets.percent[stat] + sumItemAllStatPercent(candidate.data),
       0,
     );
     const flatMain = primaryStats.reduce(
       (sum, stat) =>
-        sum + sumEquipmentFlatStat(
+      sum + sets.flat[stat] + sumEquipmentFlatStat(
           candidate.data,
           stat,
           characterLevel,
@@ -2538,12 +2604,12 @@ function selectBossEquipmentPreset(
     );
     const subPercent = subStats.reduce(
       (sum, stat) =>
-        sum + options.percent[stat] + sumItemAllStatPercent(candidate.data),
+      sum + options.percent[stat] + sets.percent[stat] + sumItemAllStatPercent(candidate.data),
       0,
     );
     const flatSub = subStats.reduce(
       (sum, stat) =>
-        sum + sumEquipmentFlatStat(
+      sum + sets.flat[stat] + sumEquipmentFlatStat(
           candidate.data,
           stat,
           characterLevel,
@@ -2553,8 +2619,8 @@ function selectBossEquipmentPreset(
     );
     const attackPercent =
       attackType === "magic"
-        ? options.magicPercent
-        : options.attackPercent;
+        ? options.magicPercent + sets.magicPercent
+        : options.attackPercent + sets.attackPercent;
     const combat = equipmentCombatTotals(
       candidate.data,
       attackType,
@@ -2567,11 +2633,11 @@ function selectBossEquipmentPreset(
       // 고정 스탯을 완전히 무시하지 않도록 낮은 가중치로 비교한다.
       (subStats.length > 1 ? subPercent * 250 + flatSub * 0.25 : 0) +
       attackPercent * 100 +
-      combat.flatAttack * 4 +
-      combat.damage * 20 +
-      combat.criticalDamage * 100 +
-      combat.bossDamage * 10 +
-      combat.ignoreDefenseSources.reduce(
+      (combat.flatAttack + (attackType === "magic" ? sets.flatMagic : sets.flatAttack)) * 4 +
+      (combat.damage + sets.damage) * 20 +
+      (combat.criticalDamage + sets.criticalDamage) * 100 +
+      (combat.bossDamage + sets.bossDamage) * 10 +
+      [...combat.ignoreDefenseSources, ...sets.ignoreDefenseSources].reduce(
         (sum, value) => sum + value * 8,
         0,
       ) -
@@ -2752,6 +2818,7 @@ function stableEquipmentSignature(items) {
         item?.additional_potential_option_3,
         JSON.stringify(equipmentSoulOptionLines(item)),
         JSON.stringify(item?.item_total_option ?? {}),
+        JSON.stringify(item?.item_exceptional_option ?? {}),
       ]
         .map((value) => String(value ?? ""))
         .join("\u0001"),
@@ -2880,6 +2947,56 @@ function abilityPresetData(abilityData, selected) {
   };
 }
 
+function passiveLevelAbility(abilityData) {
+  return Number((abilityData?.ability_info ?? []).some(({ ability_value }) =>
+    /^패시브 스킬 레벨(?:이)?\s*1\s*증가/u.test(ability_value)));
+}
+
+function abilityPassiveSkills(skillData, characterClass, activeAbility, selectedAbility, equipmentData) {
+  const combat = { ...emptyBonuses(), finalDamageRatio: 1, defenseRatio: 1 };
+  const classEffects = ABILITY_PASSIVE_LEVEL_EFFECTS[characterClass];
+  const change = passiveLevelAbility(selectedAbility) - passiveLevelAbility(activeAbility);
+  if (!classEffects || !change || !Array.isArray(skillData)) return { skillData, combat };
+  const flatFields = ["flatAttack", "flatMagic", "attackPercent", "magicPercent", "damage",
+    "bossDamage", "criticalRate", "criticalDamage", "buffDuration"];
+  const finalMultiplier = (texts) => texts.reduce((multiplier, text) =>
+    multiplier * (1 + percentFromEffect(text, /최종 데미지\s*(\d+(?:\.\d+)?)%/u) / 100), 1);
+  const defenseRemaining = (bonuses) => bonuses.ignoreDefenseSources
+    .reduce((remaining, value) => remaining * (1 - value / 100), 1);
+  const newSkills = skillData.map((grade) => {
+    if (String(grade.character_skill_grade) !== "4") return grade;
+    return {
+      ...grade,
+      character_skill: (grade.character_skill ?? []).map((skill) => {
+        const levels = classEffects[skill.skill_name];
+        const level = number(skill.skill_level);
+        const selectedLevel = level + change;
+        const effect = levels?.[selectedLevel];
+        if (!effect || !levels[level]) return skill;
+        const currentEffect = String(skill.skill_effect ?? "").trim().replace(/\s+/gu, " ");
+        if (currentEffect !== levels[level].trim().replace(/\s+/gu, " ")) return skill;
+        const changed = { ...skill, skill_level: selectedLevel, skill_effect: effect };
+        const sourceTexts = (current) => statWindowSkillTexts(
+          [{ ...grade, character_skill: [current] }], equipmentData, undefined, [],
+        );
+        const beforeTexts = sourceTexts(skill);
+        const afterTexts = sourceTexts(changed);
+        const before = parseTextBonuses(beforeTexts);
+        const after = parseTextBonuses(afterTexts);
+        for (const field of flatFields) combat[field] += after[field] - before[field];
+        for (const stat of STAT_NAMES) {
+          combat.flat[stat] += after.flat[stat] - before.flat[stat];
+          combat.percent[stat] += after.percent[stat] - before.percent[stat];
+        }
+        combat.finalDamageRatio *= finalMultiplier(afterTexts) / finalMultiplier(beforeTexts);
+        combat.defenseRatio *= defenseRemaining(after) / defenseRemaining(before);
+        return changed;
+      }),
+    };
+  });
+  return { skillData: newSkills, combat };
+}
+
 function unionPresetData(unionRaiderData, selected) {
   if (!selected) return unionRaiderData;
   const preset = (unionRaiderData?.union_state_stat_preset ?? []).find(
@@ -2894,14 +3011,23 @@ function unionPresetData(unionRaiderData, selected) {
 
 const EXPLICIT_ITEM_SET_NAMES = Object.freeze({
   "가디언 엔젤 링": "보스 장신구 세트",
+  "고귀한 이피아의 반지": "보스 장신구 세트",
   "골든 클로버 벨트": "보스 장신구 세트",
   "데아 시두스 이어링": "보스 장신구 세트",
   "도미네이터 펜던트": "보스 장신구 세트",
+  "로얄 블랙메탈 숄더": "보스 장신구 세트",
   "매커네이터 펜던트": "보스 장신구 세트",
   "블랙빈 마크": "보스 장신구 세트",
+  "분노한 자쿰의 벨트": "보스 장신구 세트",
+  "실버블라썸 링": "보스 장신구 세트",
   "응축된 힘의 결정석": "보스 장신구 세트",
   "아쿠아틱 레터 눈장식": "보스 장신구 세트",
+  "영생의 돌": "보스 장신구 세트",
+  "지옥의 불꽃": "보스 장신구 세트",
+  "크리스탈 웬투스 뱃지": "보스 장신구 세트",
   "파풀라투스 마크": "보스 장신구 세트",
+  "핑크빛 성배": "보스 장신구 세트",
+  "혼테일의 목걸이": "보스 장신구 세트",
   "카오스 혼테일의 목걸이": "보스 장신구 세트",
   "트와일라이트 마크": "여명의 보스 세트",
   "데이브레이크 펜던트": "여명의 보스 세트",
@@ -2973,13 +3099,15 @@ function knownSetCounts(equipmentData) {
 function setEffectDataForEquipment(setEffectData, activeData, selectedData) {
   if (stableEquipmentSetSignature(activeEquipment(activeData)) ===
       stableEquipmentSetSignature(activeEquipment(selectedData))) {
-    return { data: setEffectData, adjustedSets: [], unresolvedSets: [] };
+    return { data: setEffectData ?? {}, adjustedSets: [], unresolvedSets: [] };
   }
   const activeCounts = knownSetCounts(activeData);
   const selectedCounts = knownSetCounts(selectedData);
   const adjustedSets = [];
   const unresolvedSets = [];
-  const sets = (setEffectData?.set_effect ?? []).map((set) => {
+  const currentSets = setEffectData?.set_effect ?? [];
+  const currentSetNames = new Set(currentSets.map((set) => String(set?.set_name ?? "").trim()));
+  const sets = currentSets.map((set) => {
     const setName = String(set?.set_name ?? "").trim();
     const currentCount = number(set?.total_set_count);
     const activeKnown = activeCounts.get(setName) ?? 0;
@@ -2990,9 +3118,10 @@ function setEffectDataForEquipment(setEffectData, activeData, selectedData) {
     }
     const selectedCount = Math.max(0, currentCount + selectedKnown - activeKnown);
     if (selectedCount === currentCount) return set;
-    const full = Array.isArray(set?.set_option_full)
-      ? set.set_option_full
-      : [];
+    const liveOptions = set?.set_option_full;
+    const full = Array.isArray(liveOptions) && liveOptions.length
+      ? liveOptions
+      : knownEquipmentSetOptions(setName);
     if (!full.length) {
       unresolvedSets.push(setName);
       return set;
@@ -3005,11 +3134,29 @@ function setEffectDataForEquipment(setEffectData, activeData, selectedData) {
     return {
       ...set,
       total_set_count: selectedCount,
+      set_option_full: full,
       set_effect_info: full.filter(
         (effect) => number(effect?.set_count) <= selectedCount,
       ),
     };
   });
+  for (const [setName, selectedCount] of selectedCounts) {
+    if (currentSetNames.has(setName)) continue;
+    const full = knownEquipmentSetOptions(setName);
+    if (!full.length) {
+      unresolvedSets.push(setName);
+      continue;
+    }
+    const applicable = full.filter(({ set_count }) => set_count <= selectedCount);
+    if (!applicable.length) continue;
+    adjustedSets.push({ setName, activeCount: 0, selectedCount });
+    sets.push({
+      set_name: setName,
+      total_set_count: selectedCount,
+      set_effect_info: applicable,
+      set_option_full: full,
+    });
+  }
   return {
     data: { ...setEffectData, set_effect: sets },
     adjustedSets,
@@ -3112,6 +3259,7 @@ function selectBossLinkPreset(
   attackType,
   buffDurationPercent,
   characterClass,
+  maintainsSummon,
 ) {
   return selectScoredPreset(candidates, activePreset, (candidate) => {
     const preset = linkPresetData(linkSkillData, candidate);
@@ -3120,9 +3268,10 @@ function selectBossLinkPreset(
       buffDurationPercent,
       false,
       characterClass,
+      maintainsSummon,
     );
     return presetCombatScore(
-      linkSkills(preset).map((skill) => skill.skill_effect),
+      linkSkills(preset).flatMap(linkCombatTexts),
       mainStat,
       subStats,
       attackType,
@@ -3171,6 +3320,7 @@ function presetDependentVector(
   attackType,
   characterLevel,
   characterClass,
+  skillData,
 ) {
   const equipment = snapshot.equipmentData ?? {};
   const options = parseEquipmentOptions(
@@ -3232,7 +3382,7 @@ function presetDependentVector(
           number(supplemental.percent[stat]),
       ]),
     ),
-    flatAttack: number(combat.flatAttack),
+    flatAttack: number(combat.flatAttack) + magicCircuitAttack(equipment, skillData, attackType),
     attackPercent:
       (attackType === "magic"
         ? number(options.magicPercent)
@@ -3317,16 +3467,18 @@ function jointBossPresetScore({
   subStats,
   attackType,
   conditionalLinks,
+  passiveCombat,
   statusAilmentDamage,
+  externalCriticalRate,
   criticalReinforceUptime,
   criticalReinforceExtraRate,
 }) {
   const statValue = (stat) => changedFinalStat(
     number(stats[stat]),
     number(activeVector.flatStats[stat]),
-    number(selectedVector.flatStats[stat]),
+    number(selectedVector.flatStats[stat]) + passiveCombat.flat[stat],
     number(activeVector.percentStats[stat]),
-    number(selectedVector.percentStats[stat]),
+    number(selectedVector.percentStats[stat]) + passiveCombat.percent[stat],
   );
   const statTerm = mainStat === "ALL"
     ? statValue("STR") + statValue("DEX") + statValue("LUK")
@@ -3342,28 +3494,30 @@ function jointBossPresetScore({
   );
   const selectedAttackMultiplier = Math.max(
     0.01,
-    1 + selectedVector.attackPercent / 100,
+    1 + (selectedVector.attackPercent +
+      (attackType === "magic" ? passiveCombat.magicPercent : passiveCombat.attackPercent)) / 100,
   );
   const attack = Math.max(
     1,
     currentAttack * selectedAttackMultiplier / activeAttackMultiplier +
-      (selectedVector.flatAttack - activeVector.flatAttack) *
+      (selectedVector.flatAttack - activeVector.flatAttack + relevantFlatAttack(passiveCombat, attackType)) *
         selectedAttackMultiplier,
   );
   const damageTotal =
     number(stats["데미지"]) + number(stats["보스 몬스터 데미지"]) +
     selectedVector.damage + selectedVector.bossDamage -
     activeVector.damage - activeVector.bossDamage +
-    conditionalLinks.damage + conditionalLinks.bossDamage + statusAilmentDamage;
+    conditionalLinks.damage + conditionalLinks.bossDamage + statusAilmentDamage +
+    passiveCombat.damage + passiveCombat.bossDamage;
   const rawCriticalRate = Math.max(
     0,
     number(stats["크리티컬 확률"]) +
-      selectedVector.criticalRate - activeVector.criticalRate,
+      selectedVector.criticalRate - activeVector.criticalRate + passiveCombat.criticalRate,
   );
   const criticalDamage = Math.max(
     0,
     number(stats["크리티컬 데미지"]) +
-      selectedVector.criticalDamage - activeVector.criticalDamage,
+      selectedVector.criticalDamage - activeVector.criticalDamage + passiveCombat.criticalDamage,
   ) + criticalReinforceDamage(
     rawCriticalRate + criticalReinforceExtraRate,
     criticalReinforceUptime,
@@ -3382,15 +3536,15 @@ function jointBossPresetScore({
       1,
       1 - (1 - number(stats["방어율 무시"]) / 100) *
         number(selectedVector.ignoreDefenseRemaining) / activeRemaining *
-        conditionalRemaining,
+        conditionalRemaining * passiveCombat.defenseRatio,
     ),
   );
   const defenseMultiplier = Math.max(0.0001, 1 - 3.8 * (1 - ignoreDefense));
   const criticalMultiplier =
-    1 + Math.min(100, rawCriticalRate) / 100 * (0.35 + criticalDamage / 100);
+    1 + Math.min(100, rawCriticalRate + externalCriticalRate) / 100 * (0.35 + criticalDamage / 100);
   const farmingPenalty = Math.pow(0.98, selectedVector.farmingOptions);
   return statTerm * attack * Math.max(0.01, 1 + damageTotal / 100) *
-    criticalMultiplier * defenseMultiplier * farmingPenalty;
+    criticalMultiplier * defenseMultiplier * passiveCombat.finalDamageRatio * farmingPenalty;
 }
 
 function selectJointBossPreset({
@@ -3405,12 +3559,17 @@ function selectJointBossPreset({
   characterClass,
   skillData,
   includeBossCriticalBuffs,
+  includeExternalBossCriticalRate,
 }) {
   if (!Array.isArray(statData?.final_stat) || !statData.final_stat.length) {
     return null;
   }
   const stats = finalStats(statData);
+  const maintainsSummon = maintainsBossSummon(skillData, characterClass);
   const criticalBuff = bossSharpEyes(skillData);
+  const externalCriticalRate = includeBossCriticalBuffs && includeExternalBossCriticalRate
+    ? Math.max(0, FULL_BOSS_DOPING.sayramCriticalRate - criticalBuff.criticalRate)
+    : 0;
   if (includeBossCriticalBuffs) {
     stats["크리티컬 확률"] = number(stats["크리티컬 확률"]) + criticalBuff.criticalRate;
     stats["크리티컬 데미지"] = number(stats["크리티컬 데미지"]) + criticalBuff.criticalDamage;
@@ -3435,6 +3594,7 @@ function selectJointBossPreset({
     attackType,
     characterLevel,
     characterClass,
+    skillData,
   );
   const choices = Object.fromEntries(
     PRESET_COMPONENTS.map((component) => [
@@ -3457,11 +3617,20 @@ function selectJointBossPreset({
             attackType,
             characterLevel,
             characterClass,
+            skillData,
           ),
         ];
       })),
     ]),
   );
+  const passiveCombatByAbility = new Map(choices.ability.map((candidate) => [
+    candidate,
+    abilityPassiveSkills(
+      mainStat === "HP" ? undefined : skillData, characterClass, data.abilityData,
+      abilityPresetData(data.abilityData, candidate),
+      data.equipmentData,
+    ).combat,
+  ]));
   const selected = { ...active };
   // 후보 수의 곱만큼 전수 탐색하지 않고 구성요소별 최적화를 두 번
   // 교대한다. 첫 순회에서 선택한 방무·보공 조합을 두 번째 순회가 다시
@@ -3484,11 +3653,12 @@ function selectJointBossPreset({
           unionRaiderData: unionPresetData(data.unionRaiderData, trial.union),
           linkSkillData: linkPresetData(data.linkSkillData, trial.link),
         };
+        const passiveCombat = passiveCombatByAbility.get(trial.ability);
         const buffDuration = selectedBuffDurationPercent(
           stats["버프 지속시간"],
           data,
           trialSnapshot,
-        );
+        ) + passiveCombat.buffDuration;
         const score = jointBossPresetScore({
           stats,
           activeVector,
@@ -3501,12 +3671,15 @@ function selectJointBossPreset({
             buffDuration,
             false,
             characterClass,
+            maintainsSummon,
           ),
+          passiveCombat,
           statusAilmentDamage: selectedStatusAilmentDamage(
             stats["상태이상 추가 데미지"],
             data,
             trialSnapshot,
           ),
+          externalCriticalRate,
           criticalReinforceUptime,
           criticalReinforceExtraRate,
         });
@@ -3560,6 +3733,7 @@ export function resolveCharacterPresetSnapshot({
   statData,
   presetPolicy,
   includeBossCriticalBuffs = false,
+  includeExternalBossCriticalRate = true,
 }) {
   const data = {
     equipmentData,
@@ -3606,12 +3780,13 @@ export function resolveCharacterPresetSnapshot({
       characterClass,
       skillData,
       includeBossCriticalBuffs,
+      includeExternalBossCriticalRate,
     });
     if (jointSelection) {
       selected = jointSelection;
     } else {
       const equipment = selectBossEquipmentPreset(
-        equipmentData, mainStat, subStats, attackType, characterLevel, characterClass,
+        equipmentData, setEffectData, mainStat, subStats, attackType, characterLevel, characterClass,
       ).presetNumber ?? active.equipment;
       const hyper = selectBossHyperStatPreset(hyperStatData, attackType)
         .presetNumber ?? active.hyper;
@@ -3631,7 +3806,7 @@ export function resolveCharacterPresetSnapshot({
         union,
         link: selectBossLinkPreset(
           linkSkillData, available.link, active.link, mainStat, subStats, attackType,
-          buffDuration, characterClass,
+          buffDuration, characterClass, maintainsBossSummon(skillData, characterClass),
         ),
         ability,
       };
@@ -3663,7 +3838,7 @@ export function resolveCharacterPresetSnapshot({
   const selectedPresetData = applyPresetSelection(data, selected, active.equipment);
   if (selectedPresetData.setEffectResolution?.unresolvedSets?.length) {
     warnings.push(
-      `장비 프리셋 변경 시 분류되지 않은 세트는 현재 적용 단계를 유지합니다: ${
+      `장비 프리셋 변경 시 효과를 확인하지 못한 세트: ${
         selectedPresetData.setEffectResolution.unresolvedSets.join(", ")
       }`,
     );
@@ -3673,6 +3848,12 @@ export function resolveCharacterPresetSnapshot({
     selectedSnapshot: {
       ...data,
       ...selectedPresetData,
+      ...(skillData && {
+        skillData: abilityPassiveSkills(
+          skillData, characterClass, abilityData, selectedPresetData.abilityData,
+          selectedPresetData.equipmentData,
+        ).skillData,
+      }),
     },
     selection: {
       mode: policy.mode,
@@ -3749,12 +3930,8 @@ function unionStateCombatBonuses(unionRaiderData, attackType) {
 }
 
 function linkSkillCombatBonuses(linkSkillData, attackType) {
-  const skills = [
-    ...(linkSkillData?.character_link_skill ?? []),
-    linkSkillData?.character_owned_link_skill,
-  ].filter(Boolean);
   return combatBonusesFromTexts(
-    skills.map((skill) => skill.skill_effect),
+    linkSkills(linkSkillData).flatMap(linkCombatTexts),
     attackType,
   );
 }
@@ -4094,13 +4271,11 @@ export function reconstructCharacterStats({
   }));
   const skillTexts = statWindowSkillTexts(skillData, equipmentData, petEquipmentData, activeSkillNames);
   const equippedLinks = linkSkills(linkSkillData);
-  const summonedLinkDamage = Math.max(0, ...equippedLinks.flatMap(({ skill_name, skill_effect }) =>
-    skill_name === "커버넌트" ? [number(String(skill_effect ?? "")
-      .match(/소환수 소환 시 데미지\s*(\d+(?:\.\d+)?)%\s*증가/u)?.[1])] : []));
   // The first line of Nature's Friend is permanent. The following lines
   // describe a separate effect triggered by killing normal monsters.
-  const linkTexts = equippedLinks.map(({ skill_name, skill_effect }) =>
-    skill_name === "자연의 벗" ? String(skill_effect ?? "").split(/\r?\n/u, 1)[0] : skill_effect)
+  const linkTexts = equippedLinks.flatMap((skill) =>
+    skill.skill_name === "자연의 벗"
+      ? [String(skill.skill_effect ?? "").split(/\r?\n/u, 1)[0]] : linkCombatTexts(skill))
     .filter((text) => text &&
       !/\d+\s*초|공격하면|상태 이상|파티원|적에게|약점|재발동|재사용|공격할 때|소환 시|전투 상태/u.test(text));
   const abilityTexts = (abilityData?.ability_info ?? []).map(({ ability_value }) => ability_value)
@@ -4143,8 +4318,14 @@ export function reconstructCharacterStats({
     ignoreSources.push(Math.floor(propensityData.charisma_level / 10));
   }
   const attack = {
-    공격력: { flat: weapon.flatAttack + combat.flatAttack, percent: options.attackPercent + combat.attackPercent },
-    마력: { flat: magicWeapon.flatAttack + combat.flatMagic, percent: options.magicPercent + combat.magicPercent },
+    공격력: {
+      flat: weapon.flatAttack + combat.flatAttack + magicCircuitAttack(equipmentData, skillData, "attack"),
+      percent: options.attackPercent + combat.attackPercent,
+    },
+    마력: {
+      flat: magicWeapon.flatAttack + combat.flatMagic + magicCircuitAttack(equipmentData, skillData, "magic"),
+      percent: options.magicPercent + combat.magicPercent,
+    },
   };
   const computed = {
     "데미지": weapon.damage + combat.damage,
@@ -4179,7 +4360,7 @@ export function reconstructCharacterStats({
       computed[stat] = Math.floor(base * (1 + percent / 100) + 1e-8) + fixed;
     }
   }
-  return { computed, attack, attributes, summonedLinkDamage };
+  return { computed, attack, attributes };
 }
 
 function ensurePositive(value, label) {
@@ -4410,11 +4591,11 @@ export function calculateCharacterPotentialConversion({
     buffDurationPercent,
     false,
     character.character_class,
+    maintainsBossSummon(skillData, character.character_class),
   );
   const bossItemEffects = doping ? calculateBossItemCombatEffects({
     symbolData,
     vMatrixData,
-    targetBoss: doping.targetBoss,
     characterClass: character.character_class,
   }) : [];
   const guildNoblesse = calculateGuildNoblesseBonuses(guildData);

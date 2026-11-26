@@ -29,23 +29,13 @@ export function renConditionalLinkDamageCoverage(name, duration, cooldown) {
   return Math.min(1, (lowShare + (highShare - lowShare) * fraction) * REN_SOUL_REFERENCE_RATIO);
 }
 
-// https://maplestory.nexon.com/Guide/N23GameInformation/Articles/396
-const BOSS_SYMBOLS = {
-  "선택받은 세렌": "어센틱심볼:세르니움",
-  "감시자 칼로스": "어센틱심볼:아르크스",
-  "최초의 대적자": "어센틱심볼:오디움",
-  카링: "어센틱심볼:도원경",
-  림보: "어센틱심볼:카르시온",
-  발드릭스: "그랜드어센틱심볼:탈라하트",
-};
-
 export function calculateBossItemCombatEffects({
-  symbolData, vMatrixData, targetBoss, characterClass,
+  symbolData, vMatrixData, characterClass,
 } = {}) {
   const effects = [];
-  const symbolName = BOSS_SYMBOLS[targetBoss];
-  const symbol = symbolName && symbolData?.symbol?.find((entry) =>
-    String(entry?.symbol_name ?? "").replace(/\s+/gu, "") === symbolName &&
+  // 보스 효율의 공통 기준에서는 장착한 만렙 어센틱심볼의 효과를 한 번만 반영한다.
+  const symbol = symbolData?.symbol?.find((entry) =>
+    /^(?:그랜드)?어센틱심볼:/u.test(String(entry?.symbol_name ?? "").replace(/\s+/gu, "")) &&
     Number(entry?.symbol_level) >= 11
   );
   if (symbol) {
@@ -53,9 +43,9 @@ export function calculateBossItemCombatEffects({
       layer: "target",
       source: symbol.symbol_name,
       kind: "boss-symbol",
-      activation: { mode: "target-match", evidence: "equipped-level-11-symbol" },
+      activation: { mode: "always", evidence: "equipped-level-11-authentic-symbol" },
       modifiers: { bossDamage: 20 },
-      metadata: { targetBoss, level: Number(symbol.symbol_level) },
+      metadata: { level: Number(symbol.symbol_level) },
     }));
   }
 

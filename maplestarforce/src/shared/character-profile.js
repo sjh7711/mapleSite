@@ -527,7 +527,8 @@ function dynamicCombatSummary(profile) {
       parts.push(`${effect.source} 평균 데미지 +${coefficient(effect.averagedModifiers.damage)}%`);
     }
     if (effect.kind === "boss-symbol") {
-      parts.push(`${effect.source} Lv.${effect.metadata.level} · ${effect.metadata.targetBoss} 대상 +${coefficient(effect.averagedModifiers.bossDamage)}%`);
+      const target = effect.metadata.targetBoss ? `${effect.metadata.targetBoss} 대상` : "보스 전투";
+      parts.push(`${effect.source} Lv.${effect.metadata.level} · ${target} 데미지 +${coefficient(effect.averagedModifiers.bossDamage)}%`);
     }
   }
   if (Number(details.combatOrdersSharpEyesBonus) > 0) {

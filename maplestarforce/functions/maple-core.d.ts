@@ -38,12 +38,15 @@ declare module "maple-core/stat-efficiency" {
   export function bossCriticalEffects(
     skillData: Array<Record<string, unknown>>,
     doping: Record<string, unknown> | null,
-  ): { criticalDamage: number; effects: Array<Record<string, unknown>> };
+  ): {
+    sharpEyes: { criticalRate: number };
+    criticalDamage: number;
+    effects: Array<Record<string, unknown>>;
+  };
   export type CharacterStatSources = {
     computed: Record<string, number>;
     attack: Record<"공격력" | "마력", { flat: number; percent: number }>;
     attributes: Partial<Record<string, { base: number; percent: number; fixed: number }>>;
-    summonedLinkDamage: number;
   };
   export function reconstructCharacterStats(data: {
     character: Record<string, unknown>;
@@ -54,6 +57,8 @@ declare module "maple-core/stat-efficiency" {
     attackType?: "attack" | "magic";
   }): CharacterStatSources | null;
   export function equipmentSoulOptionLines(item: Record<string, unknown>): string[];
+  export function itemStatValue(item: Record<string, unknown>, key: string): number;
+  export function activeCashEquipmentItems(data: Record<string, unknown>): unknown[];
   export function characterBaselineSkillSummary(
     skillData: Array<Record<string, unknown>>,
   ): Array<{
@@ -204,11 +209,17 @@ declare module "maple-core/stat-efficiency" {
     applied: Array<Record<string, unknown>>;
   };
 
+  export function maintainsBossSummon(
+    skillData?: Array<Record<string, unknown>>,
+    characterClass?: string,
+  ): boolean;
+
   export function calculateConditionalLinkCycleBonuses(
     linkSkillData: Record<string, unknown>,
     buffDurationPercent?: number,
     targetLevelIsLower?: boolean,
     characterClass?: string,
+    maintainsSummon?: boolean,
   ): {
     damage: number;
     bossDamage: number;
@@ -219,7 +230,6 @@ declare module "maple-core/stat-efficiency" {
   export function calculateBossItemCombatEffects(options: {
     symbolData?: Record<string, unknown>;
     vMatrixData?: Record<string, unknown>;
-    targetBoss?: string;
     characterClass?: string;
   }): ReturnType<typeof import("maple-core/combat-model").createCombatEffect>[];
 
