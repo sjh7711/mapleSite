@@ -3,6 +3,7 @@ import {
   bossCriticalEffects,
   bossDopingTotals,
   calculateActiveSkillCycleBonuses,
+  calculateCombatReuse,
   calculateBossItemCombatEffects,
   calculateCombatRingBonuses,
   calculateConditionalLinkCycleBonuses,
@@ -649,6 +650,12 @@ function calculateXenon(
     text(input.character.character_class),
     cooldownReduction,
   );
+  const combatReuse = calculateCombatReuse({
+    characterClass: text(input.character.character_class),
+    skillData: snapshot.skillData,
+    abilityData: snapshot.abilityData,
+    unionArtifactData: snapshot.unionArtifactData,
+  });
   const activeSkillCycle = calculateActiveSkillCycleBonuses(
     snapshot.skillData,
     "attack",
@@ -666,6 +673,7 @@ function calculateXenon(
       collectorCoverage: number(doping?.collectorCoverage),
       includeHowling: doping?.sayramCoverage == null,
       cooldownReduction,
+      reusePercent: combatReuse.percent,
     },
   );
   const conditionalLinks = calculateConditionalLinkCycleBonuses(
@@ -675,7 +683,7 @@ function calculateXenon(
     text(input.character.character_class),
     !source?.maintainedCovenantDamage &&
       maintainsBossSummon(snapshot.skillData, text(input.character.character_class)),
-    cooldownReduction,
+    combatDuration,
   );
   const guildNoblesse = calculateGuildNoblesseBonuses(snapshot.guildData);
   const guildBaseline = object(doping?.guildBaseline) ?? {};
@@ -966,6 +974,7 @@ function calculateXenon(
       skillData: snapshot.skillData,
       vMatrixData: snapshot.vMatrixData,
       hexaMatrixData: snapshot.hexaMatrixData,
+      weightMultipliers: combatReuse.weightMultipliers,
     }),
   });
   const attackPercent = combatModel.totals.attackPercent;
@@ -1048,6 +1057,7 @@ function calculateXenon(
       } : null,
       targetDefenseRemaining: combatModel.targetDefenseRemaining,
       combatModel,
+      combatReuse: { percent: combatReuse.percent, sources: combatReuse.sources, damageMultiplier: combatReuse.damageMultiplier },
       classDamageProfile,
       combatRings: includeEquippedRing ? combatRing.applied : [],
       cooldownReduction,

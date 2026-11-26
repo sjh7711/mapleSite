@@ -15,6 +15,12 @@ import {
 } from "./combat-model.js";
 import { classBattlePracticeDamageProfile } from "./class-damage-profiles.js";
 import { effectiveSkillCooldown, skillCooldown } from "./combat-cooldown.js";
+import {
+  calculateCombatReuse,
+  expectedReusableBuffCooldown,
+  reuseEligibleSkills,
+} from "./combat-reuse.js";
+export { calculateCombatReuse } from "./combat-reuse.js";
 import { ABILITY_PASSIVE_LEVEL_EFFECTS } from "./ability-passive-level-effects.js";
 import { knownEquipmentSetOptions } from "./equipment-set-options.js";
 import {
@@ -694,6 +700,7 @@ export function resolveClassDamageChannels({
   skillData,
   vMatrixData,
   hexaMatrixData,
+  weightMultipliers,
 } = {}) {
   const discovered = skillLocalIgnoreDefenseChannelsFromSkills(skillData);
   const generalized = generalizedBattlePracticeDamageChannelsFromSkills({
@@ -701,6 +708,7 @@ export function resolveClassDamageChannels({
     vMatrixData,
     hexaMatrixData,
     profile: classBattlePracticeDamageProfile(characterClass),
+    weightMultipliers,
   });
   return generalized.length ? generalized : discovered;
 }
@@ -1633,6 +1641,7 @@ export function calculateActiveSkillCycleBonuses(
     collectorCoverage = null,
     includeHowling = true,
     cooldownReduction,
+    reusePercent = 0,
   } = {},
 ) {
   const result = {
@@ -1648,6 +1657,13 @@ export function calculateActiveSkillCycleBonuses(
     baselineReflected: [],
   };
   const skills = allCharacterSkills(skillData);
+  const reusable = reusePercent > 0 ? reuseEligibleSkills(skillData, characterClass) : new Set();
+  const cycleCooldown = (skill, duration, baseCooldown) => {
+    const cooldown = effectiveSkillCooldown(skill, baseCooldown, cooldownReduction);
+    return reusable.has(skill.skill_name)
+      ? expectedReusableBuffCooldown(duration, cooldown, reusePercent)
+      : cooldown;
+  };
   for (const skill of skills) {
     const name = String(skill?.skill_name ?? "").trim();
     const effect = String(skill?.skill_effect ?? "");
@@ -1691,7 +1707,9 @@ export function calculateActiveSkillCycleBonuses(
       for (const event of specialEvents) {
         addCycleEvent(result, {
           ...event,
-          cooldown: effectiveSkillCooldown(skill, event.cooldown, cooldownReduction),
+          cooldown: event.uptime === undefined
+            ? cycleCooldown(skill, event.duration, event.cooldown)
+            : effectiveSkillCooldown(skill, event.cooldown, cooldownReduction),
         }, combatDuration);
       }
       continue;
@@ -1734,8 +1752,8 @@ export function calculateActiveSkillCycleBonuses(
 
     if (!VERIFIED_TIMED_SELF_BUFF_SKILLS.has(name)) continue;
     const duration = percentFromEffect(effect, /(\d+(?:\.\d+)?)초 동안/u);
-    const cooldown = effectiveSkillCooldown(skill, skillCooldown(effect), cooldownReduction);
-    if (!(duration > 0) || !(cooldown > 0)) continue;
+    const baseCooldown = skillCooldown(effect);
+    if (!(duration > 0) || !(baseCooldown > 0)) continue;
     const modifiers = directCycleSkillModifiers(effect, attackType);
     const goddessMultiplier = percentFromEffect(
       effect,
@@ -1766,14 +1784,15 @@ export function calculateActiveSkillCycleBonuses(
     const tooltip = `${skill.skill_description ?? ""}\n${effect}`;
     const affectedByBuffDuration =
       /버프\s*지속\s*시간\s*증가(?:의)?\s*효과(?:를|가)\s*(?:받는다|적용된다)/u.test(tooltip);
+    const buffDuration = affectedByBuffDuration
+      ? enhanced.duration * (1 + Math.max(0, number(buffDurationPercent)) / 100)
+      : enhanced.duration;
     addCycleEvent(
       result,
       {
         name,
-        duration: affectedByBuffDuration
-          ? enhanced.duration * (1 + Math.max(0, number(buffDurationPercent)) / 100)
-          : enhanced.duration,
-        cooldown,
+        duration: buffDuration,
+        cooldown: cycleCooldown(skill, buffDuration, baseCooldown),
         modifiers: enhanced.modifiers,
         baseFlat,
         ...(enhanced.enhancement
@@ -2516,7 +2535,7 @@ export function calculateConditionalLinkCycleBonuses(
   targetLevelIsLower = false,
   characterClass,
   maintainsSummon = false,
-  cooldownReduction,
+  combatDuration = 360,
 ) {
   const result = {
     damage: 0,
@@ -2564,13 +2583,14 @@ export function calculateConditionalLinkCycleBonuses(
       const baseCooldown = name === "소울 컨트랙트"
         ? skillCooldown(effect)
         : percentFromEffect(effect, /재(?:발동|사용) 대기시간\s*(\d+(?:\.\d+)?)초/u);
-      const cooldown = name === "소울 컨트랙트"
-        ? effectiveSkillCooldown(skill, baseCooldown, cooldownReduction)
-        : baseCooldown;
-      uptime = cooldown > 0 ? Math.min(1, duration / cooldown) : 0;
+      const cooldown = baseCooldown;
+      // 소울 컨트랙트는 2분 극딜·준극딜 타이밍에 한 번씩 사용한다.
+      uptime = name === "소울 컨트랙트"
+        ? activeRingUptime(duration, 60, combatDuration)
+        : cooldown > 0 ? Math.min(1, duration / cooldown) : 0;
       if (characterClass === "렌" && cooldown > 0) {
         const damageCoverage = renConditionalLinkDamageCoverage(name, duration, baseCooldown);
-        if (damageCoverage !== null) uptime = Math.min(1, damageCoverage * baseCooldown / cooldown);
+        if (damageCoverage !== null) uptime = Math.min(1, damageCoverage);
       }
       damage = percentFromEffect(effect, /데미지\s*(\d+(?:\.\d+)?)%\s*증가/u) * uptime;
     } else if (name === "인텐시브 인썰트" && targetLevelIsLower) {
@@ -3921,6 +3941,15 @@ function selectJointBossPreset({
       doping,
     ),
   ]));
+  const reuseByAbility = new Map(choices.ability.map((candidate) => [
+    candidate,
+    calculateCombatReuse({
+      characterClass,
+      skillData,
+      abilityData: abilityPresetData(data.abilityData, candidate),
+      unionArtifactData: data.unionArtifactData,
+    }).damageMultiplier,
+  ]));
   const selected = { ...active };
   // 후보 수의 곱만큼 전수 탐색하지 않고 구성요소별 최적화를 두 번
   // 교대한다. 첫 순회에서 선택한 방무·보공 조합을 두 번째 순회가 다시
@@ -3963,7 +3992,7 @@ function selectJointBossPreset({
             false,
             characterClass,
             maintainsSummon,
-            cooldownReduction,
+            number(doping?.totals?.combatDurationSeconds) || 360,
           ),
           passiveCombat,
           statusAilmentDamage: selectedStatusAilmentDamage(
@@ -3977,7 +4006,7 @@ function selectJointBossPreset({
             : 0,
           criticalReinforceExtraRate,
           dopingTotals,
-        });
+        }) * reuseByAbility.get(trial.ability);
         if (!best || score > best.score) best = { candidate, score };
       }
       selected[component] = best?.candidate ?? selected[component];
@@ -4017,6 +4046,7 @@ export function resolveCharacterPresetSnapshot({
   setEffectData = {},
   hyperStatData = {},
   unionRaiderData = {},
+  unionArtifactData,
   linkSkillData = {},
   abilityData = {},
   skillData,
@@ -4036,6 +4066,7 @@ export function resolveCharacterPresetSnapshot({
     setEffectData,
     hyperStatData,
     unionRaiderData,
+    unionArtifactData,
     linkSkillData,
     abilityData,
   };
@@ -4818,6 +4849,7 @@ export function calculateCharacterPotentialConversion({
       setEffectData,
       hyperStatData,
       unionRaiderData,
+      unionArtifactData,
       linkSkillData,
       abilityData,
       skillData,
@@ -4904,8 +4936,14 @@ export function calculateCharacterPotentialConversion({
     character.character_class,
     !selectedStatSources?.maintainedCovenantDamage &&
       maintainsBossSummon(selectedSkillData, character.character_class),
-    cooldownReduction,
+    combatDurationSeconds,
   );
+  const combatReuse = calculateCombatReuse({
+    characterClass: character.character_class,
+    skillData: selectedSkillData,
+    abilityData: selectedAbilityData,
+    unionArtifactData,
+  });
   const bossItemEffects = doping ? calculateBossItemCombatEffects({
     symbolData,
     vMatrixData,
@@ -4955,6 +4993,7 @@ export function calculateCharacterPotentialConversion({
       collectorCoverage: doping?.collectorCoverage,
       includeHowling: doping?.sayramCoverage == null,
       cooldownReduction,
+      reusePercent: combatReuse.percent,
     },
   );
   const enumeratedBaseMain = ensurePositive(
@@ -5808,6 +5847,7 @@ export function calculateCharacterPotentialConversion({
       skillData: selectedSkillData,
       vMatrixData,
       hexaMatrixData,
+      weightMultipliers: combatReuse.weightMultipliers,
     }),
   });
   const dopedAttackPercent = combatModel.totals.attackPercent;
@@ -6029,6 +6069,7 @@ export function calculateCharacterPotentialConversion({
           }
         : null,
       combatModel,
+      combatReuse: { percent: combatReuse.percent, sources: combatReuse.sources, damageMultiplier: combatReuse.damageMultiplier },
       classDamageProfile:
         classDamageProfile?.id ?? null,
       classDamageSkillProfileHash:

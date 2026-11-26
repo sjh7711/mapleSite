@@ -844,6 +844,7 @@ export function generalizedBattlePracticeDamageChannelsFromSkills({
   vMatrixData,
   hexaMatrixData,
   profile,
+  weightMultipliers,
 } = {}) {
   const profileSkills = Array.isArray(profile?.skillShares)
     ? profile.skillShares
@@ -890,9 +891,10 @@ export function generalizedBattlePracticeDamageChannelsFromSkills({
     if (unavailableBossSkills.has(String(entry?.source ?? "").trim())) continue;
     const hexaReference = number(entry?.hexaReferenceFinalDamagePercent);
     const hexaMultiplier = hexaBonuses.get(entry?.source);
-    const weight = hexaReference > 0 && hexaMultiplier !== undefined
+    const hexaAdjustedWeight = hexaReference > 0 && hexaMultiplier !== undefined
       ? referenceWeight * hexaMultiplier / (1 + hexaReference / 100)
       : referenceWeight;
+    const weight = hexaAdjustedWeight * (weightMultipliers?.get(entry?.source) ?? 1);
     const localChannel = matchingLocalChannel(entry?.source, localChannels);
     if (!localChannel?.ignoreDefenseSources?.length) {
       generalWeight += weight;
