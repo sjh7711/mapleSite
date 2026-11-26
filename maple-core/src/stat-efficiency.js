@@ -1415,6 +1415,35 @@ function specialCycleEvents({
     }];
   }
 
+  if (characterClass === "플레임위자드" && name === "스피릿 오브 플레임") {
+    const ignoreDefense = percentFromEffect(effect,
+      /화신 소환 중[^\n]*방어율 무시\s*(\d+(?:\.\d+)?)%\s*증가/u);
+    if (!(ignoreDefense > 0)) return [];
+    return [{
+      name,
+      model: "maintained-spirit",
+      highPoint: true,
+      duration: combatDuration,
+      cooldown: 0,
+      modifiers: { ignoreDefense },
+    }];
+  }
+
+  if (characterClass === "신궁" && name === "어드밴스드 인핸스 애로우") {
+    const focus = effect.match(/^포커스 온\s*:\s*인핸스 스킬 적중 시\s*(\d+)초 동안[^\n]+/mu);
+    if (!focus) return [];
+    // Repeated Enhanced Sniping hits refresh Focus On during sustained combat.
+    return [{
+      name: "포커스 온",
+      model: "maintained-enhanced-sniping",
+      highPoint: true,
+      duration: number(focus[1]),
+      cooldown: 0,
+      uptime: 1,
+      modifiers: directCycleSkillModifiers(focus[0], attackType),
+    }];
+  }
+
   if (characterClass === "아크" && /^(?:스칼렛|어비스) 차지드라이브(?: VI)?$/u.test(name)) {
     const spellBuff = effect.match(/^(?:스칼렛|어비스) 버프\s*:\s*[^\n]*?적중 시\s*(\d+(?:\.\d+)?)초 동안[^\n]+/mu);
     if (!spellBuff || !(cooldown > 0)) return [];

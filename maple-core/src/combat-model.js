@@ -735,6 +735,7 @@ function skillLocalAttackChannels(skillData) {
   for (const channel of [
     ...hyperPassiveAttackChannels(skillData),
     ...maintainedTrinityIgnoreDefenseChannels(skillData),
+    ...snipingVariantIgnoreDefenseChannels(skillData),
     ...leteAscentBossDamageChannel(skillData),
   ]) {
     const key = normalizedBattleSkillName(channel.source);
@@ -753,6 +754,21 @@ function skillLocalAttackChannels(skillData) {
     Object.assign(current.metadata, channel.metadata);
   }
   return selected;
+}
+
+function snipingVariantIgnoreDefenseChannels(skillData) {
+  const skill = (skillData ?? []).flatMap((group) => group.character_skill ?? [])
+    .find((entry) => entry.skill_name === "스나이핑 VI" && number(entry.skill_level) > 0);
+  const source = String(skill?.skill_effect ?? "").match(
+    /^스나이핑, 인핸스 스나이핑, 얼티밋 스나이핑은 몬스터 방어율 (\d+(?:\.\d+)?)% 무시/mu,
+  );
+  if (!source) return [];
+  // The parser already keeps the same line on Sniping. Add its two other subjects.
+  return ["인핸스 스나이핑", "얼티밋 스나이핑"].map((name) => createDamageChannel({
+    source: name,
+    ignoreDefenseSources: [number(source[1])],
+    metadata: { status: "unweighted", sourceSkill: "스나이핑 VI" },
+  }));
 }
 
 function leteAscentBossDamageChannel(skillData) {

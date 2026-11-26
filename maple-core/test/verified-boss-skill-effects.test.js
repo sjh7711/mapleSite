@@ -123,3 +123,27 @@ test("레테 이딕트 하이퍼와 어센트 보공은 해당 공격만 증가�
     damageBracket: 800, currentIgnoreDefense: 1, enemyDefense: 3.8, channels: [...channels.values()],
   }) - (1 / 820 + 1 / 800 + 1 / 860) / 3) < 1e-12);
 });
+
+test("화신과 포커스 온의 방무는 풀도핑 전투의 유지형 스탯으로 반영한다", () => {
+  const spirits = [grade("4", skill("스피릿 오브 플레임",
+    "MP 115 소비, 화신 소환\n화신 소환 중 MP 소비량 105%로 증가, 방어율 무시 31% 증가"))];
+  const sniper = [grade("4", skill("어드밴스드 인핸스 애로우",
+    "포커스 온 : 인핸스 스킬 적중 시 30초 동안 최종 데미지 4% 증가, 몬스터 방어율 무시 13% 증가\n[패시브 효과 : 몬스터 방어율 20% 무시]",
+    "포커스 온을 획득하고 영구히 방어율 무시가 증가한다."))];
+  assert.deepEqual(calculateActiveSkillCycleBonuses(spirits, "magic", 360, {
+    characterClass: "플레임위자드",
+  }).ignoreDefenseSources, [31]);
+  const bonus = calculateActiveSkillCycleBonuses(sniper, "attack", 360, { characterClass: "신궁" });
+  assert.deepEqual(bonus.ignoreDefenseSources, [13]);
+  assert.equal(bonus.applied[0].name, "포커스 온");
+});
+
+test("스나이핑 VI에 명시된 두 강화 공격에도 고유 방무가 적용된다", () => {
+  const names = ["스나이핑 VI", "인핸스 스나이핑 VI", "얼티밋 스나이핑"];
+  const channels = attackChannels([
+    grade("6", attack(names[0],
+      "스나이핑, 인핸스 스나이핑, 얼티밋 스나이핑은 몬스터 방어율 40% 무시, 추가 크리티컬 확률 100%")),
+  ], names, core("인핸스 스나이핑"));
+  assert.deepEqual(names.map((name) => channels.get(name).ignoreDefenseSources),
+    [[40], [40, 20], [40]]);
+});
