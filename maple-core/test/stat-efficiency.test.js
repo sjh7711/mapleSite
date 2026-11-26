@@ -11,6 +11,9 @@ import {
   targetDefenseEffectsFromSkills,
 } from "maple-core/combat-model";
 import {
+  bossCombatOrderSkills,
+  bossCriticalEffects,
+  bossDopingTotals,
   calculateActiveSkillCycleBonuses,
   calculateCombatRingBonuses,
   calculateCharacterPotentialConversion,
@@ -30,6 +33,95 @@ function statData(values) {
     })),
   };
 }
+
+test("세이람 만료 후 하울링·블레스·샤프 아이즈의 원래 수치를 적용한다", () => {
+  const skills = [{ character_skill: [
+    { skill_name: "하울링", skill_effect: "MP 40 소비, 300초 동안 공격력과 마력 10% 증가" },
+    { skill_name: "블레스", skill_effect: "240초 동안 공격력 15, 마력 15 증가" },
+    { skill_name: "어드밴스드 블레스", skill_effect: "240초 동안 공격력 31, 마력 31, 최대 HP 775 증가" },
+    { skill_name: "쓸만한 어드밴스드 블레스", skill_effect: "공격력 20, 마력 20, 최대 HP 475 증가\n[패시브 효과 : 올스탯 6 증가]" },
+    { skill_name: "쓸만한 샤프 아이즈", skill_effect: "크리티컬 확률 10%, 크리티컬 데미지 8% 증가" },
+  ] }];
+  const atCoverage = (coverage) => ({
+    sayramCoverage: coverage,
+    sayramCriticalRate: 20,
+    sayramCriticalDamage: 16,
+    totals: { attackMagic: 50 * coverage, attackMagicPercent: 10 * coverage, hp: 1750 * coverage },
+  });
+  const off = bossDopingTotals(atCoverage(0), skills, "magic", true);
+  const on = bossDopingTotals(atCoverage(1), skills, "magic", true);
+  assert.deepEqual(off, { attackMagic: 11, attackMagicPercent: 10, hp: 300 });
+  assert.deepEqual(on, { attackMagic: 30, attackMagicPercent: 10, hp: 1275 });
+  const coverage = FULL_BOSS_DOPING.sayramCoverage;
+  const average = bossDopingTotals(atCoverage(coverage), skills, "magic", true);
+  assert.ok(Math.abs(average.attackMagic - (11 + 19 * coverage)) < 1e-9);
+  assert.equal(average.attackMagicPercent, 10);
+  const critical = bossCriticalEffects(skills, atCoverage(coverage));
+  assert.equal(critical.criticalDamage, 8 + 8 * coverage);
+  assert.equal(critical.sayramRate, 10 * coverage);
+  assert.equal(calculateActiveSkillCycleBonuses(skills, "magic", 360, { includeHowling: false }).attackPercent, 0);
+});
+
+test("콜렉터 만료 구간에는 원래 공격 버프와 상위 몽키 매직을 복원한다", () => {
+  const coverage = FULL_BOSS_DOPING.collectorCoverage;
+  const mageSkills = [{ character_skill: [
+    { skill_name: "포틱 메디테이션", skill_effect: "MP 55 소비, 180초 동안 마력 40 증가" },
+  ] }];
+  const mage = calculateActiveSkillCycleBonuses(mageSkills, "magic", 360, { collectorCoverage: coverage });
+  assert.equal(mage.flatAttack, 40 * (1 - coverage));
+
+  const cannonSkills = [{ character_skill: [
+    { skill_name: "몽키 매직", skill_effect: "MP 55 소비, 180초 동안 HP 400, MP 400, 올스탯 30 증가" },
+    { skill_name: "하이퍼 몽키 스펠", skill_effect: "MP 85 소비, 180초 동안 HP 1020, MP 1020, 올스탯 61 증가" },
+  ] }];
+  const totals = { hp: coverage * 400, mainStat: coverage * 30, subStat: coverage * 30 };
+  const cannon = bossDopingTotals({ collectorCoverage: coverage, totals }, cannonSkills, "attack", true);
+  assert.equal(cannon.mainStat, totals.mainStat + 61 * (1 - coverage));
+  assert.equal(cannon.subStat, cannon.mainStat);
+  assert.equal(cannon.hp, totals.hp + 1020 * (1 - coverage));
+});
+
+test("렌 콜렉터의 스킬 레벨 증가를 출처 합산에 적용하고 컴뱃 오더스 레벨로 되돌린다", () => {
+  const skillData = [{ character_skill_grade: "4", character_skill: [
+    { skill_name: "고급 장검 숙련", skill_level: 31, skill_effect: "장검 숙련도 71%로 증가, 공격력 51, 최종 데미지 11% 증가" },
+    { skill_name: "청허심경 IV", skill_level: 31, skill_effect: "공격력 61, 최종 데미지 18% 증가" },
+    { skill_name: "진안", skill_level: 21, skill_effect: "데미지 15%, 크리티컬 데미지 8%, 몬스터 방어율 무시 42% 증가" },
+  ] }];
+  const collector = bossCombatOrderSkills(skillData, "렌", {}, {}, 2);
+  assert.deepEqual(collector[0].character_skill.map(({ skill_level }) => skill_level), [32, 32, 22]);
+  assert.deepEqual(bossCombatOrderSkills(collector, "렌", {}, {}, 1), skillData);
+
+  const result = reconstructCharacterStats({
+    character: { character_class: "렌", character_level: 296 },
+    snapshot: {
+      skillData: collector,
+      statData: statData({ "AP 배분 STR": 1000 }),
+      equipmentData: { item_equipment: [{ item_equipment_slot: "무기", item_equipment_part: "장검" }] },
+    },
+    mainStat: "STR",
+  });
+  assert.equal(result.attack.공격력.flat, 112);
+  assert.equal(result.computed.데미지, 16);
+  assert.ok(Math.abs(result.computed["방어율 무시"] - 44) < 1e-9);
+  assert.ok(Math.abs(result.computed["최종 데미지"] - 32.16) < 1e-9);
+});
+
+test("콜렉터는 마스터 툴팁이 없는 패시브와 확인된 유지형 버프에도 반영된다", () => {
+  const skillData = [{ character_skill_grade: "4", character_skill: [
+    { skill_name: "가드 크러쉬", skill_level: 11, skill_effect: "방어율 44% 무시, 최종 데미지 10% 증가, 공격력 32 증가" },
+    { skill_name: "오펜스 폼", skill_level: 11, skill_effect: "공격 적중 시 10초 동안 데미지 27% 증가, 버프 지속 중 공격 적중 시 지속 시간 갱신 가능\n[패시브 효과 : 스크류 펀치 데미지 110% 증가]" },
+  ] }];
+  const [guard, offense] = bossCombatOrderSkills(skillData, "바이퍼", {}, {}, 2)[0].character_skill;
+  assert.equal(guard.skill_level, 12);
+  assert.match(guard.skill_effect, /^방어율 48% 무시/u);
+  assert.equal(offense.skill_level, 11);
+
+  const coverage = FULL_BOSS_DOPING.collectorCoverage;
+  const details = calculateActiveSkillCycleBonuses(skillData, "attack", 360, {
+    characterClass: "바이퍼", collectorCoverage: coverage,
+  });
+  assert.equal(details.damage, 27 + 2 * coverage);
+});
 
 test("스탯 출처 합산은 숙련도·공속 패시브와 전역 방무를 읽고 공격기 자체 효과를 제외한다", () => {
   const skill = (skill_name, skill_effect, skill_level = 30) =>
@@ -262,7 +354,8 @@ test("HEXA 링크 ID의 강화량으로 해당 공격의 기준 점유율을 조
   };
   const skillData = [{ character_skill: [
     { skill_name: "버닝 브레이커", skill_level: 30, skill_effect: "적의 방어율 100% 무시하며 공격한다" },
-    { skill_name: "버닝 브레이커 강화", skill_level: 20, skill_effect: "버닝 브레이커의 최종 데미지 40% 증가" },
+    { skill_name: "버닝 브레이커 강화", skill_level: 20,
+      skill_effect: "버닝 브레이커 강화의 최종 데미지 40% 증가, 기타 효과 설명" },
   ] }];
   const hexaMatrixData = { character_hexa_core_equipment: [{
     hexa_core_type: "강화 코어",
@@ -453,12 +546,12 @@ test("API 장비와 최종 스탯에서 풀도핑 개인 효율을 계산한다"
 
   const equivalence = result.statEquivalence;
   assert.ok(
-    Math.abs(equivalence.flatMainStatToPercent - 200 / (2160 + 125)) < 1e-12,
+    Math.abs(equivalence.flatMainStatToPercent - 200 / (2160 + 138.29)) < 1e-12,
   );
   assert.ok(
     Math.abs(
       equivalence.allStatPercentToMainPercent -
-        (1 + (509.6 + 125) / (4 * (2160 + 125))),
+        (1 + (509.6 + 138.29) / (4 * (2160 + 138.29))),
     ) < 1e-12,
   );
   assert.ok(equivalence.attackToMainStat > 3);
@@ -516,8 +609,8 @@ test("이중 부스탯을 각각 역산하고 4×LUK + DEX + STR로 환산한다
   assert.deepEqual(result.details.subStats, ["DEX", "STR"]);
   assert.deepEqual(result.details.unreflectedSubs, { DEX: 67, STR: 129 });
   assert.deepEqual(result.details.baseSubs, { DEX: 1289, STR: 726 });
-  assert.deepEqual(result.details.dopedBaseSubs, { DEX: 1414, STR: 851 });
-  assert.deepEqual(result.details.dopedSubs, { DEX: 2187, STR: 1150 });
+  assert.deepEqual(result.details.dopedBaseSubs, { DEX: 1427.29, STR: 864.29 });
+  assert.deepEqual(result.details.dopedSubs, { DEX: 2207, STR: 1165 });
 
   const equivalence = result.statEquivalence;
   assert.deepEqual(equivalence.flatStatToFlatMainStatByStat, {
@@ -532,19 +625,19 @@ test("이중 부스탯을 각각 역산하고 4×LUK + DEX + STR로 환산한다
   assert.ok(
     Math.abs(
       equivalence.statPercentToMainPercentByStat.DEX -
-        1414 / (4 * 5005),
+        1427.29 / (4 * 5018.29),
     ) < 1e-15,
   );
   assert.ok(
     Math.abs(
       equivalence.statPercentToMainPercentByStat.STR -
-        851 / (4 * 5005),
+        864.29 / (4 * 5018.29),
     ) < 1e-15,
   );
   assert.ok(
     Math.abs(
       equivalence.allStatPercentToMainPercent -
-        (1 + 1414 / (4 * 5005) + 851 / (4 * 5005)),
+        (1 + 1427.29 / (4 * 5018.29) + 864.29 / (4 * 5018.29)),
     ) < 1e-15,
   );
   assert.equal(
@@ -552,9 +645,9 @@ test("이중 부스탯을 각각 역산하고 4×LUK + DEX + STR로 환산한다
     equivalence.statPercentToMainPercentByStat.DEX,
   );
   assert.deepEqual(equivalence.unreflectedStatToPercentByStat, {
-    LUK: 100 / 5005,
-    DEX: 25 / 5005,
-    STR: 25 / 5005,
+    LUK: 100 / 5018.29,
+    DEX: 25 / 5018.29,
+    STR: 25 / 5018.29,
   });
 });
 
@@ -2651,8 +2744,8 @@ test("렌은 캐릭터별 상수를 끼워 넣지 않고 공개 스탯을 기준
   assert.equal(result.details.baseMain, 10_000);
   assert.equal(result.details.currentMain, 10_000);
   assert.equal(result.details.currentSub, 2_500);
-  assert.equal(result.details.dopedMain, 10_125);
-  assert.equal(result.details.dopedSub, 2_625);
+  assert.equal(result.details.dopedMain, 10_138);
+  assert.equal(result.details.dopedSub, 2_638);
 });
 
 test("유지되는 표식의 중첩 방무를 모든 연무장 공격군에 적용한다", () => {
@@ -2732,13 +2825,13 @@ test("챔피언의 가호 5레벨은 공통 풀도핑 능력치에 한 번씩 �
   const base = criticalRateConversion("히어로", 80, undefined, null).details;
   const full = criticalRateConversion("히어로", 80).details;
 
-  assert.equal(full.dopedBaseMain - base.dopedBaseMain, 125);
-  assert.equal(full.dopedBaseSub - base.dopedBaseSub, 125);
-  assert.equal(full.combatModel.totals.flatAttack - base.combatModel.totals.flatAttack, 350);
+  assert.ok(Math.abs(full.dopedBaseMain - base.dopedBaseMain - 138.29) < 1e-9);
+  assert.ok(Math.abs(full.dopedBaseSub - base.dopedBaseSub - 138.29) < 1e-9);
+  assert.ok(Math.abs(full.combatModel.totals.flatAttack - base.combatModel.totals.flatAttack - 394.3) < 1e-9);
   assert.equal(full.combatModel.totals.attackPercent - base.combatModel.totals.attackPercent, 14);
   assert.equal(full.combatModel.totals.bossDamage - base.combatModel.totals.bossDamage, 85);
   assert.equal(full.combatModel.totals.damage - base.combatModel.totals.damage, 31);
-  assert.equal(full.dopedCriticalDamage - base.dopedCriticalDamage, 53.5);
+  assert.ok(Math.abs(full.dopedCriticalDamage - base.dopedCriticalDamage - 53.5) < 1e-9);
   assert.deepEqual(full.effectiveDopingTotals.ignoreDefenseSources, [15, 10]);
   assert.ok(Math.abs(full.dopedIgnoreDefense - 23.5) < 1e-9);
 });
@@ -2825,7 +2918,7 @@ test("풀보스 크확은 공용·보스·조건부 보정을 구분하고 100%�
   );
   assert.equal(
     mercedesWithUsefulSharpEyes.details.combatModel.totals.criticalRate,
-    80,
+    90,
   );
   const xenonBuff = criticalRateConversion("제논", 50);
   assert.equal(xenonBuff.details.dopedCriticalRate, 90);
@@ -3102,6 +3195,8 @@ test("레테는 기존 참조 도핑으로 기존 효율 표를 재현한다", (
     attackType: "magic",
     doping: {
       ...FULL_BOSS_DOPING,
+      sayramCoverage: 1,
+      collectorCoverage: 0,
       totals: {
         ...FULL_BOSS_DOPING.totals,
         attackMagic: 375,

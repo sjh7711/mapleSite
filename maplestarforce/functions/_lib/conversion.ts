@@ -4,6 +4,7 @@ import {
   bossCriticalEffects,
   calculateCharacterPotentialConversion,
   characterBaselineSkillSummary,
+  bossCombatOrderSkills,
   resolveCharacterPresetSnapshot,
   type PresetPolicy,
   type PresetSelection,
@@ -1015,13 +1016,12 @@ export async function buildCharacterConversion(
 function bossPresetPower(
   { details }: ReturnType<typeof calculateCharacterPotentialConversion>,
   sources: CharacterStatSources,
-  extraCriticalRate: number,
 ): number {
   const subStats = objectField(details.dopedSubs) ?? {};
   const statTerm = 4 * Number(details.dopedMain) +
     Object.values(subStats).reduce<number>((total, stat) => total + Number(stat), 0);
-  const criticalRate = Math.min(100, Number(details.effectiveBossCriticalRate) + extraCriticalRate) / 100;
-  const ignoreDefense = Number(details.dopedIgnoreDefense);
+  const criticalRate = Math.min(100, Number(details.appliedBossCriticalRate ?? details.effectiveBossCriticalRate)) / 100;
+  const ignoreDefense = Number(details.dopedIgnoreDefense) / 100;
   const defense = 3.8 * Number(details.targetDefenseRemaining);
   const channels = objectField(details.combatModel)?.damageChannels;
   const fullDefenseGain = calculateDamageChannelIgnoreDefenseGain({
@@ -1036,7 +1036,7 @@ function bossPresetPower(
   return statTerm * Number(details.dopedAttack) *
     (1 + Number(details.dopedDamageTotal) / 100) *
     (1 + criticalRate * (0.35 + Number(details.dopedCriticalDamage) / 100)) *
-    defenseFactor * (1 + sources.computed["최종 데미지"] / 100);
+    defenseFactor * (1 + Number(details.fullBossSkillFinalDamage ?? sources.computed["최종 데미지"]) / 100);
 }
 
 /**
@@ -1058,10 +1058,13 @@ export function buildCharacterConversionFromData(
   const activeStatSources = reconstructPresetSources(
     data, inferredProfile.mainStat, inferredProfile.attackType, "active",
   );
-  const verification = verifyCharacterStats(snapshot, activeStatSources);
-  const rankingSources = presetPolicy.mode === "auto" && model !== "demon-avenger"
-    ? reconstructPresetSources(data, inferredProfile.mainStat, inferredProfile.attackType, "active", true)
+  const needsMaintainedSources = model !== "demon-avenger" &&
+    (presetPolicy.mode === "auto" || className === "보우마스터" || className === "신궁");
+  const maintainedStatSources = needsMaintainedSources
+    ? reconstructPresetSources(data, inferredProfile.mainStat, inferredProfile.attackType, "active", { boss: true })
     : null;
+  const verification = verifyCharacterStats(snapshot, activeStatSources, maintainedStatSources);
+  const rankingSources = presetPolicy.mode === "auto" ? maintainedStatSources : null;
 
   const subStats = [
     ...new Set(
@@ -1095,6 +1098,7 @@ export function buildCharacterConversionFromData(
       presetPolicy,
       includeBossCriticalBuffs: Boolean(rankingSources),
       includeExternalBossCriticalRate,
+      doping: FULL_BOSS_DOPING,
     });
   let resolvedPresets: ReturnType<typeof resolveCharacterPresetSnapshot>;
   try {
@@ -1119,8 +1123,51 @@ export function buildCharacterConversionFromData(
     inferredProfile.mainStat,
     inferredProfile.attackType,
     presetPolicy.mode,
-    true,
+    { boss: true, includeMaintainedSummon: true },
   );
+  const fullBossInput = (
+    selectedSnapshot: CharacterPotentialData["snapshot"],
+    sources: CharacterStatSources | null,
+  ) => {
+    if (!sources) return { snapshot: selectedSnapshot, sources };
+    const sourceAt = (ordersLevels: number) => {
+      const skillData = bossCombatOrderSkills(
+        selectedSnapshot.skillData, className, selectedSnapshot.abilityData, selectedSnapshot.equipmentData, ordersLevels,
+      );
+      const adjustedSnapshot = { ...selectedSnapshot, skillData };
+      const sum = skillData === selectedSnapshot.skillData ? sources : reconstructPresetSources(
+        { character, snapshot: adjustedSnapshot },
+        inferredProfile.mainStat, inferredProfile.attackType, presetPolicy.mode,
+        { boss: true, includeMaintainedSummon: true },
+      ) ?? sources;
+      return { snapshot: adjustedSnapshot, sources: sum };
+    };
+    const nativeOrders = selectedSnapshot.skillData.some((grade) =>
+      Array.isArray(grade?.character_skill) && grade.character_skill.some((value) =>
+        objectField(value)?.skill_name === "컴뱃 오더스" && Number(objectField(value)?.skill_level) > 0));
+    const normal = sourceAt(nativeOrders ? 2 : 1);
+    const collector = sourceAt(Number(FULL_BOSS_DOPING.collectorSkillLevels));
+    const coverage = Number(FULL_BOSS_DOPING.collectorCoverage);
+    if (normal.sources === collector.sources) return normal;
+    const blend = (before: number, after: number) => before + coverage * (after - before);
+    const average = <T extends Record<string, number>>(before: T, after: T): T =>
+      Object.fromEntries(Object.entries(before).map(([key, value]) =>
+        [key, blend(value, after[key] ?? value)])) as T;
+    const noBuff = normal.sources;
+    const withBuff = collector.sources;
+    const weighted = {
+      ...noBuff,
+      computed: average(noBuff.computed, withBuff.computed),
+      attack: {
+        공격력: average(noBuff.attack.공격력, withBuff.attack.공격력),
+        마력: average(noBuff.attack.마력, withBuff.attack.마력),
+      },
+      attributes: Object.fromEntries(Object.entries(noBuff.attributes).map(([stat, value]) => [
+        stat, value && average(value, withBuff.attributes[stat] ?? value),
+      ])),
+    };
+    return { snapshot: normal.snapshot, sources: weighted };
+  };
   const basePresetSelection: PresetSelection = {
     ...resolvedPresets.selection,
     mode: "active",
@@ -1146,14 +1193,21 @@ export function buildCharacterConversionFromData(
     const calculateBoss = (
       preset: typeof resolvedPresets,
       sources: CharacterStatSources | null,
-    ) => calculateCharacterPotentialConversion({
-      ...calculationInput,
-      doping: FULL_BOSS_DOPING,
-      includeLoadedDice: Boolean(sources),
-      presetPolicy,
-      resolvedPresetSnapshot: preset,
-      selectedStatSources: sources,
-    });
+    ) => {
+      const doped = fullBossInput({ ...snapshot, ...preset.selectedSnapshot }, sources);
+      const result = calculateCharacterPotentialConversion({
+        ...calculationInput,
+        doping: FULL_BOSS_DOPING,
+        includeLoadedDice: Boolean(doped.sources),
+        presetPolicy,
+        resolvedPresetSnapshot: { ...preset, selectedSnapshot: doped.snapshot },
+        selectedStatSources: doped.sources,
+      });
+      return {
+        ...result,
+        details: { ...result.details, fullBossSkillFinalDamage: doped.sources?.computed["최종 데미지"] },
+      };
+    };
     try {
       baseResult = calculateCharacterPotentialConversion({
         ...calculationInput,
@@ -1176,7 +1230,8 @@ export function buildCharacterConversionFromData(
         const alternateSnapshot = { ...snapshot, ...alternate.selectedSnapshot };
         const sources = reconstructPresetSources(
           { character, snapshot: alternateSnapshot },
-          inferredProfile.mainStat, inferredProfile.attackType, presetPolicy.mode, true,
+          inferredProfile.mainStat, inferredProfile.attackType, presetPolicy.mode,
+          { boss: true, includeMaintainedSummon: true },
         );
         if (sources) {
           let alternateResult;
@@ -1185,10 +1240,8 @@ export function buildCharacterConversionFromData(
           } catch {
             // 대안의 외부 데이터가 부족하면 이미 계산한 후보를 유지합니다.
           }
-          const sharpEyes = bossCriticalEffects(snapshot.skillData, FULL_BOSS_DOPING).sharpEyes;
-          const extraCriticalRate = Math.max(0, FULL_BOSS_DOPING.sayramCriticalRate - sharpEyes.criticalRate);
-          if (alternateResult && bossPresetPower(alternateResult, sources, extraCriticalRate) >
-              bossPresetPower(fullBossResult, selectedStatSources, extraCriticalRate)) {
+          if (alternateResult && bossPresetPower(alternateResult, sources) >
+              bossPresetPower(fullBossResult, selectedStatSources)) {
             resolvedPresets = alternate;
             selectedPresetSnapshot = alternateSnapshot;
             selectedStatSources = sources;
@@ -1245,15 +1298,16 @@ export function buildCharacterConversionFromData(
         doping: null,
         selectedStatSources: activeStatSources,
       });
+      const doped = fullBossInput(selectedPresetSnapshot, selectedStatSources);
       fullBossAddOption = calculateSpecialAddOptionConversion({
         character,
-        snapshot: selectedPresetSnapshot,
+        snapshot: doped.snapshot,
         activeSnapshot: activePresetSnapshot,
         presetSelection: resolvedPresets.selection,
         statModel: model,
         doping: FULL_BOSS_DOPING,
-        includeLoadedDice: Boolean(selectedStatSources),
-        selectedStatSources,
+        includeLoadedDice: Boolean(doped.sources),
+        selectedStatSources: doped.sources,
       });
     } catch {
       throw new ConversionUnavailableError(
@@ -1314,9 +1368,27 @@ export function buildCharacterConversionFromData(
       championBlessingLevel: FULL_BOSS_DOPING.championBlessingLevel,
     };
   }
+  const bossInput = selectedStatSources && model !== "demon-avenger"
+    ? {
+        attributes: selectedStatSources.attributes,
+        attack: selectedStatSources.attack,
+        stats: { ...selectedStatSources.computed },
+        sharpEyes: bossCriticalEffects(
+          selectedPresetSnapshot.skillData as CharacterPotentialData["snapshot"]["skillData"], {},
+        ).sharpEyes,
+      }
+    : null;
+  if (bossInput?.sharpEyes.name) {
+    const { stats, sharpEyes } = bossInput;
+    stats["크리티컬 확률"] += sharpEyes.criticalRate;
+    stats["크리티컬 데미지"] += sharpEyes.criticalDamage;
+    stats["방어율 무시"] = 100 - (100 - stats["방어율 무시"]) * (1 - sharpEyes.ignoreDefense / 100);
+  }
   profiles.fullBoss.details = {
     ...profiles.fullBoss.details,
     selectedStatTotals: selectedStatSources?.computed ?? null,
+    selectedBossInput: bossInput,
+    selectedCovenantDamage: selectedStatSources?.maintainedCovenantDamage ?? 0,
     statVerification: verification.comparison,
     registeredPetSkills: verification.registeredPetSkills,
     statCalculationBasis: model === "demon-avenger" ? "conventional-hp"

@@ -438,7 +438,7 @@ test("환산 계약 버전으로 이전 단일 부스탯 캐시와 키를 분리
     versionedUrl.searchParams.get("conversionVersion"),
     characterConversionCacheVersion,
   );
-  assert.equal(characterConversionCacheVersion, "combat-profile-v94-linked-preset-titles");
+  assert.equal(characterConversionCacheVersion, "combat-profile-v99-full-sayram-collector-levels");
   const freshSnapshotKey = createSnapshotCacheKey(request, "테스트", "fresh");
   const staleSnapshotKey = createSnapshotCacheKey(request, "테스트", "stale");
   assert.equal(characterSnapshotCacheVersion, "character-snapshot-v4");
@@ -521,7 +521,9 @@ test("활성 API 버프와 별개로 공통 출처를 합산하고 보스 조건
     "방어율 무시": 73, "최종 데미지": 20, "보스 몬스터 데미지": 130,
     "크리티컬 확률": 95, "크리티컬 데미지": 106.6,
   };
-  const fetchConversion = async (stats, className = "렌", covenant = false) => {
+  const fetchConversion = async (
+    stats, className = "렌", covenant = false, sharpEyesLevel = 30, armorPiercingLevel = null,
+  ) => {
     const url = new URL(apiRequest().url);
     url.searchParams.set("presetMode", "active");
     const response = await handleCharacterConversion(createContext(new Request(url)), {
@@ -592,9 +594,21 @@ test("활성 API 버프와 별개로 공통 출처를 합산하고 보스 조건
               skill_effect: "방어력 25% 감소, 공격력 30 증가, 최종 데미지 30% 증가" },
           ];
           if (grade === "4") payload.character_skill = [
-            { skill_name: "샤프 아이즈", skill_level: 30,
-              skill_effect: "300초 동안 크리티컬 확률 20%, 크리티컬 데미지 15% 증가" },
+            { skill_name: "샤프 아이즈", skill_level: sharpEyesLevel,
+              skill_effect: sharpEyesLevel === 31
+                ? "310초 동안 크리티컬 확률 21%, 크리티컬 데미지 16% 증가"
+                : "300초 동안 크리티컬 확률 20%, 크리티컬 데미지 15% 증가" },
           ];
+          if (grade === "4" && armorPiercingLevel) {
+            payload.character_skill_grade = grade;
+            payload.character_skill.push({
+              skill_name: "아머 피어싱",
+              skill_level: armorPiercingLevel,
+              skill_effect: armorPiercingLevel === 11
+                ? "방어율 무시 40%, 최종 데미지 16% 증가"
+                : "방어율 무시 41%, 최종 데미지 17% 증가",
+            });
+          }
           if (grade === "hyperpassive") payload.character_skill = [
             { skill_name: "샤프 아이즈-크리티컬 레이트", skill_level: 1,
               skill_effect: "크리티컬 확률 5% 증가" },
@@ -699,17 +713,21 @@ test("활성 API 버프와 별개로 공통 출처를 합산하고 보스 조건
   assert.deepEqual(applied(on.fullBoss, "오라 웨폰")[0].averagedModifiers.ignoreDefenseSources, [16]);
   assert.equal(applied(on.fullBoss, "컨티뉴어스 링").length, 1);
   assert.equal(applied(on.fullBoss, "쓸만한 샤프 아이즈")[0].averagedModifiers.criticalRate, 10);
-  assert.equal(applied(on.fullBoss, "쓸만한 샤프 아이즈")[0].averagedModifiers.criticalDamage, 0);
-  assert.equal(applied(on.fullBoss, "세이람의 영약")[0].averagedModifiers.criticalDamage, 16);
+  assert.equal(applied(on.fullBoss, "쓸만한 샤프 아이즈")[0].averagedModifiers.criticalDamage, 8);
+  assert.equal(applied(on.fullBoss, "세이람의 영약")[0].averagedModifiers.criticalDamage, 8);
 
   const covenant = await fetchConversion({ ...buffsOff, 데미지: 41 }, "렌", true);
-  assert.equal(covenant.fullBoss.details.currentDamage, 33);
+  assert.equal(covenant.fullBoss.details.currentDamage, 41);
+  assert.equal(covenant.fullBoss.details.selectedStatTotals.데미지, 41);
+  assert.equal(covenant.fullBoss.details.selectedCovenantDamage, 8);
   const covenantSources = (profile) => profile.details.conditionalLinkSources
     .filter(({ name }) => name === "커버넌트");
-  assert.equal(covenantSources(covenant.fullBoss).length, 1);
-  assert.equal(covenantSources(covenant.fullBoss)[0].damage, 8);
+  assert.equal(covenantSources(covenant.fullBoss).length, 0);
   assert.equal(covenantSources(covenant.base).length, 0);
-  assert.equal(covenant.fullBoss.details.statVerification.find(({ name }) => name === "데미지").matched, false);
+  assert.ok(Math.abs(covenant.fullBoss.details.dopedDamageTotal - off.fullBoss.details.dopedDamageTotal - 8) < 1e-9);
+  const covenantCheck = covenant.fullBoss.details.statVerification.find(({ name }) => name === "데미지");
+  assert.equal(covenantCheck.matched, false);
+  assert.equal(covenantCheck.conditionalMatch, "커버넌트(소환수 유지)");
 
   const bow = await fetchConversion({
     ...buffsOff,
@@ -718,11 +736,23 @@ test("활성 API 버프와 별개로 공통 출처를 합산하고 보스 조건
     "방어율 무시": 74.35,
     "크리티컬 확률": 120,
     "크리티컬 데미지": 121.6,
-  }, "보우마스터");
+  }, "보우마스터", false, 31);
   assert.equal(bow.fullBoss.details.currentCriticalRate, 95);
-  assert.equal(bow.fullBoss.details.dopedCriticalRate, 120);
+  assert.equal(bow.fullBoss.details.dopedCriticalRate, 121);
+  assert.equal(bow.fullBoss.details.selectedBossInput.stats["크리티컬 확률"], 121);
+  assert.equal(bow.fullBoss.details.selectedBossInput.stats["크리티컬 데미지"], 122.6);
   assert.equal(applied(bow.fullBoss, "샤프 아이즈").length, 1);
   assert.equal(applied(bow.fullBoss, "쓸만한 샤프 아이즈").length, 0);
+  const bowChecks = Object.fromEntries(bow.fullBoss.details.statVerification.map((row) => [row.name, row]));
+  for (const key of ["방어율 무시", "크리티컬 확률", "크리티컬 데미지"]) {
+    assert.equal(bowChecks[key].conditionalMatch, "샤프 아이즈 Lv.30");
+  }
+  assert.equal(bowChecks["최종 데미지"].conditionalMatch, "익스트림 아쳐리");
+  const withoutCollector = await fetchConversion(buffsOff, "보우마스터", false, 31, 11);
+  const withCollector = await fetchConversion(active, "보우마스터", false, 31, 12);
+  assert.deepEqual(withCollector.fullBoss.statEquivalence, withoutCollector.fullBoss.statEquivalence);
+  assert.ok(Math.abs(withCollector.fullBoss.details.fullBossSkillFinalDamage - 81.65108) < 1e-9);
+  assert.equal(withCollector.fullBoss.details.effectiveDopingTotals.attackMagic, 374.3);
 
   const diceEffect = (profile) => profile.details.activeSkillCycles
     .find(({ name }) => name === "로디드 다이스");
@@ -829,6 +859,9 @@ test("보스 프리셋을 고르면 활성 사냥 스탯의 버프와 별개로 
       fetchImpl: async (input) => {
         const path = new URL(input);
         const payload = presetNexonPayload(path);
+        if (path.pathname.endsWith("/user/union-raider")) {
+          payload.union_raider_stat = ["공격 시 20%의 확률로 데미지 20% 증가"];
+        }
         if (path.pathname.endsWith("/character/item-equipment")) {
           const title = {
             title_name: "테스트 전투 칭호",
@@ -875,6 +908,9 @@ test("보스 프리셋을 고르면 활성 사냥 스탯의 버프와 별개로 
   const { details } = hunting.profiles.fullBoss;
   assert.equal(details.selectedStatTotals.데미지, 5);
   assert.equal(details.currentDamage, 5);
+  const wildHunter = details.combatModel.effects.find(({ sourceKey }) => sourceKey === "union:wild-hunter");
+  assert.equal(wildHunter.averagedModifiers.damage, 4);
+  assert.equal(details.selectedBossInput.stats.데미지, 5);
   assert.equal(details.selectedStatTotals["보스 몬스터 데미지"], 110);
   assert.equal(details.currentBossDamage, 110);
   const unlinked = (await getConversion(0, "manual", true)).profiles.fullBoss.details;
@@ -889,6 +925,7 @@ test("보스 프리셋을 고르면 활성 사냥 스탯의 버프와 별개로 
   assert.deepEqual(autoHunting.profiles.fullBoss.statEquivalence, autoClean.profiles.fullBoss.statEquivalence);
   assert.deepEqual(autoHunting.profiles.fullBoss.addOptionEquivalence, autoClean.profiles.fullBoss.addOptionEquivalence);
   assert.deepEqual(autoHunting.profiles.fullBoss.details.selectedStatTotals, autoClean.profiles.fullBoss.details.selectedStatTotals);
+  assert.deepEqual(autoHunting.profiles.fullBoss.details.selectedBossInput, autoClean.profiles.fullBoss.details.selectedBossInput);
   assert.deepEqual(autoHunting.profiles.fullBoss.details.combatModel.totals, autoClean.profiles.fullBoss.details.combatModel.totals);
   assert.equal(autoHunting.profiles.fullBoss.details.statVerification.find(({ name }) => name === "최종 데미지").api, 50);
 });

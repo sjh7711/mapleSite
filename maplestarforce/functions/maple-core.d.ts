@@ -39,14 +39,29 @@ declare module "maple-core/stat-efficiency" {
     skillData: Array<Record<string, unknown>>,
     doping: Record<string, unknown> | null,
   ): {
-    sharpEyes: { criticalRate: number };
+    sharpEyes: {
+      name: string | null;
+      level: number;
+      criticalRate: number;
+      criticalDamage: number;
+      ignoreDefense: number;
+      hyperRate: number;
+    };
     criticalDamage: number;
+    sayramRate: number;
     effects: Array<Record<string, unknown>>;
   };
+  export function bossDopingTotals(
+    doping: Record<string, unknown> | null,
+    skillData: Array<Record<string, unknown>>,
+    attackType: "attack" | "magic",
+    hasSourceSum: boolean,
+  ): Record<string, unknown>;
   export type CharacterStatSources = {
     computed: Record<string, number>;
     attack: Record<"공격력" | "마력", { flat: number; percent: number }>;
     attributes: Partial<Record<string, { base: number; percent: number; fixed: number }>>;
+    maintainedCovenantDamage: number;
   };
   export function reconstructCharacterStats(data: {
     character: Record<string, unknown>;
@@ -55,7 +70,15 @@ declare module "maple-core/stat-efficiency" {
     activeSkillNames?: string[];
     presetMode?: PresetPolicy["mode"];
     attackType?: "attack" | "magic";
+    includeMaintainedSummon?: boolean;
   }): CharacterStatSources | null;
+  export function bossCombatOrderSkills(
+    skillData: Array<Record<string, unknown>>,
+    characterClass: string,
+    abilityData: Record<string, unknown>,
+    equipmentData: Record<string, unknown>,
+    ordersLevels: number,
+  ): Array<Record<string, unknown>>;
   export function equipmentSoulOptionLines(item: Record<string, unknown>): string[];
   export function itemStatValue(item: Record<string, unknown>, key: string): number;
   export function activeCashEquipmentItems(data: Record<string, unknown>): unknown[];
@@ -213,6 +236,12 @@ declare module "maple-core/stat-efficiency" {
     skillData?: Array<Record<string, unknown>>,
     characterClass?: string,
   ): boolean;
+
+  export function covenantLinkDamage(linkSkillData: Record<string, unknown>): number;
+
+  export function wildHunterUnionEffect(
+    unionRaiderData: Record<string, unknown>,
+  ): ReturnType<typeof import("maple-core/combat-model").createCombatEffect> | null;
 
   export function calculateConditionalLinkCycleBonuses(
     linkSkillData: Record<string, unknown>,

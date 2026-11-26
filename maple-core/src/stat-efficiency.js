@@ -2,6 +2,7 @@ import {
   CLASS_ALWAYS_ON_COMBAT,
   CRITICAL_REINFORCE_CLASSES,
   FULL_BOSS_DOPING,
+  SAYRAM_ELIXIR,
 } from "./stat-profile.js";
 import {
   calculateDamageChannelIgnoreDefenseGain,
@@ -839,6 +840,17 @@ const MAINTAINED_HIGH_POINT_MODIFIERS = Object.freeze({
   "커스 트랜지션": Object.freeze(["criticalDamage"]),
 });
 
+const COLLECTOR_REPLACED_ATTACK_BUFFS = new Set([
+  "블레싱 마하", "인커리지", "스피릿 블레이드", "메디테이션",
+  "포틱 메디테이션", "오닉스의 축복",
+]);
+
+// 넥슨 스킬 Lv.11·12 응답의 전역 유지형 효과만 사용한다.
+const COLLECTOR_MAINTAINED_SKILLS = {
+  "바이퍼": { "오펜스 폼": { modifier: "damage", level11: 27, level12: 29 } },
+  "플레임위자드": { "엘리멘트 : 플레임 IV": { modifier: "flatAttack", level11: 41, level12: 42 } },
+};
+
 function directDamageIncrease(effect) {
   const text = String(effect ?? "");
   for (const match of text.matchAll(
@@ -1595,6 +1607,8 @@ export function calculateActiveSkillCycleBonuses(
     buffDurationPercent = 0,
     includeLoadedDice = true,
     loadedDiceRolls,
+    collectorCoverage = null,
+    includeHowling = true,
   } = {},
 ) {
   const result = {
@@ -1615,6 +1629,7 @@ export function calculateActiveSkillCycleBonuses(
     const effect = String(skill?.skill_effect ?? "");
     if (
       !name ||
+      (name === "하울링" && !includeHowling) ||
       (name === "로디드 다이스" && !includeLoadedDice) ||
       ACTIVE_SKILL_CYCLE_EXCLUSIONS.has(name) ||
       MODELED_SPECIAL_RING_PATTERN.test(name)
@@ -1664,6 +1679,17 @@ export function calculateActiveSkillCycleBonuses(
         characterClass,
       );
     if (maintainedModifiers) {
+      if (COLLECTOR_REPLACED_ATTACK_BUFFS.has(name)) {
+        maintainedModifiers.flatAttack *= 1 - (collectorCoverage ?? 0);
+      }
+      const collectorSkill = COLLECTOR_MAINTAINED_SKILLS[characterClass]?.[name];
+      if (collectorCoverage !== null && collectorSkill) {
+        const { modifier, level11, level12 } = collectorSkill;
+        const recorded = collectorSkill[`level${skill.skill_level}`];
+        if (recorded !== undefined && maintainedModifiers[modifier] === recorded) {
+          maintainedModifiers[modifier] = level11 + collectorCoverage * (level12 - level11);
+        }
+      }
       addCycleEvent(
         result,
         {
@@ -2136,6 +2162,7 @@ function bossSharpEyes(skillData) {
   );
   return {
     name: skill?.skill_name ?? null,
+    level: number(skill?.skill_level),
     criticalRate: rate + hyperRate,
     criticalDamage: damage,
     ignoreDefense,
@@ -2146,7 +2173,10 @@ function bossSharpEyes(skillData) {
 export function bossCriticalEffects(skillData, doping) {
   const sharpEyes = bossSharpEyes(doping ? skillData : null);
   const sayram = number(doping?.sayramCriticalDamage);
-  const criticalDamage = Math.max(sayram, sharpEyes.criticalDamage);
+  const coverage = doping?.sayramCoverage ?? 1;
+  const sayramDamage = Math.max(0, sayram - sharpEyes.criticalDamage) * coverage;
+  const sayramRate = Math.max(0, number(doping?.sayramCriticalRate) - sharpEyes.criticalRate) * coverage;
+  const criticalDamage = sharpEyes.criticalDamage + sayramDamage;
   const effects = [];
   if (sharpEyes.name) {
     effects.push(createCombatEffect({
@@ -2154,19 +2184,66 @@ export function bossCriticalEffects(skillData, doping) {
       source: sharpEyes.name,
       modifiers: {
         criticalRate: sharpEyes.criticalRate,
-        criticalDamage: sharpEyes.criticalDamage > sayram ? sharpEyes.criticalDamage : 0,
+        criticalDamage: sharpEyes.criticalDamage,
         ignoreDefense: sharpEyes.ignoreDefense,
       },
     }));
   }
-  if (sayram > 0 && sayram >= sharpEyes.criticalDamage) {
+  if (sayramDamage || sayramRate) {
     effects.push(createCombatEffect({
       layer: "general",
       source: "세이람의 영약",
-      modifiers: { criticalDamage: sayram },
+      modifiers: { criticalDamage: sayramDamage, criticalRate: sayramRate },
     }));
   }
-  return { sharpEyes, criticalDamage, effects };
+  return { sharpEyes, criticalDamage, sayramRate, effects };
+}
+
+export function bossDopingTotals(doping, skillData, attackType, hasSourceSum) {
+  const totals = doping?.totals ?? {};
+  if (doping?.sayramCoverage == null && doping?.collectorCoverage == null) return totals;
+  const result = { ...totals };
+  const skills = allCharacterSkills(skillData);
+  const tooltip = (name) => String(skills.find((skill) => skill.skill_name === name)?.skill_effect ?? "")
+    .split(/\[패시브 효과\s*:/u, 1)[0]
+    .replace(/^.*?\d+초 동안\s*/u, "");
+  if (doping.sayramCoverage != null) {
+    const coverage = number(doping.sayramCoverage);
+    const howling = directCycleSkillModifiers(tooltip("하울링"), attackType).attackPercent;
+    if (howling > 0) {
+      result.attackMagicPercent = number(totals.attackMagicPercent) + howling -
+        coverage * Math.min(SAYRAM_ELIXIR.attackMagicPercent, howling);
+    }
+    if (hasSourceSum) {
+      const decent = parseTextBonuses([tooltip("쓸만한 어드밴스드 블레스")]);
+      const native = parseTextBonuses([tooltip("어드밴스드 블레스") || tooltip("블레스")]);
+      const decentAttack = relevantFlatAttack(decent, attackType);
+      const attack = Math.max(decentAttack, relevantFlatAttack(native, attackType));
+      if (attack > 0) {
+        result.attackMagic = number(totals.attackMagic) + attack - decentAttack -
+          coverage * Math.min(SAYRAM_ELIXIR.attackMagic, attack);
+      }
+      const hp = Math.max(decent.flatHp, native.flatHp);
+      if (hp > 0) {
+        result.hp = number(totals.hp) + hp - decent.flatHp -
+          coverage * Math.min(SAYRAM_ELIXIR.hp, hp);
+      }
+    }
+  }
+  if (doping.collectorCoverage != null) {
+    const monkey = parseTextBonuses([tooltip("하이퍼 몽키 스펠") || tooltip("몽키 매직")]);
+    // The published overlap note doesn't specify the shared stat amounts.
+    // Restore the skill's full listed HP and all-stat after the elixir expires.
+    const outside = 1 - number(doping.collectorCoverage);
+    if (monkey.flat.STR > 0) {
+      result.mainStat = number(totals.mainStat) + outside * monkey.flat.STR;
+      result.subStat = number(totals.subStat) + outside * monkey.flat.STR;
+    }
+    if (monkey.flatHp > 0) {
+      result.hp = number(result.hp) + outside * monkey.flatHp;
+    }
+  }
+  return result;
 }
 
 function skillAverageUptime(skillData, skillName, fallback = 0) {
@@ -2316,6 +2393,15 @@ export function maintainsBossSummon(skillData, characterClass) {
     Boolean(learnedSkill(skillData, "솔 헤카테"));
 }
 
+export function covenantLinkDamage(linkSkillData) {
+  return linkSkills(linkSkillData).reduce((damage, skill) =>
+    String(skill.skill_name ?? "").trim() === "커버넌트"
+      ? Math.max(damage, percentFromEffect(
+        skill.skill_effect, /소환수 소환 시 데미지\s*(\d+(?:\.\d+)?)%\s*증가/u,
+      ))
+      : damage, 0);
+}
+
 /** 정적 최종 스탯에 남지 않는 링크 스킬을 보스전 평균값으로 환산한다. */
 export function calculateConditionalLinkCycleBonuses(
   linkSkillData,
@@ -2330,7 +2416,6 @@ export function calculateConditionalLinkCycleBonuses(
     ignoreDefenseSources: [],
     applied: [],
   };
-  let covenantDamage = 0;
   for (const skill of linkSkills(linkSkillData)) {
     const name = String(skill?.skill_name ?? "").trim();
     const effect = String(skill?.skill_effect ?? "");
@@ -2339,12 +2424,7 @@ export function calculateConditionalLinkCycleBonuses(
     let ignoreDefense = 0;
     let uptime = 1;
 
-    if (name === "커버넌트" && maintainsSummon) {
-      covenantDamage = Math.max(covenantDamage, percentFromEffect(
-        effect,
-        /소환수 소환 시 데미지\s*(\d+(?:\.\d+)?)%\s*증가/u,
-      ));
-    } else if (name === "무아") {
+    if (name === "무아") {
       const initial = percentFromEffect(effect, /발동 시 데미지\s*(\d+(?:\.\d+)?)%/u);
       const perStack = percentFromEffect(effect, /중첩당 데미지\s*(\d+(?:\.\d+)?)%/u);
       const stacks = percentFromEffect(effect, /최대\s*(\d+(?:\.\d+)?)회 중첩/u);
@@ -2398,6 +2478,7 @@ export function calculateConditionalLinkCycleBonuses(
       result.applied.push({ name, damage, bossDamage, ignoreDefense, uptime });
     }
   }
+  const covenantDamage = maintainsSummon ? covenantLinkDamage(linkSkillData) : 0;
   if (covenantDamage > 0) {
     result.damage += covenantDamage;
     result.applied.push({
@@ -2958,29 +3039,59 @@ function passiveLevelAbility(abilityData) {
     /^패시브 스킬 레벨(?:이)?\s*1\s*증가/u.test(ability_value)));
 }
 
-function abilityPassiveSkills(skillData, characterClass, activeAbility, selectedAbility, equipmentData) {
+// These fourth-job buffs are not affected by the passive-skill ability.
+const MAPLE_WARRIOR_SKILLS = new Set([
+  "메이플 용사", "시그너스 나이츠", "노바의 용사", "이계의 용사", "레프의 용사",
+  "아니마의 용사", "아니마 용사", "마스테리아의 용사",
+]);
+const MAPLE_WARRIOR_AP_EFFECT = /\[패시브 효과\s*:\s*AP를 직접 투자한 모든 능력치 (15|16)% 증가\]/u;
+
+function abilityPassiveSkills(
+  skillData, characterClass, activeAbility, selectedAbility, equipmentData, ordersLevels = 0,
+) {
   const combat = { ...emptyBonuses(), finalDamageRatio: 1, defenseRatio: 1 };
   const classEffects = ABILITY_PASSIVE_LEVEL_EFFECTS[characterClass];
   const change = passiveLevelAbility(selectedAbility) - passiveLevelAbility(activeAbility);
-  if (!classEffects || !change || !Array.isArray(skillData)) return { skillData, combat };
+  if ((!ordersLevels && (!classEffects || !change)) || !Array.isArray(skillData)) {
+    return { skillData, combat };
+  }
   const flatFields = ["flatAttack", "flatMagic", "attackPercent", "magicPercent", "damage",
     "bossDamage", "criticalRate", "criticalDamage", "buffDuration"];
   const finalMultiplier = (texts) => texts.reduce((multiplier, text) =>
     multiplier * (1 + percentFromEffect(text, /최종 데미지\s*(\d+(?:\.\d+)?)%/u) / 100), 1);
   const defenseRemaining = (bonuses) => bonuses.ignoreDefenseSources
     .reduce((remaining, value) => remaining * (1 - value / 100), 1);
+  let changedLevel = false;
   const newSkills = skillData.map((grade) => {
-    if (String(grade.character_skill_grade) !== "4") return grade;
+    if (String(grade?.character_skill_grade) !== "4") return grade;
     return {
       ...grade,
       character_skill: (grade.character_skill ?? []).map((skill) => {
-        const levels = classEffects[skill.skill_name];
         const level = number(skill.skill_level);
-        const selectedLevel = level + change;
+        const levels = classEffects?.[skill.skill_name];
+        if (!levels) {
+          const target = 30 + ordersLevels;
+          if (ordersLevels && level >= 30 && level <= 32 && level !== target && MAPLE_WARRIOR_SKILLS.has(skill.skill_name) &&
+              MAPLE_WARRIOR_AP_EFFECT.test(skill.skill_effect)) {
+            changedLevel = true;
+            return {
+              ...skill,
+              skill_level: target,
+              skill_effect: skill.skill_effect.replace(MAPLE_WARRIOR_AP_EFFECT,
+                "[패시브 효과 : AP를 직접 투자한 모든 능력치 16% 증가]"),
+            };
+          }
+          return skill;
+        }
+        const masterLevel = levels.masterLevel ?? Number(Object.keys(levels)[0]);
+        const selectedLevel = ordersLevels
+          ? masterLevel + ordersLevels + passiveLevelAbility(selectedAbility)
+          : level + change;
         const effect = levels?.[selectedLevel];
-        if (!effect || !levels[level]) return skill;
+        if (selectedLevel === level || !effect || !levels[level]) return skill;
         const currentEffect = String(skill.skill_effect ?? "").trim().replace(/\s+/gu, " ");
         if (currentEffect !== levels[level].trim().replace(/\s+/gu, " ")) return skill;
+        changedLevel = true;
         const changed = { ...skill, skill_level: selectedLevel, skill_effect: effect };
         const sourceTexts = (current) => statWindowSkillTexts(
           [{ ...grade, character_skill: [current] }], equipmentData, undefined, [],
@@ -3000,7 +3111,34 @@ function abilityPassiveSkills(skillData, characterClass, activeAbility, selected
       }),
     };
   });
-  return { skillData: newSkills, combat };
+  return { skillData: changedLevel ? newSkills : skillData, combat };
+}
+
+/** Compute effective boss skill levels without treating the current buff as the learned level. */
+export function bossCombatOrderSkills(skillData, characterClass, abilityData, equipmentData, ordersLevels) {
+  return abilityPassiveSkills(
+    skillData, characterClass, abilityData, abilityData, equipmentData, ordersLevels,
+  ).skillData;
+}
+
+function weightedBossPassiveCombat(skillData, characterClass, activeAbility, selectedAbility, equipmentData, doping) {
+  const coverage = number(doping?.collectorCoverage);
+  if (!coverage) {
+    return abilityPassiveSkills(skillData, characterClass, activeAbility, selectedAbility, equipmentData).combat;
+  }
+  const orders = learnedSkill(skillData, "컴뱃 오더스") ? 2 : 1;
+  const without = abilityPassiveSkills(skillData, characterClass, activeAbility, selectedAbility, equipmentData, orders).combat;
+  const withCollector = abilityPassiveSkills(skillData, characterClass, activeAbility, selectedAbility,
+    equipmentData, Math.max(orders, number(doping.collectorSkillLevels))).combat;
+  const blend = (before, after) => before + coverage * (after - before);
+  for (const key of Object.keys(without)) {
+    if (typeof without[key] === "number") without[key] = blend(without[key], withCollector[key]);
+  }
+  for (const stat of STAT_NAMES) {
+    without.flat[stat] = blend(without.flat[stat], withCollector.flat[stat]);
+    without.percent[stat] = blend(without.percent[stat], withCollector.percent[stat]);
+  }
+  return without;
 }
 
 function unionPresetData(unionRaiderData, selected) {
@@ -3013,6 +3151,21 @@ function unionPresetData(unionRaiderData, selected) {
     use_preset_no: selected,
     union_state_stat: preset?.union_state_stat ?? unionRaiderData?.union_state_stat,
   };
+}
+
+/** 넥슨 유니온 캐릭터 효과의 공격별 기댓값을 전투 데미지에 반영한다. */
+export function wildHunterUnionEffect(unionRaiderData) {
+  const damage = Math.max(0, ...(unionRaiderData?.union_raider_stat ?? []).map((text) =>
+    percentFromEffect(text, /^공격 시\s*20%(?:의)?\s*확률로\s*데미지\s*(4|8|12|16|20)%\s*증가$/u),
+  ));
+  return damage > 0 ? createCombatEffect({
+    layer: "general",
+    source: "와일드헌터 유니온",
+    sourceKey: "union:wild-hunter",
+    activation: { mode: "probability-average", evidence: "union-character-effect" },
+    uptime: 0.2,
+    modifiers: { damage },
+  }) : null;
 }
 
 const EXPLICIT_ITEM_SET_NAMES = Object.freeze({
@@ -3478,11 +3631,14 @@ function jointBossPresetScore({
   externalCriticalRate,
   criticalReinforceUptime,
   criticalReinforceExtraRate,
+  dopingTotals,
 }) {
   const statValue = (stat) => changedFinalStat(
     number(stats[stat]),
     number(activeVector.flatStats[stat]),
-    number(selectedVector.flatStats[stat]) + passiveCombat.flat[stat],
+    number(selectedVector.flatStats[stat]) + passiveCombat.flat[stat] +
+      number(stat === "HP" ? dopingTotals?.hp
+        : stat === mainStat || mainStat === "ALL" ? dopingTotals?.mainStat : dopingTotals?.subStat),
     number(activeVector.percentStats[stat]),
     number(selectedVector.percentStats[stat]) + passiveCombat.percent[stat],
   );
@@ -3501,12 +3657,14 @@ function jointBossPresetScore({
   const selectedAttackMultiplier = Math.max(
     0.01,
     1 + (selectedVector.attackPercent +
-      (attackType === "magic" ? passiveCombat.magicPercent : passiveCombat.attackPercent)) / 100,
+      (attackType === "magic" ? passiveCombat.magicPercent : passiveCombat.attackPercent) +
+      number(dopingTotals?.attackMagicPercent)) / 100,
   );
   const attack = Math.max(
     1,
     currentAttack * selectedAttackMultiplier / activeAttackMultiplier +
-      (selectedVector.flatAttack - activeVector.flatAttack + relevantFlatAttack(passiveCombat, attackType)) *
+      (selectedVector.flatAttack - activeVector.flatAttack + relevantFlatAttack(passiveCombat, attackType) +
+        number(dopingTotals?.attackMagic)) *
         selectedAttackMultiplier,
   );
   const damageTotal =
@@ -3566,15 +3724,22 @@ function selectJointBossPreset({
   skillData,
   includeBossCriticalBuffs,
   includeExternalBossCriticalRate,
+  doping,
 }) {
   if (!Array.isArray(statData?.final_stat) || !statData.final_stat.length) {
     return null;
   }
   const stats = finalStats(statData);
   const maintainsSummon = maintainsBossSummon(skillData, characterClass);
+  const dopingTotals = bossDopingTotals(doping, skillData, attackType, includeBossCriticalBuffs);
+  const wildHunter = wildHunterUnionEffect(data.unionRaiderData);
+  if (wildHunter) {
+    stats["데미지"] = number(stats["데미지"]) + wildHunter.modifiers.damage * wildHunter.uptime;
+  }
   const criticalBuff = bossSharpEyes(skillData);
   const externalCriticalRate = includeBossCriticalBuffs && includeExternalBossCriticalRate
-    ? Math.max(0, FULL_BOSS_DOPING.sayramCriticalRate - criticalBuff.criticalRate)
+    ? Math.max(0, FULL_BOSS_DOPING.sayramCriticalRate - criticalBuff.criticalRate) *
+      (doping?.sayramCoverage ?? 1)
     : 0;
   if (includeBossCriticalBuffs) {
     stats["크리티컬 확률"] = number(stats["크리티컬 확률"]) + criticalBuff.criticalRate;
@@ -3631,11 +3796,12 @@ function selectJointBossPreset({
   );
   const passiveCombatByAbility = new Map(choices.ability.map((candidate) => [
     candidate,
-    abilityPassiveSkills(
+    weightedBossPassiveCombat(
       mainStat === "HP" ? undefined : skillData, characterClass, data.abilityData,
       abilityPresetData(data.abilityData, candidate),
       data.equipmentData,
-    ).combat,
+      doping,
+    ),
   ]));
   const selected = { ...active };
   // 후보 수의 곱만큼 전수 탐색하지 않고 구성요소별 최적화를 두 번
@@ -3688,6 +3854,7 @@ function selectJointBossPreset({
           externalCriticalRate,
           criticalReinforceUptime,
           criticalReinforceExtraRate,
+          dopingTotals,
         });
         if (!best || score > best.score) best = { candidate, score };
       }
@@ -3740,6 +3907,7 @@ export function resolveCharacterPresetSnapshot({
   presetPolicy,
   includeBossCriticalBuffs = false,
   includeExternalBossCriticalRate = true,
+  doping,
 }) {
   const data = {
     equipmentData,
@@ -3787,6 +3955,7 @@ export function resolveCharacterPresetSnapshot({
       skillData,
       includeBossCriticalBuffs,
       includeExternalBossCriticalRate,
+      doping,
     });
     if (jointSelection) {
       selected = jointSelection;
@@ -4261,6 +4430,7 @@ function hexaStatCombatBonuses(hexaStatData) {
  */
 export function reconstructCharacterStats({
   character, snapshot, mainStat, activeSkillNames = [], presetMode = "active", attackType = "attack",
+  includeMaintainedSummon = false,
 }) {
   const {
     statData, equipmentData, setEffectData, otherStatData, cashEquipmentData,
@@ -4333,8 +4503,12 @@ export function reconstructCharacterStats({
       percent: options.magicPercent + combat.magicPercent,
     },
   };
+  const maintainedCovenantDamage = includeMaintainedSummon &&
+    maintainsBossSummon(skillData, character.character_class)
+    ? covenantLinkDamage(linkSkillData)
+    : 0;
   const computed = {
-    "데미지": weapon.damage + combat.damage,
+    "데미지": weapon.damage + combat.damage + maintainedCovenantDamage,
     "보스 몬스터 데미지": weapon.bossDamage + combat.bossDamage,
     "크리티컬 확률": 5 + weapon.criticalRate + combat.criticalRate,
     "크리티컬 데미지": weapon.criticalDamage + combat.criticalDamage,
@@ -4366,7 +4540,7 @@ export function reconstructCharacterStats({
       computed[stat] = Math.floor(base * (1 + percent / 100) + 1e-8) + fixed;
     }
   }
-  return { computed, attack, attributes };
+  return { computed, attack, attributes, maintainedCovenantDamage };
 }
 
 function ensurePositive(value, label) {
@@ -4539,6 +4713,7 @@ export function calculateCharacterPotentialConversion({
   const selectedLinkSkillData = resolvedPresets.selectedSnapshot.linkSkillData;
   const selectedAbilityData = resolvedPresets.selectedSnapshot.abilityData;
   const selectedSkillData = resolvedPresets.selectedSnapshot.skillData ?? skillData;
+  const wildHunter = doping ? wildHunterUnionEffect(selectedUnionRaiderData) : null;
   const buffDurationPercent = sourceValues?.["버프 지속시간"] ?? selectedBuffDurationPercent(
     stats["버프 지속시간"],
     resolvedPresets.activeSnapshot,
@@ -4598,7 +4773,8 @@ export function calculateCharacterPotentialConversion({
     buffDurationPercent,
     false,
     character.character_class,
-    maintainsBossSummon(selectedSkillData, character.character_class),
+    !selectedStatSources?.maintainedCovenantDamage &&
+      maintainsBossSummon(selectedSkillData, character.character_class),
   );
   const bossItemEffects = doping ? calculateBossItemCombatEffects({
     symbolData,
@@ -4646,6 +4822,8 @@ export function calculateCharacterPotentialConversion({
       buffDurationPercent,
       includeLoadedDice,
       loadedDiceRolls: doping?.loadedDiceRolls,
+      collectorCoverage: doping?.collectorCoverage,
+      includeHowling: doping?.sayramCoverage == null,
     },
   );
   const enumeratedBaseMain = ensurePositive(
@@ -5050,7 +5228,7 @@ export function calculateCharacterPotentialConversion({
     ],
   );
 
-  const baseDopingTotals = doping?.totals ?? {};
+  const baseDopingTotals = bossDopingTotals(doping, selectedSkillData, attackType, Boolean(selectedStatSources));
   const guildBaseline = doping?.guildBaseline ?? {};
   const guildDifference = doping && guildNoblesse.available
     ? {
@@ -5201,7 +5379,8 @@ export function calculateCharacterPotentialConversion({
     number(classAlwaysOnAdjustment.bossDamage) +
     bossItemEffects.reduce((sum, effect) => sum + effect.uptime *
       (effect.modifiers.damage + effect.modifiers.bossDamage), 0) +
-    (doping ? conditionalLinks.damage + conditionalLinks.bossDamage : 0);
+    (doping ? conditionalLinks.damage + conditionalLinks.bossDamage : 0) +
+    (wildHunter ? wildHunter.modifiers.damage * wildHunter.uptime : 0);
   const criticalReinforceUptime =
     doping && CRITICAL_REINFORCE_CLASSES.has(character.character_class)
       ? weightedCriticalReinforceUptime({
@@ -5243,6 +5422,7 @@ export function calculateCharacterPotentialConversion({
     { abilityData: selectedAbilityData, linkSkillData: selectedLinkSkillData },
   );
   const combatEffects = [...bossItemEffects];
+  if (wildHunter) combatEffects.push(wildHunter);
   if (doping) {
     combatEffects.push(createCombatEffect({
       layer: "general",
@@ -5437,6 +5617,7 @@ export function calculateCharacterPotentialConversion({
     }));
   }
   const combatModel = composeCombatModel({
+    basis: selectedStatSources ? "selected-preset-sources" : "nexon-final-stat",
     baseline: {
       flatAttack: rawAttack,
       attackPercent,
@@ -5821,6 +6002,9 @@ export function calculateCharacterPotentialConversion({
       sharpEyesHyperCriticalRateBonus: sharpEyes.hyperRate + legacyHyperRate,
       usefulSharpEyesCriticalRateBonus: sharpEyes.name === "쓸만한 샤프 아이즈" ? sharpEyes.criticalRate : 0,
       effectiveBossCriticalRate,
+      appliedBossCriticalRate: effectiveBossCriticalRate === null
+        ? null
+        : effectiveBossCriticalRate + criticalBuffs.sayramRate,
       conditionalBossCriticalRateBonus,
       conditionalBossCriticalRate,
       conditionalBossCriticalRateSource:
