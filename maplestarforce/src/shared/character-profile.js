@@ -443,21 +443,22 @@ function fullBossDopingSummary(profile) {
     ...FULL_BOSS_DOPING.totals,
     ...(profile.details?.effectiveDopingTotals ?? {}),
   };
+  const display = (value) => Number(value).toLocaleString("ko-KR", { maximumFractionDigits: 2 });
   const statText = profile.statModel === "xenon"
-    ? `STR·DEX·LUK 각각 +${totals.mainStat}`
+    ? `STR·DEX·LUK 각각 +${display(totals.mainStat)}`
     : [
-        profile.mainStat ? `${profile.mainStat} +${totals.mainStat}` : null,
+        profile.mainStat ? `${profile.mainStat} +${display(totals.mainStat)}` : null,
         ...getProfileSubStats(profile).map(
-          (stat) => `${stat} +${totals.subStat}`,
+          (stat) => `${stat} +${display(totals.subStat)}`,
         ),
       ].filter(Boolean).join(" · ");
   return [
-    `공·마 +${totals.attackMagic}`,
-    `공·마 +${totals.attackMagicPercent}%`,
+    `공·마 +${display(totals.attackMagic)}`,
+    `공·마 +${display(totals.attackMagicPercent)}%`,
     statText,
-    `보공 +${totals.bossDamage}%`,
-    `데미지 +${totals.damage}%`,
-    `크뎀 +${totals.criticalDamage}%`,
+    `보공 +${display(totals.bossDamage)}%`,
+    `데미지 +${display(totals.damage)}%`,
+    `크뎀 +${display(totals.criticalDamage)}%`,
     `방무 ${totals.ignoreDefenseSources.join("% · ")}% 각각 적용`,
   ].filter(Boolean).join(" · ");
 }
@@ -523,7 +524,7 @@ function dynamicCombatSummary(profile) {
   }
   for (const effect of details.combatModel?.effects ?? []) {
     if (!effect.applied) continue;
-    if (effect.kind === "special-core") {
+    if (effect.kind === "special-core" || effect.sourceKey === "union:wild-hunter") {
       parts.push(`${effect.source} 평균 데미지 +${coefficient(effect.averagedModifiers.damage)}%`);
     }
     if (effect.kind === "boss-symbol") {
@@ -647,24 +648,69 @@ function formatCharacterStat(name, amount, difference = false) {
   return `${prefix}${coefficient(amount, percent ? 2 : 0)}${percent ? (difference ? "%p" : "%") : ""}`;
 }
 
-function selectedPresetStatDetails(totals, presetMode) {
-  if (!totals || typeof totals !== "object") return null;
-  const rows = Object.entries(totals).filter(([, value]) => Number.isFinite(value))
+function selectedPresetStatDetails(profile) {
+  const { selectedBossInput, selectedStatTotals, selectedCovenantDamage } = profile.details ?? {};
+  const input = selectedBossInput ?? { stats: selectedStatTotals };
+  if (!input?.stats) return null;
+  const rows = Object.entries(input.stats).filter(([, value]) => Number.isFinite(value))
+    .map(([name, value]) => [name, name === "방어율 무시"
+      ? `${coefficient(value, 4)}%` : formatCharacterStat(name, value)]);
+  const panel = element("details", "profile-stat-verification");
+  const basis = profile.presetSelection?.mode === "auto" ? "자동 보스" : "선택 프리셋";
+  panel.append(element("summary", "", `${basis} 기준 스탯 · 도핑 전`));
+  const statNames = profile.statModel === "xenon" ? ["STR", "DEX", "LUK"]
+    : [profile.mainStat, ...getProfileSubStats(profile)];
+  const attributes = statNames
+    .map((stat) => [stat, input.attributes?.[stat]])
+    .filter(([, value]) => value)
+    .map(([stat, { base, percent, fixed }]) => [stat, coefficient(base, 0), `${coefficient(percent)}%`, coefficient(fixed, 0)]);
+  const attackName = profile.attackType === "magic" ? "마력" : "공격력";
+  const attack = input.attack?.[attackName];
+  if (attack) attributes.push([attackName, coefficient(attack.flat, 0), `${coefficient(attack.percent)}%`, "—"]);
+  if (attributes.length) {
+    panel.append(characterStatTable(["스탯", "기본수치", "% 수치", "% 미적용 수치"], attributes));
+  }
+  const included = [
+    input.sharpEyes?.name,
+    Number(selectedCovenantDamage) > 0
+      ? `커버넌트(소환수 유지) 데미지 +${coefficient(selectedCovenantDamage)}%p`
+      : null,
+  ].filter(Boolean);
+  if (included.length) panel.append(element("p", "profile-doping__class", `기준에 포함 · ${included.join(" · ")}`));
+  panel.append(characterStatTable(["스탯", basis], rows));
+  return panel;
+}
+
+function appliedBossStatDetails(profile) {
+  const details = profile.details;
+  const totals = details?.combatModel?.totals;
+  if (!details?.selectedBossInput || !totals) return null;
+  const attackName = profile.attackType === "magic" ? "마력" : "공격력";
+  const values = {
+    [attackName]: details.dopedAttack,
+    데미지: totals.damage,
+    "보스 몬스터 데미지": totals.bossDamage,
+    "최종 데미지": details.fullBossSkillFinalDamage,
+    "방어율 무시": totals.ignoreDefense * 100,
+    "크리티컬 확률": details.appliedBossCriticalRate ?? details.effectiveBossCriticalRate ?? totals.criticalRate,
+    "크리티컬 데미지": totals.criticalDamage,
+  };
+  const rows = Object.entries(values).filter(([, value]) => Number.isFinite(value))
     .map(([name, value]) => [name, formatCharacterStat(name, value)]);
   if (!rows.length) return null;
   const panel = element("details", "profile-stat-verification");
-  const basis = presetMode === "auto" ? "자동 보스" : "선택 프리셋";
   panel.append(
-    element("summary", "", `${basis} 출처 합산 · 도핑 전`),
-    characterStatTable(["스탯", basis], rows),
+    element("summary", "", "보스 환산 적용값"),
+    characterStatTable(["스탯", "전투 기준"], rows),
   );
   return panel;
 }
 
 function statVerificationDetails(rows) {
   if (!Array.isArray(rows) || !rows.length) return null;
-  const values = rows.map(({ name, calculated, api, matched }) => {
+  const values = rows.map(({ name, calculated, api, matched, conditionalMatch }) => {
     const status = calculated === null ? "자료 부족" : matched ? "일치"
+        : conditionalMatch ? `${conditionalMatch} 적용 시 일치`
         : `차이 ${formatCharacterStat(name, api - calculated, true)}`;
     return [
       name,
@@ -674,11 +720,11 @@ function statVerificationDetails(rows) {
     ];
   });
   const panel = element("details", "profile-stat-verification");
-  const verified = rows.filter(({ matched }) => matched).length;
+  const verified = rows.filter(({ matched, conditionalMatch }) => matched || conditionalMatch).length;
   panel.append(
     element("summary", "", `현재 활성 API 스탯 검증 · ${verified}/${rows.length}개 확인`),
     element("p", "profile-doping__class",
-      "활성 프리셋의 기본 출처 합산과 넥슨 API 수치를 비교합니다. 일시 효과에 따라 차이가 날 수 있습니다."),
+      "활성 프리셋의 기본 출처 합산과 넥슨 API를 비교하고, 스킬을 적용하면 일치하는 조건을 표시합니다."),
     characterStatTable(["스탯", "출처 합산", "API", "확인 결과"], values),
   );
   return panel;
@@ -697,16 +743,17 @@ function fullBossDopingDetails(profile, conventionalAddOption, collapsed = false
     content.append(element("strong", "profile-doping__title", FULL_BOSS_DOPING.label));
   }
   content.append(element("p", "profile-doping__totals", fullBossDopingSummary(profile)));
+  content.append(element("p", "profile-doping__class",
+    `세이람 전량 · 콜렉터 8분 (20분 피해 비중 ${coefficient(100 * FULL_BOSS_DOPING.collectorCoverage, 1)}%)`));
   const petSkills = profile.details?.registeredPetSkills;
   if (petSkills?.length) {
     content.append(element("p", "profile-doping__class",
       `펫 자동버프 등록 · ${petSkills.join(" · ")}`));
   }
-  const selectedStats = selectedPresetStatDetails(
-    profile.details?.selectedStatTotals,
-    profile.presetSelection?.mode,
-  );
+  const selectedStats = selectedPresetStatDetails(profile);
   if (selectedStats) content.append(selectedStats);
+  const appliedStats = appliedBossStatDetails(profile);
+  if (appliedStats) content.append(appliedStats);
   const verification = statVerificationDetails(profile.details?.statVerification);
   if (verification) content.append(verification);
   if (profile.details?.statCalculationBasis === "api-fallback") {

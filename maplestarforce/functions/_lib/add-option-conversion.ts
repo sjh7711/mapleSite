@@ -1,6 +1,7 @@
 import type { CharacterPotentialSnapshot, JsonObject } from "./nexon";
 import {
   bossCriticalEffects,
+  bossDopingTotals,
   calculateActiveSkillCycleBonuses,
   calculateBossItemCombatEffects,
   calculateCombatRingBonuses,
@@ -17,6 +18,7 @@ import {
   selectedBuffDurationPercent,
   unionAllocatedStat,
   unionUnreflectedStat,
+  wildHunterUnionEffect,
   xenonHexaStatScale,
   type CharacterStatSources,
 } from "maple-core/stat-efficiency";
@@ -495,12 +497,16 @@ function conditionalDamageFromAbility(abilityData: JsonObject): number {
   }, 0);
 }
 
-function dopingRecords(input: SpecialAddOptionConversionInput): {
+function dopingRecords(
+  input: SpecialAddOptionConversionInput,
+  skillData: JsonObject[],
+  hasSourceSum: boolean,
+): {
   totals: JsonObject;
   adjustment: JsonObject;
 } {
   const doping = object(input.doping);
-  const totals = object(doping?.totals) ?? {};
+  const totals = bossDopingTotals(doping, skillData, "attack", hasSourceSum);
   const adjustments = object(doping?.classAdjustments);
   const className = text(input.character.character_class);
   return { totals, adjustment: object(adjustments?.[className]) ?? {} };
@@ -614,7 +620,7 @@ function calculateXenon(
       ),
     ]),
   ) as Record<(typeof XENON_STATS)[number], Record<string, number>>;
-  const { totals, adjustment } = dopingRecords(input);
+  const { totals, adjustment } = dopingRecords(input, snapshot.skillData, Boolean(source));
   const doping = object(input.doping);
   const criticalBuffs = bossCriticalEffects(snapshot.skillData, doping);
   const classAlwaysOnCombat = resolveClassAlwaysOnCombatAdjustment(
@@ -649,6 +655,8 @@ function calculateXenon(
       buffDurationPercent,
       includeLoadedDice: input.includeLoadedDice,
       loadedDiceRolls: doping?.loadedDiceRolls,
+      collectorCoverage: number(doping?.collectorCoverage),
+      includeHowling: doping?.sayramCoverage == null,
     },
   );
   const conditionalLinks = calculateConditionalLinkCycleBonuses(
@@ -656,7 +664,8 @@ function calculateXenon(
     buffDurationPercent,
     false,
     text(input.character.character_class),
-    maintainsBossSummon(snapshot.skillData, text(input.character.character_class)),
+    !source?.maintainedCovenantDamage &&
+      maintainsBossSummon(snapshot.skillData, text(input.character.character_class)),
   );
   const guildNoblesse = calculateGuildNoblesseBonuses(snapshot.guildData);
   const guildBaseline = object(doping?.guildBaseline) ?? {};
@@ -770,6 +779,8 @@ function calculateXenon(
     characterClass: text(input.character.character_class),
   }) : [];
   if (input.doping) {
+    const wildHunter = wildHunterUnionEffect(snapshot.unionRaiderData);
+    if (wildHunter) combatEffects.push(wildHunter);
     combatEffects.push(...criticalBuffs.effects);
     combatEffects.push(createCombatEffect({
       layer: "general",
@@ -919,6 +930,7 @@ function calculateXenon(
     }));
   }
   const combatModel = composeCombatModel({
+    basis: source ? "selected-preset-sources" : "nexon-final-stat",
     baseline: {
       flatAttack: rawAttack,
       attackPercent: sourceAttack?.percent ?? percent.attack,

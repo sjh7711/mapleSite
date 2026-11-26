@@ -59,13 +59,16 @@ test("이중 부스탯 도적은 DEX와 STR을 모두 추론한다", () => {
 
 test("풀보스 도핑 프리셋과 직업 보정을 공용으로 제공한다", () => {
   assert.equal(FULL_BOSS_DOPING.championBlessingLevel, 5);
-  assert.equal(FULL_BOSS_DOPING.totals.attackMagic, 350);
+  assert.equal(FULL_BOSS_DOPING.sayramCoverage, 1);
+  assert.ok(Math.abs(FULL_BOSS_DOPING.collectorCoverage - 0.443) < 1e-9);
+  assert.ok(FULL_BOSS_DOPING.items.includes("콜렉터의 영약"));
+  assert.equal(FULL_BOSS_DOPING.totals.attackMagic, 394.3);
   assert.equal(FULL_BOSS_DOPING.totals.attackMagicPercent, 14);
   assert.ok(FULL_BOSS_DOPING.items.includes("세이람의 영약 (공·마 +10%)"));
   assert.ok(FULL_BOSS_DOPING.items.includes("영웅의 메아리 계열 (공·마 +4%)"));
-  assert.equal(FULL_BOSS_DOPING.totals.mainStat, 125);
-  assert.equal(FULL_BOSS_DOPING.totals.subStat, 125);
-  assert.equal(FULL_BOSS_DOPING.totals.hp, 4_000);
+  assert.equal(FULL_BOSS_DOPING.totals.mainStat, 138.29);
+  assert.equal(FULL_BOSS_DOPING.totals.subStat, 138.29);
+  assert.equal(FULL_BOSS_DOPING.totals.hp, 4427.2);
   assert.equal(FULL_BOSS_DOPING.totals.bossDamage, 85);
   assert.equal(FULL_BOSS_DOPING.totals.damage, 31);
   assert.equal(FULL_BOSS_DOPING.totals.criticalDamage, 37.5);

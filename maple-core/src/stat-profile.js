@@ -3,7 +3,7 @@
  * Node, Discord, DOM에 의존하지 않아 브라우저와 Worker에서도 그대로 쓴다.
  */
 
-export const CHARACTER_CONVERSION_CACHE_VERSION = "combat-profile-v94-linked-preset-titles";
+export const CHARACTER_CONVERSION_CACHE_VERSION = "combat-profile-v99-full-sayram-collector-levels";
 
 // 넥슨 유니온 챔피언 가이드의 전투 능력치 5레벨 기준.
 // https://maplestory.nexon.com/Guide/N23GameInformation/Articles/409
@@ -17,16 +17,40 @@ const CHAMPION_BLESSING_LEVEL_5 = {
   ignoreDefense: 10,
 };
 
-const FULL_BOSS_ATTACK_MAGIC_PERCENT_BUFFS = [
-  { name: "세이람의 영약", percent: 10 },
-  { name: "영웅의 메아리 계열", percent: 4 },
-];
+// Collector is taken just before entering the reference fight.
+const ELIXIR_REFERENCE_SECONDS = 1_200;
+const ELIXIR_BURST_INTERVAL_SECONDS = 120;
+// Estimated extra damage from bursts, compared with a constant sustained rate.
+// Calibrated from the 380-defense Bowmaster elixir comparison, shared by all jobs.
+const ELIXIR_BURST_EXTRA_DAMAGE_SHARE = 0.43;
+
+function bossElixirDamageCoverage(durationSeconds) {
+  const duration = Math.min(Math.max(0, durationSeconds), ELIXIR_REFERENCE_SECONDS);
+  if (duration === 0) return 0;
+  const timeShare = duration / ELIXIR_REFERENCE_SECONDS;
+  const burstCount = Math.ceil(ELIXIR_REFERENCE_SECONDS / ELIXIR_BURST_INTERVAL_SECONDS);
+  // The burst at the 8-minute boundary is assumed to land just before expiry.
+  const coveredBursts = Math.min(burstCount, 1 + Math.floor(duration / ELIXIR_BURST_INTERVAL_SECONDS));
+  return timeShare * (1 - ELIXIR_BURST_EXTRA_DAMAGE_SHARE) +
+    (coveredBursts / burstCount) * ELIXIR_BURST_EXTRA_DAMAGE_SHARE;
+}
+
+// https://maplestory.nexon.com/news/update/750
+export const SAYRAM_ELIXIR = { duration: 900, attackMagic: 50, attackMagicPercent: 10, bossDamage: 10, hp: 1_750 };
+// https://maplestory.nexon.com/news/update/774?page=3
+const COLLECTOR_ELIXIR = { duration: 480, attackMagic: 100, allStat: 30, hp: 400, skillLevels: 2 };
+// The full boss profile applies Sayram at its listed strength.
+const sayramCoverage = 1;
+const collectorCoverage = bossElixirDamageCoverage(COLLECTOR_ELIXIR.duration);
 
 export const FULL_BOSS_DOPING = {
   label: "풀도핑 (고급 무기 제련·이벤트 버프 포함)",
   championBlessingLevel: CHAMPION_BLESSING_LEVEL_5.level,
   sayramCriticalDamage: 16,
   sayramCriticalRate: 20,
+  sayramCoverage,
+  collectorCoverage,
+  collectorSkillLevels: COLLECTOR_ELIXIR.skillLevels,
   items: [
     "익스트림 레드/블루",
     "마슈르의 선물 기상 효과",
@@ -35,26 +59,26 @@ export const FULL_BOSS_DOPING = {
     "MVP 슈퍼파워",
     "향상된 10단계 주스탯 물약",
     "반짝이는 빨간 별 물약",
-    ...FULL_BOSS_ATTACK_MAGIC_PERCENT_BUFFS.map(
-      ({ name, percent }) => `${name} (공·마 +${percent}%)`,
-    ),
+    "세이람의 영약 (공·마 +10%)",
+    "콜렉터의 영약",
+    "영웅의 메아리 계열 (공·마 +4%)",
     "고급 무기 제련",
     "이벤트 버프",
     "쓸만한 샤프 아이즈",
   ],
   totals: {
-    // 길드의 더 큰 축복 30과 쓸만한 어드밴스드 블레스 20은 기본 스탯으로 반영한다.
-    attackMagic: 325 + CHAMPION_BLESSING_LEVEL_5.attackMagic,
-    attackMagicPercent: FULL_BOSS_ATTACK_MAGIC_PERCENT_BUFFS.reduce(
-      (total, buff) => total + buff.percent,
-      0,
-    ),
-    mainStat: 75 + CHAMPION_BLESSING_LEVEL_5.allStat,
-    subStat: 75 + CHAMPION_BLESSING_LEVEL_5.allStat,
-    hp: 1_500 + CHAMPION_BLESSING_LEVEL_5.hp,
+    // 기존 공·마 325와 보공 75 중 세이람 효과를 분리하고 영약별 피해 비중을 적용한다.
+    // 쓸만한 어드밴스드 블레스의 공·마는 기본 합산에 있어 사용 구간에서 교체한다.
+    attackMagic: 275 + CHAMPION_BLESSING_LEVEL_5.attackMagic +
+      SAYRAM_ELIXIR.attackMagic * sayramCoverage + COLLECTOR_ELIXIR.attackMagic * collectorCoverage,
+    attackMagicPercent: 4 + SAYRAM_ELIXIR.attackMagicPercent * sayramCoverage,
+    mainStat: 75 + CHAMPION_BLESSING_LEVEL_5.allStat + COLLECTOR_ELIXIR.allStat * collectorCoverage,
+    subStat: 75 + CHAMPION_BLESSING_LEVEL_5.allStat + COLLECTOR_ELIXIR.allStat * collectorCoverage,
+    hp: CHAMPION_BLESSING_LEVEL_5.hp + SAYRAM_ELIXIR.hp * sayramCoverage +
+      COLLECTOR_ELIXIR.hp * collectorCoverage,
     // 같은 프리셋의 무도핑·풀도핑 툴팁 차이. 길드 기준 수치는
     // 아래 guildBaseline을 통해 캐릭터의 실제 노블레스 수치로 교체한다.
-    bossDamage: 75 + CHAMPION_BLESSING_LEVEL_5.bossDamage,
+    bossDamage: 65 + CHAMPION_BLESSING_LEVEL_5.bossDamage + SAYRAM_ELIXIR.bossDamage * sayramCoverage,
     damage: 31,
     // 노블레스 30%, 무기 제련 5%, 챔피언의 가호. 세이람/샤프는
     // 중첩 제한이 있는 효과로 전투 조건에서 선택한다.

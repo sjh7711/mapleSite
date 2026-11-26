@@ -219,6 +219,7 @@ export function createCombatEffect({
  * 더하지 않고 이 효과 목록만 만들기 때문에 중복 여부를 한 곳에서 통제한다.
  */
 export function composeCombatModel({
+  basis = "nexon-final-stat",
   baseline = {},
   baselineSources = [],
   effects = [],
@@ -277,7 +278,7 @@ export function composeCombatModel({
   totals.ignoreDefense = 1 - ignoreDefenseRemaining;
   return {
     version: 2,
-    basis: "nexon-final-stat",
+    basis,
     baselineSources: baselineSources.map((source) => ({ ...source })),
     order: [...COMBAT_LAYER_ORDER],
     totals,
@@ -822,10 +823,10 @@ export function hexaSkillDamageBonuses(skillData, hexaMatrixData) {
         continue;
       }
       const effect = String(skill.skill_effect ?? "").trim().match(
-        /^([^\r\n]+)의\s*최종 데미지\s*(\d+(?:\.\d+)?)%\s*증가$/u,
+        /^([^\r\n]+?)의\s*최종 데미지\s*(\d+(?:\.\d+)?)%\s*증가(?=$|[,\r\n])/u,
       );
       if (!effect) continue;
-      const attack = effect[1].trim();
+      const attack = effect[1].trim().replace(/\s+강화$/u, "");
       const multiplier = 1 + number(effect[2]) / 100;
       bonuses.set(attack, (bonuses.get(attack) ?? 1) * multiplier);
     }
