@@ -732,6 +732,19 @@ test("active·manual 정책으로 장비·하이퍼·유니온·링크·어빌�
     nestedTitle.selectedSnapshot.equipmentData.title.title_name,
     "중첩 2번 칭호",
   );
+
+  for (const [title, expected] of [
+    [{ title_name: null, disable_flag: "false" }, "1번 칭호"],
+    [{ title_name: null, disable_flag: "true" }, null],
+    [{ title_name: "별도 칭호", disable_flag: "true" }, "별도 칭호"],
+  ]) {
+    const resolved = resolveCharacterPresetSnapshot({
+      ...input,
+      equipmentData: { ...input.equipmentData, title_preset2: title },
+      presetPolicy: { mode: "manual", manual: manual.selection.selected },
+    });
+    assert.equal(resolved.selectedSnapshot.equipmentData.title?.title_name ?? null, expected);
+  }
 });
 
 test("자동 보스 프리셋은 380 방어율 대상의 전체 피해로 조합을 고른다", () => {
