@@ -438,7 +438,7 @@ test("환산 계약 버전으로 이전 단일 부스탯 캐시와 키를 분리
     versionedUrl.searchParams.get("conversionVersion"),
     characterConversionCacheVersion,
   );
-  assert.equal(characterConversionCacheVersion, "combat-profile-v93-shared-stat-sources");
+  assert.equal(characterConversionCacheVersion, "combat-profile-v94-linked-preset-titles");
   const freshSnapshotKey = createSnapshotCacheKey(request, "테스트", "fresh");
   const staleSnapshotKey = createSnapshotCacheKey(request, "테스트", "stale");
   assert.equal(characterSnapshotCacheVersion, "character-snapshot-v4");
@@ -806,12 +806,16 @@ test("manual 정책을 적용하고 선택 장비의 환산 요약만 응답한�
 });
 
 test("보스 프리셋을 고르면 활성 사냥 스탯의 버프와 별개로 선택 출처를 합산한다", async () => {
+  const activeCombatStats = new Set([
+    "데미지", "보스 몬스터 데미지", "최종 데미지", "방어율 무시",
+    "크리티컬 확률", "크리티컬 데미지", "공격력", "STR", "DEX",
+  ]);
   const url = new URL(apiRequest().url);
   url.searchParams.set("presetMode", "manual");
   for (const field of ["equipmentPreset", "hyperPreset", "unionPreset", "linkPreset", "abilityPreset"]) {
     url.searchParams.set(field, "2");
   }
-  const getConversion = async (temporaryBonus, mode = "manual") => {
+  const getConversion = async (temporaryBonus, mode = "manual", titleLinkDisabled = false) => {
     const endpoint = new URL(url);
     endpoint.searchParams.set("presetMode", mode);
     if (mode === "auto") {
@@ -825,6 +829,15 @@ test("보스 프리셋을 고르면 활성 사냥 스탯의 버프와 별개로 
       fetchImpl: async (input) => {
         const path = new URL(input);
         const payload = presetNexonPayload(path);
+        if (path.pathname.endsWith("/character/item-equipment")) {
+          const title = {
+            title_name: "테스트 전투 칭호",
+            title_description: "올스탯 +20\n공격력/마력+10\n보스 몬스터 공격 시 데미지+10%",
+            disable_flag: "false",
+          };
+          payload.title = payload.title_preset1 = title;
+          payload.title_preset2 = { title_name: null, disable_flag: String(titleLinkDisabled) };
+        }
         if (path.pathname.endsWith("/character/skill") && path.searchParams.get("character_skill_grade") === "0") {
           payload.character_skill = [{
             skill_name: "윈터 파워업", skill_level: 1, skill_effect: "보스 몬스터 공격 시 데미지 20% 증가",
@@ -837,10 +850,14 @@ test("보스 프리셋을 고르면 활성 사냥 스탯의 버프와 별개로 
           }];
         }
         if (path.pathname.endsWith("/character/stat")) {
+          payload.final_stat.push(
+            { stat_name: "최종 데미지", stat_value: "20" },
+            { stat_name: "크리티컬 확률", stat_value: "90" },
+          );
           for (const row of payload.final_stat) {
-            if (["데미지", "보스 몬스터 데미지", "크리티컬 데미지", "공격력"].includes(row.stat_name)) {
-              row.stat_value = String(Number(row.stat_value) + temporaryBonus);
-            }
+            if (!activeCombatStats.has(row.stat_name)) continue;
+            const total = Number(row.stat_value) + temporaryBonus;
+            row.stat_value = String(row.stat_name === "방어율 무시" ? Math.min(99, total) : total);
           }
         }
         return Response.json(payload);
@@ -853,18 +870,27 @@ test("보스 프리셋을 고르면 활성 사냥 스탯의 버프와 별개로 
   const clean = await getConversion(0);
   const hunting = await getConversion(30);
   assert.deepEqual(hunting.profiles.fullBoss.statEquivalence, clean.profiles.fullBoss.statEquivalence);
+  assert.deepEqual(hunting.profiles.fullBoss.addOptionEquivalence, clean.profiles.fullBoss.addOptionEquivalence);
   assert.deepEqual(hunting.profiles.base.statEquivalence, clean.profiles.base.statEquivalence);
   const { details } = hunting.profiles.fullBoss;
   assert.equal(details.selectedStatTotals.데미지, 5);
   assert.equal(details.currentDamage, 5);
-  assert.equal(details.selectedStatTotals["보스 몬스터 데미지"], 100);
-  assert.equal(details.currentBossDamage, 100);
+  assert.equal(details.selectedStatTotals["보스 몬스터 데미지"], 110);
+  assert.equal(details.currentBossDamage, 110);
+  const unlinked = (await getConversion(0, "manual", true)).profiles.fullBoss.details;
+  assert.equal(details.selectedStatTotals.마력 - unlinked.selectedStatTotals.마력, 10);
+  assert.equal(details.rawAttack - unlinked.rawAttack, 10);
+  assert.equal(unlinked.currentBossDamage, 100);
   assert.equal(details.selectedStatTotals.STR, details.currentMain);
   assert.equal(details.selectedStatTotals.공격력, details.currentAttack);
   assert.equal(details.statVerification.find(({ name }) => name === "보스 몬스터 데미지").api, 330);
   const [autoClean, autoHunting] = await Promise.all([getConversion(0, "auto"), getConversion(30, "auto")]);
   assert.deepEqual(autoHunting.presetSelection.selected, autoClean.presetSelection.selected);
   assert.deepEqual(autoHunting.profiles.fullBoss.statEquivalence, autoClean.profiles.fullBoss.statEquivalence);
+  assert.deepEqual(autoHunting.profiles.fullBoss.addOptionEquivalence, autoClean.profiles.fullBoss.addOptionEquivalence);
+  assert.deepEqual(autoHunting.profiles.fullBoss.details.selectedStatTotals, autoClean.profiles.fullBoss.details.selectedStatTotals);
+  assert.deepEqual(autoHunting.profiles.fullBoss.details.combatModel.totals, autoClean.profiles.fullBoss.details.combatModel.totals);
+  assert.equal(autoHunting.profiles.fullBoss.details.statVerification.find(({ name }) => name === "최종 데미지").api, 50);
 });
 
 test("/id 후 공개 스냅샷을 제한 속도·4개 이하 동시성으로 조회한다", async () => {

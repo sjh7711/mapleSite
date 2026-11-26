@@ -647,16 +647,16 @@ function formatCharacterStat(name, amount, difference = false) {
   return `${prefix}${coefficient(amount, percent ? 2 : 0)}${percent ? (difference ? "%p" : "%") : ""}`;
 }
 
-function selectedPresetStatDetails(totals) {
+function selectedPresetStatDetails(totals, presetMode) {
   if (!totals || typeof totals !== "object") return null;
   const rows = Object.entries(totals).filter(([, value]) => Number.isFinite(value))
     .map(([name, value]) => [name, formatCharacterStat(name, value)]);
   if (!rows.length) return null;
   const panel = element("details", "profile-stat-verification");
+  const basis = presetMode === "auto" ? "자동 보스" : "선택 프리셋";
   panel.append(
-    element("summary", "", "선택 프리셋 출처 합산"),
-    element("p", "profile-doping__class", "선택한 프리셋의 도핑 적용 전 수치입니다."),
-    characterStatTable(["스탯", "선택 프리셋"], rows),
+    element("summary", "", `${basis} 출처 합산 · 도핑 전`),
+    characterStatTable(["스탯", basis], rows),
   );
   return panel;
 }
@@ -676,7 +676,7 @@ function statVerificationDetails(rows) {
   const panel = element("details", "profile-stat-verification");
   const verified = rows.filter(({ matched }) => matched).length;
   panel.append(
-    element("summary", "", `API 스탯 검증 · ${verified}/${rows.length}개 확인`),
+    element("summary", "", `현재 활성 API 스탯 검증 · ${verified}/${rows.length}개 확인`),
     element("p", "profile-doping__class",
       "활성 프리셋의 기본 출처 합산과 넥슨 API 수치를 비교합니다. 일시 효과에 따라 차이가 날 수 있습니다."),
     characterStatTable(["스탯", "출처 합산", "API", "확인 결과"], values),
@@ -702,7 +702,10 @@ function fullBossDopingDetails(profile, conventionalAddOption, collapsed = false
     content.append(element("p", "profile-doping__class",
       `펫 자동버프 등록 · ${petSkills.join(" · ")}`));
   }
-  const selectedStats = selectedPresetStatDetails(profile.details?.selectedStatTotals);
+  const selectedStats = selectedPresetStatDetails(
+    profile.details?.selectedStatTotals,
+    profile.presetSelection?.mode,
+  );
   if (selectedStats) content.append(selectedStats);
   const verification = statVerificationDetails(profile.details?.statVerification);
   if (verification) content.append(verification);

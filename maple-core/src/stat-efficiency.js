@@ -2532,22 +2532,28 @@ function titleFlatAttack(equipmentData, attackType) {
   return total;
 }
 
+function equipmentTitlePresetEntry(equipmentData, presetNumber) {
+  return equipmentData?.[`title_preset${presetNumber}`] ??
+    equipmentData?.[`title_preset_${presetNumber}`] ??
+    equipmentData?.title?.[`title_preset_${presetNumber}`] ??
+    equipmentData?.title?.[`title_preset${presetNumber}`];
+}
+
 function equipmentPresetData(equipmentData, presetNumber) {
   if (!presetNumber || presetNumber === number(equipmentData?.preset_no)) {
     return equipmentData;
   }
-  // KMS 실응답의 top-level 키와 문서/SDK에서 쓰는 중첩 키를 모두
-  // 받아 프리셋을 바꿔도 칭호 스탯이 빠지지 않게 한다.
-  const title =
-    equipmentData?.[`title_preset${presetNumber}`] ??
-    equipmentData?.[`title_preset_${presetNumber}`] ??
-    equipmentData?.title?.[`title_preset_${presetNumber}`] ??
-    equipmentData?.title?.[`title_preset${presetNumber}`];
+  const title = equipmentTitlePresetEntry(equipmentData, presetNumber);
+  // 칭호가 따로 등록되지 않았고 연동 해제 플래그가 꺼져 있으면 1번 칭호를 공유한다.
+  const effectiveTitle = !title?.title_name && presetNumber > 1 &&
+    String(title?.disable_flag) === "false"
+    ? equipmentTitlePresetEntry(equipmentData, 1)
+    : title;
   return {
     ...equipmentData,
     item_equipment:
       equipmentData?.[`item_equipment_preset_${presetNumber}`] ?? [],
-    title: title?.title_name ? title : null,
+    title: effectiveTitle?.title_name ? effectiveTitle : null,
   };
 }
 
@@ -4532,18 +4538,19 @@ export function calculateCharacterPotentialConversion({
     resolvedPresets.selectedSnapshot.unionRaiderData;
   const selectedLinkSkillData = resolvedPresets.selectedSnapshot.linkSkillData;
   const selectedAbilityData = resolvedPresets.selectedSnapshot.abilityData;
+  const selectedSkillData = resolvedPresets.selectedSnapshot.skillData ?? skillData;
   const buffDurationPercent = sourceValues?.["버프 지속시간"] ?? selectedBuffDurationPercent(
     stats["버프 지속시간"],
     resolvedPresets.activeSnapshot,
     resolvedPresets.selectedSnapshot,
   );
   const classDopingAdjustment = { ...doping?.classAdjustments?.[character.character_class] };
-  const criticalBuffs = bossCriticalEffects(skillData, doping);
+  const criticalBuffs = bossCriticalEffects(selectedSkillData, doping);
   const { sharpEyes } = criticalBuffs;
   if (selectedStatSources || sharpEyes.name === "샤프 아이즈") delete classDopingAdjustment.criticalRate;
   const classAlwaysOnCombat = resolveClassAlwaysOnCombatAdjustment(
     character.character_class,
-    skillData,
+    selectedSkillData,
   );
   const classAlwaysOnAdjustment = classAlwaysOnCombat.adjustment;
   const activeEquipmentData = equipmentData;
@@ -4571,7 +4578,7 @@ export function calculateCharacterPotentialConversion({
     attackType,
     resolvedPresets.selection.mode,
   );
-  const skills = skillBonuses(skillData);
+  const skills = skillBonuses(selectedSkillData);
   const activeLinks = linkSkillBonuses(linkSkillData);
   const links = linkSkillBonuses(selectedLinkSkillData);
   const combatDurationSeconds = Math.max(
@@ -4581,7 +4588,7 @@ export function calculateCharacterPotentialConversion({
   const combatRing = calculateCombatRingBonuses(
     selectedEquipmentData,
     ringReserveData,
-    skillData,
+    selectedSkillData,
     attackType,
     combatDurationSeconds,
     character.character_class,
@@ -4591,7 +4598,7 @@ export function calculateCharacterPotentialConversion({
     buffDurationPercent,
     false,
     character.character_class,
-    maintainsBossSummon(skillData, character.character_class),
+    maintainsBossSummon(selectedSkillData, character.character_class),
   );
   const bossItemEffects = doping ? calculateBossItemCombatEffects({
     symbolData,
@@ -4626,7 +4633,7 @@ export function calculateCharacterPotentialConversion({
   const mapleWarriorPercent = skills.apPercent || 15;
   const mapleWarriorMultiplier = 1 + mapleWarriorPercent / 100;
   const activeSkillCycle = calculateActiveSkillCycleBonuses(
-    skillData,
+    selectedSkillData,
     attackType,
     combatDurationSeconds,
     {
@@ -5147,7 +5154,7 @@ export function calculateCharacterPotentialConversion({
     number(classAlwaysOnAdjustment.criticalDamage) +
     (doping ? activeSkillCycle.criticalDamage : 0);
   const legacyHyperRate = doping && !selectedStatSources && !sharpEyes.name
-    ? sharpEyesHyperCriticalRate(skillData) : 0;
+    ? sharpEyesHyperCriticalRate(selectedSkillData) : 0;
   // 크리티컬 확률은 세이람의 영약·이벤트 버프 같은 외부 도핑을
   // 의도적으로 배제한다. 선택한 보스 세팅과 직업 스킬 보정만 사용한다.
   // 기존 응답 필드명은 호환성을 위해 dopedCriticalRate로 유지한다.
@@ -5198,7 +5205,7 @@ export function calculateCharacterPotentialConversion({
   const criticalReinforceUptime =
     doping && CRITICAL_REINFORCE_CLASSES.has(character.character_class)
       ? weightedCriticalReinforceUptime({
-          skillData,
+          skillData: selectedSkillData,
           activeSkillCycle,
           combatRing,
           combatDuration: combatDurationSeconds,
@@ -5212,7 +5219,7 @@ export function calculateCharacterPotentialConversion({
           mainPercent,
           subPercents,
         }) || skillAverageUptime(
-          skillData,
+          selectedSkillData,
           "크리티컬 리인포스",
           30 / 120,
         )
@@ -5386,7 +5393,7 @@ export function calculateCharacterPotentialConversion({
       metadata: { sources: conditionalLinks.applied.map(({ name }) => name) },
     }));
     combatEffects.push(
-      ...targetDefenseEffectsFromSkills(skillData),
+      ...targetDefenseEffectsFromSkills(selectedSkillData),
     );
   }
   combatEffects.push(createCombatEffect({
@@ -5452,7 +5459,7 @@ export function calculateCharacterPotentialConversion({
     effects: combatEffects,
     damageChannels: resolveClassDamageChannels({
       characterClass: character.character_class,
-      skillData,
+      skillData: selectedSkillData,
       vMatrixData,
       hexaMatrixData,
     }),
