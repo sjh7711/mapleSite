@@ -685,7 +685,7 @@ function calculateXenon(
       maintainsBossSummon(snapshot.skillData, text(input.character.character_class)),
     combatDuration,
   );
-  const guildNoblesse = calculateGuildNoblesseBonuses(snapshot.guildData);
+  const guildNoblesse = calculateGuildNoblesseBonuses(snapshot.guildData, combatDuration);
   const guildBaseline = object(doping?.guildBaseline) ?? {};
   const guildDifference = input.doping && guildNoblesse.available
     ? {

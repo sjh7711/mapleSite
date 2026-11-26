@@ -488,6 +488,25 @@ function parsedSkillLocalIgnoreDefenseChannels(skillData) {
       if (!/방어율/u.test(line) || /영구적으로|영구히/u.test(line)) {
         continue;
       }
+      if (name === "무아지경") {
+        const exclusive = line.trim().match(
+          /^(암살\s*:\s*멸),\s*(분쇄\s*:\s*멸)은 몬스터 방어율\s*(\d+(?:\.\d+)?)%\s*추가 무시/u,
+        );
+        if (exclusive) {
+          for (const source of exclusive.slice(1, 3)) {
+            result.push(createDamageChannel({
+              source,
+              ignoreDefenseSources: [number(exclusive[3])],
+              metadata: {
+                status: "unweighted",
+                intrinsicIgnoreDefenseSources: [number(exclusive[3])],
+                sourceSkill: name,
+              },
+            }));
+          }
+          continue;
+        }
+      }
       const requiredLevelMatch = line.match(/^\s*(\d+(?:\.\d+)?)레벨\s*:/u);
       // `오라 웨폰`, `파이렛 플래그 VI`, `소드 오브 소울 라이트`,
       // `어비스 버프`처럼 일정 시간 캐릭터 전체 방무를 올리는 문장은
@@ -631,7 +650,7 @@ function hyperPassiveAttackChannels(skillData) {
     const name = String(skill.skill_name ?? "");
     if (grade !== "hyperpassive" && !/이그노어\s*가드/u.test(name)) continue;
     // Target debuffs and ordinary buffs are resolved by their own models.
-    if (/^(?:트루 사이트|샤프 아이즈|다크 오라|어드밴스드 블레스|어드밴스드 콤보)-/u.test(name)) continue;
+    if (/^(?:트루 사이트|샤프 아이즈|다크 오라|어드밴스드 블레스|어드밴스드 콤보|퍼지 에어리어)-/u.test(name)) continue;
     const description = String(skill.skill_description ?? "");
     const effect = String(skill.skill_effect ?? "");
     const ignoreDefense = number(effect.match(
@@ -659,7 +678,7 @@ function hyperPassiveAttackChannels(skillData) {
   return result;
 }
 
-function maintainedTrinityIgnoreDefenseChannels(skillData) {
+function maintainedTrinityAttackChannels(skillData) {
   const skills = (skillData ?? []).flatMap((grade) => grade?.character_skill ?? []);
   const learned = (name) => skills.find((skill) =>
     skill.skill_name === name && number(skill.skill_level) > 0
@@ -671,10 +690,13 @@ function maintainedTrinityIgnoreDefenseChannels(skillData) {
   if (!match) return [];
   const stacks = number(match[2]);
   const perStack = number(match[1]);
+  const stackedBonus = stacks * perStack;
   return [trinity, learned("트리니티 퓨전")].filter(Boolean).map((skill) =>
     createDamageChannel({
       source: skill.skill_name,
-      ignoreDefenseSources: [Math.min(100, stacks * perStack)],
+      ignoreDefenseSources: [Math.min(100, stackedBonus)],
+      // 해당 공격의 데미지는 보스전에서 그 공격의 보공과 같은 합산 구간이다.
+      localBossDamage: stackedBonus,
       metadata: { status: "unweighted", maintainedTrinityStacks: stacks, perStack },
     })
   );
@@ -725,6 +747,7 @@ function skillLocalAttackChannels(skillData) {
         status: "unweighted",
         reason: "스킬 고유 방무와 달성한 6차 강화 효과",
         sources: active.map((channel) => channel.source),
+        sourceSkill: representative.metadata?.sourceSkill,
         inheritedFromLegacy: Boolean(
           sixth.length && !activeIntrinsic.length && intrinsic.length,
         ),
@@ -734,9 +757,11 @@ function skillLocalAttackChannels(skillData) {
 
   for (const channel of [
     ...hyperPassiveAttackChannels(skillData),
-    ...maintainedTrinityIgnoreDefenseChannels(skillData),
+    ...maintainedTrinityAttackChannels(skillData),
     ...snipingVariantIgnoreDefenseChannels(skillData),
-    ...leteAscentBossDamageChannel(skillData),
+    ...zeroFormDefenseChannels(skillData),
+    ...verifiedAttackBossDamageChannels(skillData),
+    ...leveledAttackBossDamageChannels(skillData),
   ]) {
     const key = normalizedBattleSkillName(channel.source);
     const current = selected.find(
@@ -771,25 +796,94 @@ function snipingVariantIgnoreDefenseChannels(skillData) {
   }));
 }
 
-function leteAscentBossDamageChannel(skillData) {
-  const skill = (skillData ?? []).flatMap((group) => group.character_skill ?? [])
-    .find((entry) => entry.skill_name === "앱솔루트 레인" && number(entry.skill_level) > 0);
-  if (!skill) return [];
-  // The increase is listed on the attack itself. Its level 10/20 boss
-  // lines are separate additions that unlock with the same Ascent skill.
+const ZERO_FORM_ATTACKS = [
+  {
+    passive: "태도 마스터리",
+    scope: /알파의[^\r\n]*방어율\s*(\d+)%\s*무시/u,
+    attacks: [
+      "문 스트라이크", "피어스 쓰러스트", "쉐도우 스트라이크",
+      "플래시 어썰터", "스핀 커터", "롤링 커브", "롤링 어썰터",
+      "윈드 커터", "윈드 스트라이크", "스톰 브레이크",
+    ],
+  },
+  {
+    passive: "아머 스플릿",
+    scope: /베타가 공격 시[^\r\n]*방어율\s*(\d+)%\s*무시/u,
+    attacks: [
+      "어퍼 슬래시", "파워 스텀프", "프론트 슬래시", "스로잉 웨폰",
+      "휠 윈드", "터닝 드라이브", "기가 크래시", "점핑 크래시", "어스 브레이크",
+    ],
+  },
+];
+
+function zeroFormDefenseChannels(skillData) {
+  const skills = (skillData ?? []).flatMap((group) => group.character_skill ?? []);
+  return ZERO_FORM_ATTACKS.flatMap(({ passive, scope, attacks }) => {
+    const skill = skills.find((entry) =>
+      entry.skill_name === passive && number(entry.skill_level) > 0);
+    const defense = number(String(skill?.skill_effect ?? "").match(scope)?.[1]);
+    if (!(defense > 0)) return [];
+    return attacks.map((source) => createDamageChannel({
+      source,
+      ignoreDefenseSources: [defense],
+      metadata: { status: "unweighted", formPassive: passive },
+    }));
+  });
+}
+
+function verifiedAttackBossDamageChannels(skillData) {
+  const skills = (skillData ?? []).flatMap((group) => group.character_skill ?? [])
+    .filter((skill) => number(skill.skill_level) > 0);
+  const learned = (name) => skills.find((skill) => skill.skill_name === name);
+  const impact = learned("데몬 임팩트 VI") ?? learned("데몬 임팩트");
+  const effects = [
+    ["데몬 어웨이크닝", String(learned("데몬 어웨이크닝")?.skill_effect ?? "")
+      .match(/^강화 데몬 슬래시\s*:[^\r\n]+/mu)?.[0]],
+    [impact?.skill_name, impact?.skill_effect],
+    ["다크로드의 비전서", learned("다크로드의 비전서")?.skill_effect],
+    ["메소 익스플로젼", String(learned("블러디 파킷")?.skill_effect ?? "")
+      .match(/메소 익스플로젼으로 보스 몬스터 공격 시 데미지[^\r\n]*/u)?.[0]],
+  ];
+  return effects.flatMap(([source, text]) => {
+    const localBossDamage = number(text?.match(
+      /보스 몬스터 공격 시 데미지\s*(\d+(?:\.\d+)?)%\s*증가/u,
+    )?.[1]);
+    return localBossDamage > 0 ? [createDamageChannel({
+      source, localBossDamage, metadata: { status: "unweighted" },
+    })] : [];
+  });
+}
+
+function leveledAttackBossDamageChannels(skillData) {
+  // 어센트와 솔 헤카테의 10·20레벨 보공은 해당 공격의 고유 효과다.
   const bossValue = (text) => number(text.match(/보스 몬스터 공격 시 데미지\s*(\d+(?:\.\d+)?)%\s*증가/u)?.[1]);
-  const effectLines = String(skill.skill_effect ?? "").split(/\r?\n/u);
-  const description = String(skill.skill_description ?? "");
-  const base = effectLines.filter((line) => !/^\s*\d+레벨\s*:/u.test(line)).map(bossValue).reduce((a, b) => a + b, 0);
-  const milestones = new Map([...description.split(/\r?\n/u), ...effectLines].flatMap((line) => {
-    const level = line.match(/^\s*(\d+)레벨\s*:/u)?.[1];
-    return level && number(level) <= number(skill.skill_level)
-      ? [[level, bossValue(line)]] : [];
-  }));
-  const localBossDamage = base + [...milestones.values()].reduce((sum, value) => sum + value, 0);
-  return localBossDamage > 0 ? [createDamageChannel({
-    source: skill.skill_name, localBossDamage, metadata: { status: "unweighted" },
-  })] : [];
+  const sixthSkills = (skillData ?? []).filter((group) => String(group.character_skill_grade) === "6")
+    .flatMap((group) => group.character_skill ?? []);
+  return sixthSkills.flatMap((skill) => {
+    const skillLevel = number(skill.skill_level);
+    if (!(skillLevel > 0)) return [];
+    const effectLines = String(skill.skill_effect ?? "").split(/\r?\n/u);
+    const descriptionLines = String(skill.skill_description ?? "").split(/\r?\n/u);
+    const milestones = new Map();
+    for (const line of [...descriptionLines, ...effectLines]) {
+      const level = line.match(/^\s*(10|20)레벨\s*:/u)?.[1];
+      const value = bossValue(line);
+      if (level && value > 0) milestones.set(number(level), value);
+    }
+    // 일부 이전 API 응답에는 해금된 단계까지만 표시된다.
+    if (milestones.size < 2 && skill.skill_name !== "앱솔루트 레인" &&
+        !effectLines.some((line) =>
+          /몬스터 방어율 60% 추가 무시, 보스 몬스터 공격 시 데미지 40% 증가/u.test(line)
+        )) return [];
+    const base = effectLines.filter((line) => !/^\s*\d+레벨\s*:/u.test(line))
+      .reduce((sum, line) => sum + bossValue(line), 0);
+    const localBossDamage = base + [...milestones].reduce(
+      (sum, [level, value]) => sum + (skillLevel >= level ? value : 0), 0,
+    );
+    return localBossDamage > 0 ? [createDamageChannel({
+      source: skill.skill_name, localBossDamage, metadata: { status: "unweighted" },
+    })] : [];
+  });
 }
 
 /** V 강화 코어 40레벨에서 해당 스킬에 붙는 몬스터 방어율 무시 20%. */
@@ -877,6 +971,13 @@ function mergedLocalIgnoreDefenseChannels(skillData, vMatrixData) {
   for (const [key, channel] of merged) {
     const parent = key.includes(":") ? merged.get(key.slice(0, key.lastIndexOf(":"))) : null;
     if (!parent) continue;
+    // 새 고유 방무를 추가해도 암살 : 멸에 적용하던 기존 암살 효과는 유지한다.
+    if (key === "암살:멸" && channel.metadata.sources.some((item) => item.sourceSkill === "무아지경")) {
+      channel.ignoreDefenseSources.push(...parent.ignoreDefenseSources);
+      channel.localBossDamage += number(parent.localBossDamage);
+      channel.metadata.sources.push(...parent.metadata.sources);
+      continue;
+    }
     for (const { coreName, coreLevel, source } of parent.metadata.sources) {
       if (!coreName || channel.metadata.sources.some((item) => item.coreName === coreName)) continue;
       channel.ignoreDefenseSources.push(20);

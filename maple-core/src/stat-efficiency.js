@@ -954,6 +954,9 @@ function directCycleSkillModifiers(effect, attackType) {
   const ignoreDefense = percentFromEffect(
     text,
     /(?:몬스터 )?방어율 무시(?:가)?\s*(\d+(?:\.\d+)?)%(?=\s*(?:증가|[,·]))/u,
+  ) || percentFromEffect(
+    text,
+    /(?:^|[,·\n]|초\s*동안)\s*(?:적의\s*|몬스터의?\s*)?방어율(?:을)?\s*(\d+(?:\.\d+)?)%\s*무시/u,
   );
   const finalDamage = percentFromEffect(
     text,
@@ -1080,6 +1083,8 @@ function phaseScopedPermanentEvent(
   if (/베타/u.test(scopedText)) scopes.add("beta");
   if (!scopes.size) return null;
   const modifiers = directCycleSkillModifiers(scopedText, attackType);
+  // 알파와 베타의 방무는 폼별 공격군에 적용한다.
+  modifiers.ignoreDefense = 0;
   if (!Object.values(modifiers).some((value) => value > 0)) return null;
   return {
     name: String(skill?.skill_name ?? "").trim(),
@@ -1563,6 +1568,67 @@ function specialCycleEvents({
           /몬스터 방어율 무시\s*(\d+(?:\.\d+)?)%/u,
         ),
       },
+    }];
+  }
+
+  if (characterClass === "소울마스터" && name === "트루 사이트") {
+    const duration = percentFromEffect(effect, /(\d+)초 동안 방어율 \d+% 무시/u);
+    if (!duration) return [];
+    const modifiers = directCycleSkillModifiers(effect, attackType);
+    const hyperEffect = (suffix) => skills.find(({ skill_name }) =>
+      skill_name === `트루 사이트-${suffix}`
+    )?.skill_effect ?? "";
+    modifiers.ignoreDefense += percentFromEffect(
+      hyperEffect("이그노어 가드"),
+      /방어율\s*(\d+)%\s*추가 무시/u,
+    );
+    modifiers.finalDamage += directCycleSkillModifiers(
+      hyperEffect("인핸스"), attackType,
+    ).finalDamage;
+    return [{
+      name,
+      model: "true-sight-self-buff",
+      duration,
+      cooldown,
+      uptime: cooldown > 0 ? undefined : 1,
+      modifiers,
+    }];
+  }
+
+  if (characterClass === "제논" && name === "오버로드 모드") {
+    const buff = effect.match(/^\s*(\d+)초 동안 데미지[^\r\n]*방어율 무시[^\r\n]*/mu);
+    return buff ? [{
+      name,
+      model: "overload-mode-combat-buff",
+      duration: number(buff[1]),
+      cooldown,
+      modifiers: directCycleSkillModifiers(buff[0], attackType),
+    }] : [];
+  }
+
+  if (characterClass === "제논" && name === "오파츠 코드" && !cooldown) {
+    const duration = percentFromEffect(effect, /(\d+(?:\.\d+)?)초 동안/u);
+    if (!(duration > 0) || !/^\[서플라이\]/u.test(effect)) return [];
+    return [{
+      name,
+      model: "ooparts-code-maintained",
+      duration,
+      uptime: 1,
+      modifiers: directCycleSkillModifiers(effect, attackType),
+    }];
+  }
+
+  if (characterClass === "히어로" && name === "어드밴스드 콤보-보스 킬러") {
+    const combo = skills.find(({ skill_name }) => skill_name === "어드밴스드 콤보");
+    const maxStacks = percentFromEffect(combo?.skill_effect, /최대 콤보 카운터\s*(\d+)/u);
+    const bossDamage = directCycleSkillModifiers(effect, attackType).bossDamage;
+    if (!(maxStacks > 0 && bossDamage > 0)) return [];
+    return [{
+      name,
+      model: "advanced-combo-max-stacks",
+      duration: combatDuration,
+      uptime: 1,
+      modifiers: { bossDamage: maxStacks * bossDamage },
     }];
   }
 
@@ -2624,8 +2690,22 @@ export function calculateConditionalLinkCycleBonuses(
     ignoreDefenseSources: [],
     applied: [],
   };
-  for (const skill of linkSkills(linkSkillData)) {
-    const name = String(skill?.skill_name ?? "").trim();
+  const links = linkSkills(linkSkillData);
+  const stackedExplorerLinks = new Map();
+  for (const skill of links) {
+    const name = String(skill.skill_name ?? "").trim().match(
+      /^(임피리컬 널리지|시프 커닝)(?:\([^()]+\))?$/u,
+    )?.[1];
+    if (!name) continue;
+    const previous = stackedExplorerLinks.get(name);
+    if (!previous || number(skill.skill_level) > number(previous.skill_level)) {
+      stackedExplorerLinks.set(name, skill);
+    }
+  }
+  for (const skill of links) {
+    const rawName = String(skill.skill_name ?? "").trim();
+    const name = rawName.replace(/^(임피리컬 널리지|시프 커닝)\([^()]+\)$/u, "$1");
+    if (stackedExplorerLinks.has(name) && stackedExplorerLinks.get(name) !== skill) continue;
     const effect = String(skill?.skill_effect ?? "");
     let damage = 0;
     let bossDamage = 0;
@@ -2705,7 +2785,7 @@ export function calculateConditionalLinkCycleBonuses(
   return result;
 }
 
-export function calculateGuildNoblesseBonuses(guildData) {
+export function calculateGuildNoblesseBonuses(guildData, combatDurationSeconds = 0) {
   const skills = guildData?.guild_noblesse_skill;
   const available = Array.isArray(skills);
   const result = {
@@ -2722,27 +2802,33 @@ export function calculateGuildNoblesseBonuses(guildData) {
     const effect = String(skill?.skill_effect ?? "");
     if (!name) continue;
     result.skills.push(name);
+    const duration = effect.match(/(\d+(?:\.\d+)?)\s*(분|초)\s*동안/u);
+    const durationSeconds = number(duration?.[1]) * (duration?.[2] === "분" ? 60 : 1);
+    // Start with the guild buff active. It cannot be recast in the boss map.
+    const uptime = combatDurationSeconds > 0 && durationSeconds > 0
+      ? Math.min(1, durationSeconds / combatDurationSeconds)
+      : 1;
     if (name === "보스 킬링 머신") {
       result.bossDamage += percentFromEffect(
         effect,
         /보스 몬스터 공격 시 데미지\s*(\d+(?:\.\d+)?)%/u,
-      );
+      ) * uptime;
     } else if (name === "길드의 이름으로") {
       result.damage += percentFromEffect(
         effect,
         /데미지\s*(\d+(?:\.\d+)?)%/u,
-      );
+      ) * uptime;
     } else if (name === "크게 한방") {
       result.criticalDamage += percentFromEffect(
         effect,
         /크리티컬 데미지\s*(\d+(?:\.\d+)?)%/u,
-      );
+      ) * uptime;
     } else if (name === "방어력은 숫자일 뿐") {
       const ignoreDefense = percentFromEffect(
         effect,
         /방어율 무시\s*(\d+(?:\.\d+)?)%/u,
       );
-      if (ignoreDefense > 0) result.ignoreDefenseSources.push(ignoreDefense);
+      if (ignoreDefense > 0) result.ignoreDefenseSources.push(ignoreDefense * uptime);
     }
   }
   return result;
@@ -4554,6 +4640,7 @@ const STAT_WINDOW_ATTACK_TEXT = /\d+(?:\.\d+)?%\s*(?:의\s*)?데미지로/u;
 const STAT_WINDOW_CONDITIONAL_SKILLS = new Set([
   "익스트림 아쳐리 : 활", "익스트림 아쳐리 : 석궁",
   "태도 마스터리", "대검 마스터리", "디바인 포스", "디바인 스위프트",
+  "트루 사이트-인핸스",
   "샤프 아이즈-크리티컬 레이트", "샤프 아이즈-이그노어 가드",
 ]);
 const MUTUALLY_EXCLUSIVE_BLESSINGS = new Set(["정령의 축복", "여제의 축복"]);
@@ -4562,8 +4649,11 @@ const RETAINED_BASE_STAT_PASSIVES = new Set(["임펠", "트와일라잇 노바",
 const GLOBAL_REVERSE_DEFENSE_SKILLS = new Set([
   "마크맨쉽", "컴뱃 마스터리", "어드밴스드 차지 마스터리",
   "디펜스 브레이크", "가드 크러쉬", "언포시어블", "언플리칭 커리지",
-  "오버버닝 캐논", "풀메탈 자켓",
+  "오버버닝 캐논", "풀메탈 자켓", "다크 레조넌스", "다크니스 소서리",
+  "다크 바인드", "어드밴스드 인핸스 애로우", "애로우 일루전", "프레이 오브 아리아",
 ]);
+const PURGE_AREA_PASSIVE_DEFENSE = /(몬스터 방어율 무시\s*)(\d+(?:\.\d+)?)%/u;
+const PURGE_AREA_HYPER_DEFENSE = /^방어율 무시\s*(\d+(?:\.\d+)?)%\s*추가 증가$/u;
 
 function normalizeStatWindowText(value) {
   return value.trim()
@@ -4573,7 +4663,7 @@ function normalizeStatWindowText(value) {
     .replace(/지능/g, "지력");
 }
 
-function statWindowSkillTexts(skillData, equipmentData, petEquipmentData, activeSkillNames) {
+function statWindowSkillTexts(skillData, equipmentData, petEquipmentData, activeSkillNames, allocatedAp) {
   const highGradeSkills = new Set((skillData ?? []).filter(({ character_skill_grade }) =>
     /^(?:5|6|ascent)$/iu.test(String(character_skill_grade))).flatMap(({ character_skill }) =>
     character_skill ?? []));
@@ -4590,6 +4680,12 @@ function statWindowSkillTexts(skillData, equipmentData, petEquipmentData, active
   const weaponType = activeEquipment(equipmentData).find((item) =>
     item.item_equipment_slot === "무기")?.item_equipment_part;
   const petSkillNames = new Set(lunaPetSkills(petEquipmentData).map(({ skill_name }) => skill_name));
+  const purgeAreaPassive = String(unique.get("퍼지 에어리어")?.skill_effect ?? "")
+    .match(/\[패시브 효과\s*:\s*([^\]]+)\]/u)?.[1];
+  const purgeAreaIncrease = PURGE_AREA_PASSIVE_DEFENSE.test(purgeAreaPassive ?? "")
+    ? number(String(unique.get("퍼지 에어리어-인핸스")?.skill_effect ?? "").trim()
+      .match(PURGE_AREA_HYPER_DEFENSE)?.[1])
+    : 0;
   const texts = [...unique.values()].flatMap((skill) => {
     const { skill_name, skill_effect } = skill;
     if (petSkillNames.has(skill_name)) return [];
@@ -4597,10 +4693,31 @@ function statWindowSkillTexts(skillData, equipmentData, petEquipmentData, active
     const confirmedActive = activeSkillNames.includes(skill_name);
     if (STAT_WINDOW_CONDITIONAL_SKILLS.has(skill_name) && !confirmedActive) return [];
     const text = String(skill_effect ?? "");
+    if (/^멀티래터럴 [IVⅠ-Ⅵ]+$/u.test(skill_name)) {
+      const condition = text.match(/^STR\/DEX\/LUK (?:모두 )?(\d+) 이상 시\s*:\s*데미지 (\d+)%/mu);
+      return condition && ["STR", "DEX", "LUK"].every((stat) => allocatedAp[`AP 배분 ${stat}`] >= number(condition[1]))
+        ? [`데미지 ${condition[2]}% 증가`] : [];
+    }
+    if (skill_name === "오펜시브 매트릭스") {
+      // 공격 시 방무는 전투 모드가 처리한다. 같은 문장의 능력치는 상시다.
+      const stats = text.match(/(?:^|,\s*)(STR \d+, DEX \d+, LUK \d+ 증가)/u)?.[1];
+      if (stats) return [stats];
+    }
+    if (skill_name === "아케인 에임") {
+      // 공격 시 방무와 적중 시 데미지 중첩은 적용 조건이 다르다.
+      const ignoreDefense = percentFromEffect(
+        text, /공격 시 몬스터의 방어율\s*(\d+(?:\.\d+)?)%\s*무시/u,
+      );
+      if (ignoreDefense > 0) return [`방어율 무시 ${ignoreDefense}%`];
+    }
     const passive = [...text.matchAll(/\[패시브 효과\s*:\s*([^\]]+)\]/gu)];
+    // 툴팁의 다음 줄에 나열된 스탯도 30초 버프의 일부다.
+    if (skill_name === "파이널 컨트랙트" && !passive.length && /\d+초 동안/u.test(text)) return [];
+    if (skill_name === "퍼지 에어리어-인핸스" && purgeAreaIncrease > 0) return [];
     // V 코어의 블레스는 본문 공격력·마력과 별도 패시브 올스탯이 모두 상시 효과다.
     const permanentBless = skill_name === "쓸만한 어드밴스드 블레스";
     if (!passive.length && !confirmedActive &&
+      !/^(?:정신 강화|공격모드 [1-3]차 강화)$/u.test(skill_name) &&
       /리인포스|보스\s*킬러|이그노어\s*가드|[ -](?:강화|퍼시스트)$/u.test(skill_name)) return [];
     const needsPermanentMarker = !permanentBless && !passive.length &&
       (highGradeSkills.has(skill) || STAT_WINDOW_ATTACK_TEXT.test(text));
@@ -4610,10 +4727,25 @@ function statWindowSkillTexts(skillData, equipmentData, petEquipmentData, active
       if (needsPermanentMarker && !STAT_WINDOW_PERMANENT_LEAD.test(raw.trim())) return [];
       // 수치 뒤의 %p는 개별 공격기의 퍼뎀 증가 표기다.
       let line = normalizeStatWindowText(raw).replace(/,\s*[^,]*\d+(?:\.\d+)?%p.*$/u, "");
+      if (skill_name === "퍼지 에어리어" && purgeAreaIncrease > 0) {
+        // 하이퍼는 본체가 부여하는 동일한 방무 수치를 올린다.
+        line = line.replace(PURGE_AREA_PASSIVE_DEFENSE, (_, prefix, value) =>
+          `${prefix}${Math.min(100, number(value) + purgeAreaIncrease)}%`);
+      }
+      if (skill_name === "서포트 프로토콜") {
+        // 주기적 HP 회복 뒤에 표기된 방무는 항상 적용된다.
+        line = line.replace(/^\d+초마다 [^,]*자동 회복,\s*/u, "");
+      }
       if (GLOBAL_REVERSE_DEFENSE_SKILLS.has(skill_name)) {
         line = line.replace(
-          /(^|,\s*)(?:공격 시\s*)?(?:몬스터의?\s*|적의\s*)?(?:물리\s*)?방어율(?:을)?\s*(\d+(?:\.\d+)?)%\s*무시/gu,
+          /(^|,\s*)(?:영구적으로\s*)?(?:공격 시\s*)?(?:몬스터의?\s*|적의\s*)?(?:물리\s*)?방어율(?:을)?\s*(\d+(?:\.\d+)?)%\s*무시/gu,
           "$1방어율 무시 $2%",
+        );
+      }
+      if (skill_name === "프레이 오브 아리아") {
+        line = line.replace(
+          /공격 시\s*(\d+(?:\.\d+)?)%만큼 적의 방어율을 무시/u,
+          "방어율 무시 $1%",
         );
       }
       const parts = line.split(/,\s*(?=\S+ 착용 시 )/u);
@@ -4679,7 +4811,8 @@ export function reconstructCharacterStats({
     set_effect_info: (set.set_effect_info ?? []).filter((entry) =>
       set.total_set_count == null || number(entry.set_count) <= number(set.total_set_count)),
   }));
-  const skillTexts = statWindowSkillTexts(skillData, equipmentData, petEquipmentData, activeSkillNames);
+  const allocatedAp = finalStats(statData ?? {});
+  const skillTexts = statWindowSkillTexts(skillData, equipmentData, petEquipmentData, activeSkillNames, allocatedAp);
   const equippedLinks = linkSkills(linkSkillData);
   // The first line of Nature's Friend is permanent. The following lines
   // describe a separate effect triggered by killing normal monsters.
@@ -4759,11 +4892,10 @@ export function reconstructCharacterStats({
   const hexa = hexaUnreflectedMainStat(hexaStatData, hexaScale);
   const attributes = {};
   if (STAT_NAMES.includes(mainStat) || xenonStats.length) {
-    const ap = finalStats(statData);
     const apPercent = parseTextBonuses(allCharacterSkills(skillData).map((skill) => skill.skill_effect)).apPercent;
     for (const stat of STAT_NAMES) {
-      if (!Object.hasOwn(ap, `AP 배분 ${stat}`)) continue;
-      const base = Math.floor(ap[`AP 배분 ${stat}`] * (1 + apPercent / 100) + 1e-8) +
+      if (!Object.hasOwn(allocatedAp, `AP 배분 ${stat}`)) continue;
+      const base = Math.floor(allocatedAp[`AP 배분 ${stat}`] * (1 + apPercent / 100) + 1e-8) +
         sumItemTotal(equipmentData, stat) + options.flat[stat] + permanent.flat[stat] +
         unionAllocatedStat(unionRaiderData, stat);
       const percent = options.percent[stat] + sumItemAllStatPercent(equipmentData) + permanent.percent[stat];
@@ -5030,7 +5162,7 @@ export function calculateCharacterPotentialConversion({
     vMatrixData,
     characterClass: character.character_class,
   }) : [];
-  const guildNoblesse = calculateGuildNoblesseBonuses(guildData);
+  const guildNoblesse = calculateGuildNoblesseBonuses(guildData, combatDurationSeconds);
   const supplemental = mergeBonuses(
     title,
     otherStats,
