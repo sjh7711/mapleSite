@@ -3,7 +3,7 @@
  * Node, Discord, DOM에 의존하지 않아 브라우저와 Worker에서도 그대로 쓴다.
  */
 
-export const CHARACTER_CONVERSION_CACHE_VERSION = "combat-profile-v89-direct-stat-sources";
+export const CHARACTER_CONVERSION_CACHE_VERSION = "combat-profile-v93-shared-stat-sources";
 
 // 넥슨 유니온 챔피언 가이드의 전투 능력치 5레벨 기준.
 // https://maplestory.nexon.com/Guide/N23GameInformation/Articles/409
@@ -24,9 +24,9 @@ const FULL_BOSS_ATTACK_MAGIC_PERCENT_BUFFS = [
 
 export const FULL_BOSS_DOPING = {
   label: "풀도핑 (고급 무기 제련·이벤트 버프 포함)",
-  targetBoss: "선택받은 세렌",
   championBlessingLevel: CHAMPION_BLESSING_LEVEL_5.level,
   sayramCriticalDamage: 16,
+  sayramCriticalRate: 20,
   items: [
     "익스트림 레드/블루",
     "마슈르의 선물 기상 효과",

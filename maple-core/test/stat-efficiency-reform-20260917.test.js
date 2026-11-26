@@ -90,12 +90,13 @@ test('전수 소울 컨트랙트에는 벞지를 적용하고 발동형 시프 �
   assert.equal(result.details.conditionalLinkSources[0].uptime, 1 / 3);
 });
 
-test('렌의 조건부 링크와 장착 일격필살, 대상 심볼만 전투 환산에 포함한다', () => {
+test('렌의 조건부 링크와 장착 일격필살, 만렙 어센틱심볼을 보스 환산에 포함한다', () => {
   const parameters = input({
     character: { character_level: 296, character_class: '렌' },
     symbolData: { symbol: [
-      { symbol_name: '어센틱심볼 : 세르니움', symbol_level: 11 },
-      { symbol_name: '어센틱심볼 : 오디움', symbol_level: 10 },
+      { symbol_name: '어센틱심볼 : 세르니움', symbol_level: 10 },
+      { symbol_name: '어센틱심볼 : 오디움', symbol_level: 11 },
+      { symbol_name: '그랜드 어센틱심볼 : 기어드락', symbol_level: 11 },
     ] },
     vMatrixData: { character_v_core_equipment: [
       { v_core_name: '일격필살 I', v_core_type: '특수 코어', v_core_level: 1 },
@@ -112,10 +113,22 @@ test('렌의 조건부 링크와 장착 일격필살, 대상 심볼만 전투 �
   assert.equal(full.conditionalLinkSources[1].damage, 17 * 0.55579);
   const effects = full.combatModel.effects;
   assert.equal(effects.find(({ kind }) => kind === 'special-core').averagedModifiers.damage, 9.683);
-  assert.equal(effects.find(({ kind }) => kind === 'boss-symbol').averagedModifiers.bossDamage, 20);
+  const symbols = effects.filter(({ kind }) => kind === 'boss-symbol');
+  assert.equal(symbols.length, 1);
+  assert.equal(symbols[0].source, '어센틱심볼 : 오디움');
+  assert.equal(symbols[0].averagedModifiers.bossDamage, 20);
   assert.equal(full.combatModel.totals.bossDamage, 300 + 85 + 20);
-  assert.equal(convert({ ...FULL_BOSS_DOPING, targetBoss: '최초의 대적자' }).details.combatModel.totals.bossDamage, 300 + 85);
   assert.equal(convert(null).details.combatModel.totals.bossDamage, 300);
+  for (const [symbol, bonus] of [
+    [[{ symbol_name: '어센틱심볼 : 세르니움', symbol_level: 10 },
+      { symbol_name: '아케인심볼 : 소멸의 여로', symbol_level: 20 }], 0],
+    [[{ symbol_name: '그랜드 어센틱심볼 : 기어드락', symbol_level: 11 }], 20],
+  ]) {
+    const result = calculateCharacterPotentialConversion({
+      ...parameters, symbolData: { symbol }, doping: FULL_BOSS_DOPING,
+    });
+    assert.equal(result.details.combatModel.totals.bossDamage, 300 + 85 + bonus);
+  }
 });
 
 test('선택 프리셋의 벞지는 어빌리티와 유니온 설정 차이만 더한다', () => {

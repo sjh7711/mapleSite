@@ -438,7 +438,7 @@ test("환산 계약 버전으로 이전 단일 부스탯 캐시와 키를 분리
     versionedUrl.searchParams.get("conversionVersion"),
     characterConversionCacheVersion,
   );
-  assert.equal(characterConversionCacheVersion, "combat-profile-v89-direct-stat-sources");
+  assert.equal(characterConversionCacheVersion, "combat-profile-v93-shared-stat-sources");
   const freshSnapshotKey = createSnapshotCacheKey(request, "테스트", "fresh");
   const staleSnapshotKey = createSnapshotCacheKey(request, "테스트", "stale");
   assert.equal(characterSnapshotCacheVersion, "character-snapshot-v4");
@@ -576,6 +576,11 @@ test("활성 API 버프와 별개로 공통 출처를 합산하고 보스 조건
           });
         }
         if (apiPath.endsWith("/propensity")) return Response.json({ charisma_level: 100, sensibility_level: 100 });
+        if (apiPath.endsWith("/skill") && covenant && request.searchParams.get("character_skill_grade") === "6") {
+          payload.character_skill = [{
+            skill_name: "솔 헤카테", skill_level: 1, skill_effect: "HP 100 소비, 솔 헤카테 소환",
+          }];
+        }
         if (apiPath.endsWith("/skill") && isBow) {
           const grade = request.searchParams.get("character_skill_grade");
           if (grade === "0") payload.character_skill = [luna];
@@ -643,9 +648,11 @@ test("활성 API 버프와 별개로 공통 출처를 합산하고 보스 조건
             { skill_name: "전투의 흐름", skill_level: 2, skill_effect: "10초 동안 데미지 10% 증가" },
           ];
           if (covenant) {
-            payload.character_link_skill.push({
+            const covenantSkill = {
               skill_name: "커버넌트", skill_level: 2, skill_effect: "소환수 소환 시 데미지 8% 증가",
-            });
+            };
+            payload.character_link_skill.push(covenantSkill);
+            payload.character_owned_link_skill = covenantSkill;
           }
         }
         if (apiPath.endsWith("/stat")) {
@@ -697,6 +704,11 @@ test("활성 API 버프와 별개로 공통 출처를 합산하고 보스 조건
 
   const covenant = await fetchConversion({ ...buffsOff, 데미지: 41 }, "렌", true);
   assert.equal(covenant.fullBoss.details.currentDamage, 33);
+  const covenantSources = (profile) => profile.details.conditionalLinkSources
+    .filter(({ name }) => name === "커버넌트");
+  assert.equal(covenantSources(covenant.fullBoss).length, 1);
+  assert.equal(covenantSources(covenant.fullBoss)[0].damage, 8);
+  assert.equal(covenantSources(covenant.base).length, 0);
   assert.equal(covenant.fullBoss.details.statVerification.find(({ name }) => name === "데미지").matched, false);
 
   const bow = await fetchConversion({

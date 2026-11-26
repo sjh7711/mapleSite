@@ -8,7 +8,9 @@ import {
   calculateGuildNoblesseBonuses,
   equipmentSoulOptionLines,
   hexaUnreflectedMainStat,
+  itemStatValue,
   linkSkillBonuses,
+  maintainsBossSummon,
   resolveCharacterExternalBonuses,
   resolveClassAlwaysOnCombatAdjustment,
   resolveClassDamageChannels,
@@ -149,10 +151,9 @@ function titleData(equipmentData: JsonObject): JsonObject | null {
 function equipmentPercentBonuses(equipmentData: JsonObject): PercentBonuses {
   const result = emptyPercentBonuses();
   for (const item of equipmentItems(equipmentData)) {
-    const total = object(item.item_total_option);
-    const allStat = number(total?.all_stat);
+    const allStat = itemStatValue(item, "all_stat");
     for (const stat of STAT_KEYS) result.stat[stat] += allStat;
-    result.hp += number(total?.max_hp_rate);
+    result.hp += itemStatValue(item, "max_hp_rate");
   }
   for (const line of equipmentOptionLines(equipmentData)) {
     parsePercentText(line, result);
@@ -197,7 +198,7 @@ function equipmentFlatStat(
 ): number {
   const key = stat.toLocaleLowerCase("en-US");
   const total = equipmentItems(equipmentData).reduce(
-    (sum, item) => sum + number(object(item.item_total_option)?.[key]),
+    (sum, item) => sum + itemStatValue(item, key),
     0,
   );
   return total + flatStatFromTexts(
@@ -253,15 +254,15 @@ function snapshotCombatTotals(
 ): CombatTotals {
   const attackItems = equipmentItems(snapshot.equipmentData).reduce(
     (sum, item) =>
-      sum + number(object(item.item_total_option)?.attack_power),
+      sum + itemStatValue(item, "attack_power"),
     0,
   );
   const itemBoss = equipmentItems(snapshot.equipmentData).reduce(
-    (sum, item) => sum + number(object(item.item_total_option)?.boss_damage),
+    (sum, item) => sum + itemStatValue(item, "boss_damage"),
     0,
   );
   const itemDamage = equipmentItems(snapshot.equipmentData).reduce(
-    (sum, item) => sum + number(object(item.item_total_option)?.damage),
+    (sum, item) => sum + itemStatValue(item, "damage"),
     0,
   );
   const texts = [
@@ -653,6 +654,9 @@ function calculateXenon(
   const conditionalLinks = calculateConditionalLinkCycleBonuses(
     snapshot.linkSkillData,
     buffDurationPercent,
+    false,
+    text(input.character.character_class),
+    maintainsBossSummon(snapshot.skillData, text(input.character.character_class)),
   );
   const guildNoblesse = calculateGuildNoblesseBonuses(snapshot.guildData);
   const guildBaseline = object(doping?.guildBaseline) ?? {};
@@ -763,7 +767,6 @@ function calculateXenon(
   const combatEffects = input.doping ? calculateBossItemCombatEffects({
     symbolData: snapshot.symbolData,
     vMatrixData: snapshot.vMatrixData,
-    targetBoss: text(doping?.targetBoss),
     characterClass: text(input.character.character_class),
   }) : [];
   if (input.doping) {
