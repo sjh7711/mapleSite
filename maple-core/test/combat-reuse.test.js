@@ -114,3 +114,56 @@ test("reuse extends eligible buff uptime and Soul Contract only casts on schedul
   const shortened = calculateConditionalLinkCycleBonuses(soul, 71, false, "레테", false, 65);
   assert.ok(Math.abs(shortened.damage - 60 * 22.1 / 65) < 1e-9);
 });
+
+const link = (damage) => attack("소울 컨트랙트",
+  `10초 동안 데미지 ${damage}% 증가\n재사용 대기시간 60초`);
+const nova = attack("그란디스 여신의 축복", [
+  "40초 동안 지속",
+  "노바 : 스킬 사용 시 최대 6회까지 재사용 대기시간 미적용",
+  "최종 데미지 12% 증가",
+  "재사용 대기시간 120초",
+].join("\n"));
+const rhinne = attack("초월자 륀느의 기원", [
+  "버프 지속 중 스킬 재사용 시 다시 초기화",
+  "45초 동안 최종 데미지 10% 증가",
+  "재사용 대기시간 120초",
+].join("\n"));
+
+test("observed repeat casts use the selected duration and cooldown and count overlapping buff time once", () => {
+  const received = link(60);
+  const evaluate = (job, anchor, combatDuration, buffDuration = 89, equipmentSeconds = 5) => {
+    const own = job === "엔젤릭버스터" ? link(120) : null;
+    return calculateConditionalLinkCycleBonuses(
+      { character_link_skill: own ? [received, own] : [received, received], character_owned_link_skill: own },
+      buffDuration, false, job, false, combatDuration,
+      { skillData: [group("5", anchor)], cooldownReduction: { equipmentSeconds, unionPercent: 6 } },
+    );
+  };
+  const own = evaluate("엔젤릭버스터", nova, 360);
+  assert.equal(own.applied.length, 1);
+  assert.ok(own.applied[0].uptime > 0.6 && own.applied[0].uptime < 0.75);
+  assert.equal(own.damage, 120 * own.applied[0].uptime);
+  assert.equal(evaluate("엔젤릭버스터", nova, 10).damage, 120);
+  assert.ok(evaluate("엔젤릭버스터", nova, 360, 0).damage < own.damage);
+  assert.ok(evaluate("엔젤릭버스터", nova, 360, 89, 0).damage < own.damage);
+  assert.ok(evaluate("카이저", nova, 360).applied[0].uptime > 0.45);
+  assert.ok(evaluate("카인", nova, 360).applied[0].uptime > 0.34);
+  assert.ok(evaluate("제로", rhinne, 360).applied[0].uptime > 0.6);
+  const cadenceOnly = evaluate("카데나", nova, 360);
+  assert.equal(cadenceOnly.applied[0].uptime, 0.315);
+  assert.equal(cadenceOnly.damage, 18.9);
+  assert.equal(evaluate("제로", attack("초월자 륀느의 기원"), 360).applied[0].uptime, 0.315);
+  assert.equal(calculateActiveSkillCycleBonuses([group("5", rhinne)], "attack", 360).applied[0].duration, 45);
+});
+
+test("Shadower's Killing Intent bonus stays off the global buff", () => {
+  const skillData = [group("6", attack("무아지경", [
+    "MP 500 소비, 30초 동안 데미지 10% 증가",
+    "암살 : 멸 : 시전 시 살의 버프를 소모하여 최종 데미지 50% 증가",
+    "분쇄 : 멸 : 시전 시 살의 버프를 소모하여 최종 데미지 50% 증가",
+    "재사용 대기시간 120초",
+  ].join("\n")))];
+  const result = calculateActiveSkillCycleBonuses(skillData, "attack", 360).applied[0];
+  assert.equal(result.damage, 10);
+  assert.equal(result.finalDamage, 0);
+});

@@ -3,7 +3,7 @@
  * Node, Discord, DOM에 의존하지 않아 브라우저와 Worker에서도 그대로 쓴다.
  */
 
-export const CHARACTER_CONVERSION_CACHE_VERSION = "combat-profile-v107-verified-skill-corrections";
+export const CHARACTER_CONVERSION_CACHE_VERSION = "combat-profile-v108-observed-buff-reuse";
 
 // 넥슨 유니온 챔피언 가이드의 전투 능력치 5레벨 기준.
 // https://maplestory.nexon.com/Guide/N23GameInformation/Articles/409

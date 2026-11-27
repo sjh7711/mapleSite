@@ -1,5 +1,6 @@
 import { classBattlePracticeDamageProfile } from "./class-damage-profiles.js";
 import { battlePracticeReuseReferences } from "./battle-practice-reuse-references.js";
+import { effectiveSkillCooldown, skillCooldown } from "./combat-cooldown.js";
 
 const SOUL_CONTRACT = "소울 컨트랙트";
 const LETE_EDICT = /^이딕트\s*:\s*(?:템플러 아츠|램페이지)(?: VI)?$/u;
@@ -128,4 +129,60 @@ export function expectedReusableBuffCooldown(duration, cooldown, percent) {
   // Recast after the current buff expires when reuse procs.
   const chance = Math.min(1, percent / 100);
   return cooldown - chance * (cooldown - duration);
+}
+
+// Representative sequences from the lower, middle and upper portions of observed
+// Soul Contract coverage. Cast times are scaled to a 110-second burst cycle.
+// Source: Nexon Battle Practice replays registered October–November 2026.
+// Samples: 11 Angelic Buster, 13 Kaiser, 20 Kain and 14 Zero replays.
+const SOUL_CONTRACT_ROTATIONS = {
+  "엔젤릭버스터": [
+    [0, 19.3, 37.5, 53.6],
+    [0, 17.6, 34.9, 38.1, 53.3],
+    [0, 14.8, 19.4, 28.8, 37.9, 55.5],
+  ],
+  "카이저": [
+    [0, 25.6, 48.4],
+    [0, 26, 52.2],
+    [0, 25.6, 28.9, 56.5],
+  ],
+  "카인": [
+    [0, 17.9],
+    [0, 53],
+    [0, 12.1, 48],
+  ],
+  "제로": [
+    [0, 20.2, 44.3, 97.9],
+    [0, 18.9, 37.6, 91.4],
+    [0, 17.3, 30.8, 49.4, 101.9],
+  ],
+};
+
+export function observedSoulContractUptime({ characterClass, skillData, cooldownReduction, duration, combatDuration }) {
+  const rotations = Object.hasOwn(SOUL_CONTRACT_ROTATIONS, characterClass)
+    ? SOUL_CONTRACT_ROTATIONS[characterClass] : null;
+  if (!rotations || !(duration > 0 && combatDuration > 0)) return null;
+
+  const isZero = characterClass === "제로";
+  const anchorName = isZero ? "초월자 륀느의 기원" : "그란디스 여신의 축복";
+  const anchor = skillData?.flatMap((group) => group.character_skill ?? [])
+    .find((skill) => skill.skill_name === anchorName && Number(skill.skill_level) > 0);
+  const effect = anchor?.skill_effect ?? "";
+  const hasReset = isZero
+    ? /버프 지속 중 스킬 재사용 시 다시 초기화/u.test(effect)
+    : /노바\s*:\s*스킬 사용 시 최대 \d+회까지 재사용 대기시간 미적용/u.test(effect);
+  if (!hasReset) return null;
+
+  const cycle = effectiveSkillCooldown(anchor, skillCooldown(effect), cooldownReduction);
+  if (!(cycle > 0)) return null;
+  const completeCycles = Math.floor(combatDuration / cycle);
+  const remainder = combatDuration - completeCycles * cycle;
+  const coveredTime = (casts, end) => casts.reduce((covered, offset, index) => {
+    const start = offset * cycle / 110;
+    const next = (casts[index + 1] ?? 110) * cycle / 110;
+    return covered + Math.max(0, Math.min(end, start + duration, next) - start);
+  }, 0);
+  const total = rotations.reduce((covered, casts) =>
+    covered + completeCycles * coveredTime(casts, cycle) + coveredTime(casts, remainder), 0);
+  return total / (rotations.length * combatDuration);
 }
