@@ -338,8 +338,18 @@ input:focus {
 
 .total__meta {
   margin: 14px 0 0;
-  color: var(--muted);
+  padding: 8px 12px;
+  border: 1px solid var(--summary-border);
+  border-radius: 8px;
+  background: var(--summary-bg);
+  color: #fff;
   font-size: 1rem;
+  font-weight: 700;
+  word-break: keep-all;
+}
+
+:root[data-theme="light"] .total__meta {
+  color: #000;
 }
 
 .total__scaled {
