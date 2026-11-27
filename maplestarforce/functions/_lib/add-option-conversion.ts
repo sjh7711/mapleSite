@@ -687,7 +687,7 @@ function calculateXenon(
   );
   const guildNoblesse = calculateGuildNoblesseBonuses(snapshot.guildData, combatDuration);
   const guildBaseline = object(doping?.guildBaseline) ?? {};
-  const guildDifference = input.doping && guildNoblesse.available
+  const guildDifference = input.doping
     ? {
         damage:
           number(guildNoblesse.damage) - number(guildBaseline.damage),
@@ -821,9 +821,7 @@ function calculateXenon(
         damage: guildDifference.damage,
         bossDamage: guildDifference.bossDamage,
         criticalDamage: guildDifference.criticalDamage,
-        ignoreDefenseSources: guildNoblesse.available
-          ? guildNoblesse.ignoreDefenseSources
-          : [],
+        ignoreDefenseSources: guildNoblesse.ignoreDefenseSources,
       },
     }));
   }
@@ -1063,6 +1061,7 @@ function calculateXenon(
       cooldownReduction,
       activeSkillCycles: input.doping ? activeSkillCycle.applied : [],
       conditionalLinkSources: input.doping ? conditionalLinks.applied : [],
+      guildNoblesseResolved: guildNoblesse.available,
       guildNoblesseSkills: guildNoblesse.available
         ? guildNoblesse.skills
         : [],

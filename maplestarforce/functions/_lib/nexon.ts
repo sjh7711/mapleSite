@@ -442,15 +442,12 @@ async function fetchGuildData(
     );
     return {
       guild_skill: Array.isArray(guildPayload.guild_skill) ? guildPayload.guild_skill : [],
-      guild_noblesse_skill: Array.isArray(
-        guildPayload.guild_noblesse_skill,
-      )
-        ? guildPayload.guild_noblesse_skill
-        : [],
+      ...(Array.isArray(guildPayload.guild_noblesse_skill)
+        ? { guild_noblesse_skill: guildPayload.guild_noblesse_skill }
+        : {}),
     };
   } catch {
-    // 길드 자료는 부가 입력이다. 실패해도 캐릭터 본체 조회를 유지하고
-    // 코어가 기존 안전 기준과 경고를 사용하게 한다.
+    // 캐릭터 조회는 성공으로 두고 노블레스 미조회 상태를 전달한다.
     return {};
   }
 }

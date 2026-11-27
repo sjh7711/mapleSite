@@ -6,10 +6,12 @@ import {
 } from "../src/combat-model.js";
 import {
   calculateActiveSkillCycleBonuses,
+  calculateCharacterPotentialConversion,
   calculateConditionalLinkCycleBonuses,
   calculateGuildNoblesseBonuses,
   reconstructCharacterStats,
 } from "../src/stat-efficiency.js";
+import { FULL_BOSS_DOPING } from "../src/stat-profile.js";
 
 const skill = (skill_name, skill_effect, skill_description = "", skill_level = 30) =>
   ({ skill_name, skill_effect, skill_description, skill_level });
@@ -32,6 +34,135 @@ function attackChannels(skillData, names, ...cores) {
     },
   }).filter((channel) => channel.weight > 0).map((channel) => [channel.source, channel]));
 }
+
+test("라라 V 코어는 40레벨부터 연결된 분출·흡수 공격에만 적용한다", () => {
+  const eruptions = ["분출 : 너울이는 강 VI", "분출 : 돌개바람 VI", "분출 : 해돋이 우물 VI"];
+  const absorptions = ["흡수 : 강 웅덩이 물벼락 VI", "흡수 : 소소리 바람 VI", "흡수 : 햇빛 맹아리 VI"];
+  const names = [...eruptions, ...absorptions, "정기 뿌리기 VI"];
+  const skills = [
+    grade("6", ...names.map((name) => attack(name))),
+    grade("hyperpassive", hyper("분출/흡수 - 이그노어 가드",
+      "분출, 흡수 스킬의 방어율 무시 수치를 증가시킨다.", "방어율 무시 15% 증가")),
+  ];
+  const belowLevel = { ...core("용맥 흡수"), v_core_level: 39 };
+  const first = attackChannels(skills, names, core("용맥 분출"), belowLevel);
+  for (const name of eruptions) assert.deepEqual(first.get(name).ignoreDefenseSources, [15, 20]);
+  for (const name of absorptions) assert.deepEqual(first.get(name).ignoreDefenseSources, [15]);
+  const second = attackChannels(skills, names, core("용맥 분출"), { ...belowLevel, slot_level: 1 });
+  for (const name of absorptions) assert.deepEqual(second.get(name).ignoreDefenseSources, [15, 20]);
+  assert.equal(second.has("정기 뿌리기 VI"), false);
+  assert.deepEqual(calculateActiveSkillCycleBonuses(skills, "magic", 360, {
+    characterClass: "라라",
+  }).ignoreDefenseSources, []);
+});
+
+test("다크니스 오브 그레이스의 방무는 해당 타격마다 한 번만 적용한다", () => {
+  const name = "다크니스 오브 그레이스";
+  const parts = ["비홀더 쇼크", "비홀더스 퍼니시먼트", "비홀더 데버스테이션"];
+  const names = parts.map((part) => name + " : " + part);
+  const effect = [
+    "MP 500 소비, 30초 동안 데미지 11% 증가",
+    "지속 중 3회에 한해 비홀더 쇼크 적중 시 추가타 발생, 몬스터 방어율 20% 추가 무시",
+    "비홀더스 퍼니시먼트 데미지 535%로 적용, 몬스터 방어율 20% 추가 무시",
+    "비홀더 데버스테이션 : 충격파 발생, 몬스터 방어율 20% 추가 무시",
+    "재사용 대기시간 120초",
+  ].join("\n");
+  const skills = [grade("6", skill(name, effect))];
+  const channels = attackChannels(skills, [...names, name + " : 그 외 공격", "비홀더 쇼크 VI"]);
+  for (const part of names) assert.deepEqual(channels.get(part).ignoreDefenseSources, [20]);
+  assert.equal(channels.has(name + " : 그 외 공격"), false);
+  assert.equal(channels.has("비홀더 쇼크 VI"), false);
+  const cycles = calculateActiveSkillCycleBonuses(skills, "attack", 360, { characterClass: "다크나이트" });
+  assert.equal(cycles.damage, 2.75);
+  assert.deepEqual(cycles.ignoreDefenseSources, []);
+});
+
+test("피니쉬 블로우 VI의 고유 방무는 기본 공격의 고유 수치를 대체하고 V코어와 결합한다", () => {
+  const channels = attackChannels([
+    grade("4", attack("피니쉬 블로우", "추가 크리티컬 확률 25%, 추가 방어율 무시 20%")),
+    grade("6", attack("피니쉬 블로우 VI", "추가 크리티컬 확률 26%, 추가 방어율 무시 22%"),
+      attack("배틀킹 바 VI")),
+  ], ["피니쉬 블로우 VI", "배틀킹 바 VI"], core("피니쉬 블로우/배틀킹 바"));
+  assert.deepEqual(channels.get("피니쉬 블로우 VI").ignoreDefenseSources, [22, 20]);
+  assert.deepEqual(channels.get("배틀킹 바 VI").ignoreDefenseSources, [20]);
+});
+
+test("파이렛 스타일은 공%, 버닝 리젼은 쿨감을 적용한 시간제 데미지다", () => {
+  const style = skill("파이렛 스타일",
+    "MP 60 소비, 186초 동안 공격력 21%, 상태 이상 내성 30, 모든 속성 내성 30% 증가\n[패시브 효과 : 스탠스 60% 증가]",
+    "추가로 영구히 스탠스를 증가시킨다.", 21);
+  const pirate = calculateActiveSkillCycleBonuses([grade("4", style)], "attack", 360, {
+    characterClass: "캡틴",
+  });
+  assert.equal(pirate.attackPercent, 21);
+  assert.equal(pirate.flatAttack, 0);
+  const region = skill("버닝 리젼",
+    "MP 115 소비, 40초 동안 데미지 61%, 공격 속도 1단계 증가\n재사용 대기시간 60초", "", 31);
+  const flame = calculateActiveSkillCycleBonuses([grade("4", region)], "magic", 360, {
+    characterClass: "플레임위자드",
+    cooldownReduction: { unionPercent: 5, equipmentSeconds: 5 },
+  });
+  assert.equal(flame.applied[0].cooldown, 52);
+  assert.ok(Math.abs(flame.damage - 61 * 280 / 360) < 1e-12);
+  assert.deepEqual(flame.ignoreDefenseSources, []);
+});
+
+test("에인션트 아처리와 일리움 고유 보공을 툴팁의 공격 범위에 제한한다", () => {
+  const archer = attackChannels([
+    grade("4", skill("에인션트 아처리",
+      "에인션트 포스/인챈트 포스 스킬의 최종 데미지 10% 증가, 보스 몬스터 공격 시 데미지 50% 증가"),
+      skill("엣지 오브 레조넌스", "700%의 데미지로 공격", "[에인션트 포스]")),
+    grade("6", skill("엣지 오브 레조넌스 VI", "1200%의 데미지로 공격", "[에인션트 포스]"),
+      attack("카디널 블래스트 VI")),
+    grade("5", skill("렐릭 언바운드", "1000%의 데미지로 공격", "[인챈트 포스]")),
+  ], ["엣지 오브 레조넌스 VI", "렐릭 언바운드(블래스트)", "카디널 블래스트 VI"]);
+  assert.equal(archer.get("엣지 오브 레조넌스 VI").localBossDamage, 50);
+  assert.equal(archer.get("렐릭 언바운드(블래스트)").localBossDamage, 50);
+  assert.equal(archer.has("카디널 블래스트 VI"), false);
+  const names = ["크래프트:롱기누스 VI", "리액션:디스트럭션 VI", "크리스탈 이그니션", "리액션:스펙트럼"];
+  const illium = attackChannels([grade("6",
+    ...names.map((name) => attack(name,
+      "보스 몬스터 공격 시 데미지 20% 증가\n글로리 윙 중 보스 몬스터 공격 시 데미지 20% 추가 증가")),
+    attack("커스 마크 완성 VI"),
+  )], [...names, "커스 마크 완성 VI"]);
+  for (const name of names) assert.equal(illium.get(name).localBossDamage, 20);
+  assert.equal(illium.has("커스 마크 완성 VI"), false);
+});
+
+test("풀도핑은 길드 API의 노블레스만 적용하고 미조회에는 길드 기준을 남기지 않는다", () => {
+  const input = {
+    character: { character_class: "히어로", character_level: 290 },
+    equipmentData: { item_equipment: [] },
+    statData: { final_stat: Object.entries({
+      STR: 18_000, DEX: 2_000, 공격력: 2400, 데미지: 100,
+      "AP 배분 STR": 1400, "AP 배분 DEX": 4,
+      "보스 몬스터 데미지": 300, "방어율 무시": 95, "크리티컬 데미지": 80,
+    }).map(([stat_name, stat_value]) => ({ stat_name, stat_value: String(stat_value) })) },
+    mainStat: "STR",
+    subStat: "DEX",
+    attackType: "attack",
+    doping: FULL_BOSS_DOPING,
+  };
+  const resolved = calculateCharacterPotentialConversion({ ...input, guildData: {
+    guild_noblesse_skill: [
+      { skill_name: "방어력은 숫자일 뿐", skill_effect: "4분 동안 몬스터 방어율 무시 4% 증가" },
+      { skill_name: "보스 킬링 머신", skill_effect: "14분 동안 보스 몬스터 공격 시 데미지 14% 증가" },
+    ],
+  } }).details;
+  const missing = calculateCharacterPotentialConversion(input).details;
+  const empty = calculateCharacterPotentialConversion({
+    ...input, guildData: { guild_noblesse_skill: [] },
+  }).details;
+  assert.equal(resolved.guildNoblesseResolved, true);
+  assert.equal(missing.guildNoblesseResolved, false);
+  assert.equal(empty.guildNoblesseResolved, true);
+  assert.equal(resolved.combatModel.totals.bossDamage - missing.combatModel.totals.bossDamage, 14);
+  assert.deepEqual(missing.combatModel.totals, empty.combatModel.totals);
+  const source = (result) => result.combatModel.effects
+    .find(({ sourceKey }) => sourceKey === "preset:full-boss-doping");
+  assert.deepEqual(source(resolved).averagedModifiers.ignoreDefenseSources, [15, 10, 4 * (4 / 6)]);
+  assert.deepEqual(source(missing).averagedModifiers.ignoreDefenseSources, [15, 10]);
+});
 
 test("스트라이커는 습득한 중첩 상한과 천지개벽의 대체 수치를 반영한다", () => {
   const skills = [

@@ -117,7 +117,7 @@ test('렌의 조건부 링크와 장착 일격필살, 만렙 어센틱심볼을 
   assert.equal(symbols.length, 1);
   assert.equal(symbols[0].source, '어센틱심볼 : 오디움');
   assert.equal(symbols[0].averagedModifiers.bossDamage, 20);
-  assert.equal(full.combatModel.totals.bossDamage, 300 + 85 + 20);
+  assert.equal(full.combatModel.totals.bossDamage, 300 + 55 + 20);
   assert.equal(convert(null).details.combatModel.totals.bossDamage, 300);
   for (const [symbol, bonus] of [
     [[{ symbol_name: '어센틱심볼 : 세르니움', symbol_level: 10 },
@@ -127,7 +127,7 @@ test('렌의 조건부 링크와 장착 일격필살, 만렙 어센틱심볼을 
     const result = calculateCharacterPotentialConversion({
       ...parameters, symbolData: { symbol }, doping: FULL_BOSS_DOPING,
     });
-    assert.equal(result.details.combatModel.totals.bossDamage, 300 + 85 + bonus);
+    assert.equal(result.details.combatModel.totals.bossDamage, 300 + 55 + bonus);
   }
 });
 
