@@ -788,6 +788,7 @@ const VERIFIED_TIMED_SELF_BUFF_SKILLS = new Set([
   "도미니언",
   "도미니언 VI",
   "다크 레조넌스",
+  "다크니스 오브 그레이스",
   "다크 서스트",
   "메타모포시스",
   "메타모포시스 VI",
@@ -796,6 +797,7 @@ const VERIFIED_TIMED_SELF_BUFF_SKILLS = new Set([
   "파이널 컷",
   "발현 : 햇살 가득 안은 터",
   "아름드리 나무",
+  "버닝 리젼",
   "언페이딩 글로리",
   "로 아이아스",
   "소드 오브 소울 라이트",
@@ -851,6 +853,7 @@ const MAINTAINED_HIGH_POINT_MODIFIERS = Object.freeze({
   "앤시언트 스피릿": Object.freeze(["attackPercent"]),
   "인커리지": Object.freeze(["flatAttack"]),
   "바이퍼지션": Object.freeze(["attackPercent"]),
+  "파이렛 스타일": Object.freeze(["attackPercent"]),
   "오펜스 폼": Object.freeze(["damage"]),
   "아케인 에임": Object.freeze(["damage"]),
   "스노우 차지": Object.freeze(["damage"]),
@@ -5613,7 +5616,7 @@ export function calculateCharacterPotentialConversion({
 
   const baseDopingTotals = bossDopingTotals(doping, selectedSkillData, attackType, Boolean(selectedStatSources));
   const guildBaseline = doping?.guildBaseline ?? {};
-  const guildDifference = doping && guildNoblesse.available
+  const guildDifference = doping
     ? {
         damage:
           guildNoblesse.damage - number(guildBaseline.damage),
@@ -5636,11 +5639,7 @@ export function calculateCharacterPotentialConversion({
       ...(Array.isArray(baseDopingTotals.ignoreDefenseSources)
         ? baseDopingTotals.ignoreDefenseSources
         : [baseDopingTotals.ignoreDefense].filter(Boolean)),
-      ...(doping && guildNoblesse.available
-        ? guildNoblesse.ignoreDefenseSources
-        : doping
-          ? guildBaseline.ignoreDefenseSources ?? []
-          : []),
+      ...(doping ? guildNoblesse.ignoreDefenseSources : []),
     ],
   };
 

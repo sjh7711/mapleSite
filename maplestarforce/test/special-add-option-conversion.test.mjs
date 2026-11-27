@@ -101,8 +101,17 @@ test("제논은 STR·DEX·LUK를 모두 쓰고 INT·HP·마력은 제외한다",
     assert.ok(Math.abs(full.dopedBase[stat] - result.details.dopedBase[stat] - 138.29) < 1e-9);
   }
   assert.ok(Math.abs(full.combatModel.totals.flatAttack - result.details.combatModel.totals.flatAttack - 394.3) < 1e-9);
-  assert.equal(full.dopedCriticalDamage - result.details.dopedCriticalDamage, 53.5);
+  assert.equal(full.guildNoblesseResolved, false);
+  assert.equal(full.dopedCriticalDamage - result.details.dopedCriticalDamage, 23.5);
   assert.ok(Math.abs(full.dopedIgnoreDefense - 0.235) < 1e-12);
+  const withGuild = calculateSpecialAddOptionConversion({
+    ...input, doping: FULL_BOSS_DOPING,
+    snapshot: { ...input.snapshot, guildData: { guild_noblesse_skill: [
+      { skill_name: "크게 한방", skill_level: 15, skill_effect: "30분 동안 크리티컬 데미지 30% 증가" },
+    ] } },
+  }).details;
+  assert.equal(withGuild.guildNoblesseResolved, true);
+  assert.equal(withGuild.dopedCriticalDamage - full.dopedCriticalDamage, 30);
 });
 
 test("제논은 패치 시점의 HEXA, 공격대원 스탯, 하이브리드 로직을 세 주스탯에 적용한다", () => {

@@ -1412,7 +1412,7 @@ export function buildCharacterConversionFromData(
     profiles.fullBoss.details?.guildNoblesseResolved === false
   ) {
     warnings.push(
-      "현재 길드의 노블레스 스킬을 확인하지 못해 공통 45포인트 길드 기준을 적용했습니다.",
+      "현재 길드의 노블레스 스킬을 확인하지 못해 노블레스 효과를 제외했습니다.",
     );
   }
   const rawEffectiveBossCriticalRate =

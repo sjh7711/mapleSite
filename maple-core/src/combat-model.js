@@ -532,6 +532,23 @@ function parsedSkillLocalIgnoreDefenseChannels(skillData) {
           /(?:(?:몬스터|적)(?:의)?\s*)?방어(?:율)?(?:을)?\s*(\d+(?:\.\d+)?)%\s*(?:를\s*)?(?:(?:추가(?:로)?\s*)?무시|무시(?:하여|하고)|추가\s*적용)/gu,
         ),
       ].map((match) => number(match[1]));
+      if (name === "다크니스 오브 그레이스") {
+        const attack = line.trim().match(
+          /^(?:지속 중 \d+회에 한해 )?(비홀더 쇼크|비홀더스 퍼니시먼트|비홀더 데버스테이션)/u,
+        )?.[1];
+        if (attack && directSources.length) {
+          result.push(createDamageChannel({
+            source: name + " : " + attack,
+            ignoreDefenseSources: directSources,
+            metadata: {
+              status: "unweighted",
+              intrinsicIgnoreDefenseSources: directSources,
+              sourceSkill: name,
+            },
+          }));
+        }
+        continue;
+      }
       const levelSources = attackLike
         ? [
           ...line.matchAll(
@@ -540,6 +557,10 @@ function parsedSkillLocalIgnoreDefenseChannels(skillData) {
         ].map((match) => number(match[1]))
         : [];
 
+      if (/^피니쉬 블로우(?: VI)?$/u.test(name)) {
+        const intrinsic = line.match(/추가 방어율 무시\s*(\d+(?:\.\d+)?)%/u);
+        if (intrinsic) levelSources.push(number(intrinsic[1]));
+      }
       if (requiredLevelMatch) {
         progressionSources.push(...directSources, ...levelSources);
       } else {
@@ -832,10 +853,21 @@ function zeroFormDefenseChannels(skillData) {
 }
 
 function verifiedAttackBossDamageChannels(skillData) {
-  const skills = (skillData ?? []).flatMap((group) => group.character_skill ?? [])
-    .filter((skill) => number(skill.skill_level) > 0);
+  const skillRows = (skillData ?? []).flatMap((group) =>
+    (group.character_skill ?? []).filter((skill) => number(skill.skill_level) > 0)
+      .map((skill) => ({ skill })),
+  );
+  const skills = skillRows.map(({ skill }) => skill);
   const learned = (name) => skills.find((skill) => skill.skill_name === name);
   const impact = learned("데몬 임팩트 VI") ?? learned("데몬 임팩트");
+  const archery = learned("에인션트 아처리")?.skill_effect?.match(
+    /^에인션트 포스\/인챈트 포스 스킬의[^\r\n]*보스 몬스터 공격 시 데미지[^\r\n]*/mu,
+  )?.[0];
+  const archeryTargets = archery
+    ? hyperAttackTargets("에인션트 포스/인챈트 포스 스킬의 보스 몬스터 공격 시 데미지", skillRows)
+    : [];
+  const uniqueArcheryTargets = new Map(archeryTargets.map((name) =>
+    [normalizedBattleSkillName(name), name]));
   const effects = [
     ["데몬 어웨이크닝", String(learned("데몬 어웨이크닝")?.skill_effect ?? "")
       .match(/^강화 데몬 슬래시\s*:[^\r\n]+/mu)?.[0]],
@@ -843,6 +875,13 @@ function verifiedAttackBossDamageChannels(skillData) {
     ["다크로드의 비전서", learned("다크로드의 비전서")?.skill_effect],
     ["메소 익스플로젼", String(learned("블러디 파킷")?.skill_effect ?? "")
       .match(/메소 익스플로젼으로 보스 몬스터 공격 시 데미지[^\r\n]*/u)?.[0]],
+    ...[...uniqueArcheryTargets.values()].map((name) => [name, archery]),
+    ...[
+      "리액션:디스트럭션 VI",
+      "크래프트:롱기누스 VI",
+      "크리스탈 이그니션",
+      "리액션:스펙트럼",
+    ].map((name) => [name, learned(name)?.skill_effect]),
   ];
   return effects.flatMap(([source, text]) => {
     const localBossDamage = number(text?.match(
@@ -886,6 +925,19 @@ function leveledAttackBossDamageChannels(skillData) {
   });
 }
 
+const BOOST_CORE_ATTACKS = new Map([
+  ["비홀더", [
+    "비홀더", "비홀더 도미넌트", "비홀더 쇼크", "비홀더스 리벤지",
+    "비홀더스 퍼니시먼트", "비홀더 임팩트",
+  ]],
+  ["용맥 분출", [
+    "용맥 분출", "분출 : 너울이는 강", "분출 : 돌개바람", "분출 : 해돋이 우물",
+  ]],
+  ["용맥 흡수", [
+    "용맥 흡수", "흡수 : 강 웅덩이 물벼락", "흡수 : 소소리 바람", "흡수 : 햇빛 맹아리",
+  ]],
+]);
+
 /** V 강화 코어 40레벨에서 해당 스킬에 붙는 몬스터 방어율 무시 20%. */
 export function boostCoreIgnoreDefenseChannels(vMatrixData) {
   const result = [];
@@ -896,9 +948,8 @@ export function boostCoreIgnoreDefenseChannels(vMatrixData) {
     const coreName = String(core?.v_core_name ?? "")
       .replace(/\s*강화\s*$/u, "")
       .trim();
-    const linkedSkills = coreName === "비홀더"
-      ? ["비홀더", "비홀더 도미넌트", "비홀더 쇼크", "비홀더스 리벤지", "비홀더스 퍼니시먼트", "비홀더 임팩트"]
-      : coreName.split("/").map((name) => name.trim());
+    const linkedSkills = BOOST_CORE_ATTACKS.get(coreName) ??
+      coreName.split("/").map((name) => name.trim());
     for (const skillName of linkedSkills) {
       if (!skillName) continue;
       result.push(createDamageChannel({

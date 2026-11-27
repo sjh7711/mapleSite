@@ -3,7 +3,7 @@
  * Node, Discord, DOM에 의존하지 않아 브라우저와 Worker에서도 그대로 쓴다.
  */
 
-export const CHARACTER_CONVERSION_CACHE_VERSION = "combat-profile-v105-guild-buff-duration";
+export const CHARACTER_CONVERSION_CACHE_VERSION = "combat-profile-v106-verified-attack-effects";
 
 // 넥슨 유니온 챔피언 가이드의 전투 능력치 5레벨 기준.
 // https://maplestory.nexon.com/Guide/N23GameInformation/Articles/409
@@ -91,13 +91,11 @@ export const FULL_BOSS_DOPING = {
     combatDurationSeconds: 360,
     includeEquippedRing: true,
   },
-  // 기존 공통 합계에 포함해 두었던 45포인트 길드 기준이다. 실제 길드의
-  // 노블레스 배분을 조회하면 이 값과의 차이만큼 보정한다.
+  // 기존 공통 합계에 포함된 길드분을 빼고 조회된 노블레스 효과를 적용한다.
   guildBaseline: {
     bossDamage: 30,
     damage: 30,
     criticalDamage: 30,
-    ignoreDefenseSources: [],
   },
   classAdjustments: {
     // 크리티컬 리인포스의 크확 계산에는 외부 도핑을 제외한다.
