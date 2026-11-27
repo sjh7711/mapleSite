@@ -61,3 +61,24 @@ test("제논 잠재 환산은 올스탯%가 아니라 STR% 1을 기준 단위로
   assert.equal(result.statPercentToMainPercentByStat.LUK, 1.2);
   assert.ok(Math.abs(result.unreflectedMainStatToPercent - 0.1) < 1e-12);
 });
+
+test("제논 보공 환산은 공격 전용 데미지를 전체 공격에 합산하지 않는다", () => {
+  const result = xenonPotentialStatEquivalence({
+    flatStatToDamagePercent: { STR: 0.1, DEX: 0.1, LUK: 0.1 },
+    flatAttackToDamagePercent: 0.2,
+    allStatPercentToDamagePercent: 1,
+    details: {
+      dopedBase: { STR: 1_000, DEX: 1_000, LUK: 1_000 },
+      damageTotal: 1_000,
+      dopedAttackPercent: 200,
+      dopedCriticalDamage: 100,
+      dopedIgnoreDefense: 0.98,
+      combatModel: { damageChannels: [
+        { weight: 0.5, localBossDamage: 20 },
+        { weight: 0.5 },
+      ] },
+    },
+  });
+  const expected = (0.5 / 1_020 + 0.5 / 1_000) / result.oneMainPercentRelative;
+  assert.ok(Math.abs(result.bossDamageToMainPercent - expected) < 1e-12);
+});

@@ -20,7 +20,7 @@ import {
   calculatePotentialOptionsStatEquivalent,
   parsePotentialOption,
 } from "maple-core/potential";
-import { calculateDamageChannelIgnoreDefenseGain } from "maple-core/combat-model";
+import { bossDamageGainPerPoint, calculateDamageChannelIgnoreDefenseGain } from "maple-core/combat-model";
 
 import {
   fetchCharacterPotentialData,
@@ -952,7 +952,12 @@ export function xenonPotentialStatEquivalence(
       (damageTotal / (135 + criticalDamage)) / strPercentUnit,
     attackPercentToMainPercent:
       (damageTotal / (100 + attackPercent)) / strPercentUnit,
-    bossDamageToMainPercent: 1 / strPercentUnit,
+    bossDamageToMainPercent: bossDamageGainPerPoint({
+      damageBracket: damageTotal,
+      currentIgnoreDefense,
+      enemyDefense: 3.8 * targetDefenseRemaining,
+      channels: damageChannels,
+    }) / oneMainPercentRelative,
     unreflectedMainStatToPercent: unreflectedStatToPercentByStat.STR,
     unreflectedSubStatToPercent: unreflectedStatToPercentByStat.DEX,
     unreflectedStatToPercentByStat,

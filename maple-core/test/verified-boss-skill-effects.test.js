@@ -12,6 +12,7 @@ import {
   reconstructCharacterStats,
 } from "../src/stat-efficiency.js";
 import { FULL_BOSS_DOPING } from "../src/stat-profile.js";
+import { calculateBossItemCombatEffects } from "../src/boss-combat-effects.js";
 
 const skill = (skill_name, skill_effect, skill_description = "", skill_level = 30) =>
   ({ skill_name, skill_effect, skill_description, skill_level });
@@ -234,12 +235,72 @@ test("정확한 공격을 우선 연결하고 하이퍼와 V 코어 방무를 �
   ], names, core("트리니티"), core("환영 분신부"), core("퍼지롭 매스커레이드"));
 
   assert.deepEqual(channels.get("트리니티 VI").ignoreDefenseSources, [30, 20]);
-  assert.deepEqual(channels.get("트리니티 퓨전").ignoreDefenseSources, [30]);
+  assert.deepEqual(channels.get("트리니티 퓨전").ignoreDefenseSources, [30, 20]);
   assert.equal(channels.get("트리니티 VI").localBossDamage, 30);
   assert.equal(channels.get("트리니티 퓨전").localBossDamage, 30);
   assert.deepEqual(channels.get("환영 분신부 VI").ignoreDefenseSources, [25, 20]);
   assert.deepEqual(channels.get("선기 : 극대 분신난무").ignoreDefenseSources, [25]);
   assert.deepEqual(channels.get(names[4]).ignoreDefenseSources, [40, 10, 20]);
+});
+
+test("엔젤릭버스터의 리인포스는 배운 하이퍼와 연결된 공격에만 적용한다", () => {
+  const skills = [
+    grade("6", attack("트리니티 VI", "트리니티 VI 및 트리니티 퓨전의 데미지 및 방어율 무시 15% 증가 버프가 최대 2회 중첩"),
+      attack("소울 시커 엑스퍼트 VI"), attack("그랜드 피날레 : 응원 풍선")),
+    grade("5", attack("트리니티 퓨전")),
+    grade("hyperpassive",
+      hyper("트리니티-리인포스", "트리니티, 트리니티 퓨전의 데미지를 증가시킨다.", "데미지 20% 증가"),
+      hyper("소울 시커-리인포스", "소울 시커의 데미지를 증가시킨다.", "데미지 20% 증가"),
+      hyper("소울 시커-이그노어 가드", "소울 시커의 방어율 무시 수치를 증가시킨다.", "방어율 무시 15% 증가", 0)),
+  ];
+  const channels = attackChannels(skills, [
+    "트리니티 VI", "트리니티 퓨전", "소울 시커 엑스퍼트 VI", "그랜드 피날레 : 응원 풍선",
+  ], core("트리니티"), core("소울 시커/스타 크래시"));
+  for (const name of ["트리니티 VI", "트리니티 퓨전"]) {
+    assert.equal(channels.get(name).localBossDamage, 50);
+    assert.deepEqual(channels.get(name).ignoreDefenseSources, [30, 20]);
+  }
+  assert.equal(channels.get("소울 시커 엑스퍼트 VI").localBossDamage, 20);
+  assert.deepEqual(channels.get("소울 시커 엑스퍼트 VI").ignoreDefenseSources, [20]);
+  assert.equal(channels.has("그랜드 피날레 : 응원 풍선"), false);
+});
+
+test("라라의 해돋이 우물 보공 패시브는 다른 분출에 적용하지 않는다", () => {
+  const well = "분출 : 해돋이 우물 VI";
+  const wind = "분출 : 돌개바람 VI";
+  const channels = attackChannels([
+    grade("6", attack(well), attack(wind)),
+    grade("4", skill("발현 : 햇살 가득 안은 터",
+      "120초 동안 데미지 25% 증가\n[패시브 효과 : 해돋이 우물의 데미지 34%p, 보스 몬스터 공격 시 데미지 14%p 증가]")),
+    grade("hyperpassive", hyper("분출/흡수 - 리인포스", "분출, 흡수 스킬의 데미지를 증가시킨다.", "데미지 10% 증가")),
+  ], [well, wind]);
+  assert.equal(channels.get(well).localBossDamage, 24);
+  assert.equal(channels.get(wind).localBossDamage, 10);
+});
+
+test("오버 드라이브는 실효 쿨타임의 상승·감소 구간을 전투 종료 시점까지 계산한다", () => {
+  const skills = [grade("5", skill("오버 드라이브",
+    "28초 동안 무기 순수 공격력의 80%만큼 공격력 증가, 지속시간이 끝난 후 남은 재사용 대기시간 동안 무기 순수 공격력의 15%만큼 공격력 감소\n재사용 대기시간 60초"))];
+  const cycles = calculateActiveSkillCycleBonuses(skills, "attack", 360, {
+    characterClass: "엔젤릭버스터",
+    equipmentData: { item_equipment: [{ item_equipment_slot: "무기", item_base_option: { attack_power: "280" } }] },
+    cooldownReduction: { equipmentSeconds: 7, unionPercent: 6 },
+  });
+  assert.equal(cycles.applied.length, 2);
+  assert.ok(Math.abs(cycles.applied[0].cooldown - 49.4) < 1e-9);
+  assert.deepEqual(cycles.applied.map((phase) => phase.flatAttack), [224, -42]);
+  assert.ok(Math.abs(cycles.flatAttack - 113.31444444444445) < 1e-9);
+});
+
+test("11레벨 어센틱심볼 보공은 여러 개 장착해도 공통으로 20% 한 번만 적용한다", () => {
+  const effects = calculateBossItemCombatEffects({ symbolData: { symbol: [
+    { symbol_name: "어센틱심볼 : 오디움", symbol_level: 10 },
+    { symbol_name: "어센틱심볼 : 아르테리아", symbol_level: 11 },
+    { symbol_name: "어센틱심볼 : 세르니움", symbol_level: 11 },
+  ] } });
+  assert.equal(effects.length, 1);
+  assert.equal(effects[0].modifiers.bossDamage, 20);
+  assert.equal(effects[0].uptime, 1);
 });
 
 test("레테 이딕트 하이퍼와 어센트 보공은 해당 공격만 증가시킨다", () => {
