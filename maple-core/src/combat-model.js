@@ -699,6 +699,58 @@ function hyperPassiveAttackChannels(skillData) {
   return result;
 }
 
+const VERIFIED_REINFORCE_ATTACKS = new Map([
+  ["트리니티-리인포스", ["트리니티", "트리니티 퓨전"]],
+  ["소울 시커-리인포스", ["소울 시커"]],
+  ["퍼지롭 매스커레이드-리인포스", [
+    "퍼지롭 매스커레이드 : 저격", "퍼지롭 매스커레이드 : 처형", "퍼지롭 매스커레이드 : 포격",
+  ]],
+  ["블레이드 댄싱-리인포스", ["블레이드 댄싱"]],
+  ["홀로그램 그래피티-리인포스", [
+    "홀로그램 그래피티 : 관통", "홀로그램 그래피티 : 역장", "홀로그램 그래피티 : 지원",
+    "홀로그램 그래피티 : 융합",
+  ]],
+  ["분출/흡수-리인포스", [
+    "분출 : 너울이는 강", "분출 : 돌개바람", "분출 : 해돋이 우물",
+    "흡수 : 강 웅덩이 물벼락", "흡수 : 소소리 바람", "흡수 : 햇빛 맹아리",
+  ]],
+  ["궁니르 디센트-리인포스", ["궁니르 디센트"]],
+  ["비홀더-리인포스", ["비홀더 도미넌트", "비홀더 쇼크", "비홀더스 리벤지", "비홀더 임팩트"]],
+  ["암살-리인포스", ["암살"]],
+  ["메소 익스플로젼-리인포스", ["메소 익스플로젼"]],
+  ["카디널 포스-리인포스", ["카디널 블래스트", "카디널 디스차지"]],
+  ["메타모포시스-리인포스", ["메타모포시스"]],
+  ["데몬 임팩트-리인포스", ["데몬 임팩트"]],
+  ["블리자드-리인포스", ["블리자드"]],
+  ["체인 라이트닝-리인포스", ["체인 라이트닝"]],
+  ["프로즌 오브-리인포스", ["프로즌 오브"]],
+  ["플레임 스윕-리인포스", ["플레임 스윕"]],
+  ["미스트 이럽션-리인포스", ["미스트 이럽션"]],
+  ["블레이징 익스팅션-리인포스", ["블레이징 익스팅션"]],
+  ["기가 슬래셔-리인포스", ["기가 슬래셔", "드라코 슬래셔"]],
+  ["인퍼널 브레스-리인포스", ["인퍼널 브레스"]],
+  ["윙비트-리인포스", ["윙비트"]],
+]);
+
+function reinforceAttackBonuses(skillData) {
+  const passives = (skillData ?? [])
+    .filter((group) => group.character_skill_grade === "hyperpassive")
+    .flatMap((group) => group.character_skill ?? []);
+  return passives.flatMap((skill) => {
+    const name = skill.skill_name?.trim().replace(/\s*-\s*/u, "-");
+    const attacks = VERIFIED_REINFORCE_ATTACKS.get(name);
+    if (!attacks || !(number(skill.skill_level) > 0)) return [];
+    const match = String(skill.skill_effect ?? "").trim().match(
+      /^(?:블레이징 익스팅션의 )?데미지\s*(\d+(?:\.\d+)?)%\s*증가$/u,
+    );
+    return match ? attacks.map((source) => ({
+      source,
+      damage: Number(match[1]),
+      hyperPassive: skill.skill_name,
+    })) : [];
+  });
+}
+
 function maintainedTrinityAttackChannels(skillData) {
   const skills = (skillData ?? []).flatMap((grade) => grade?.character_skill ?? []);
   const learned = (name) => skills.find((skill) =>
@@ -868,7 +920,10 @@ function verifiedAttackBossDamageChannels(skillData) {
     : [];
   const uniqueArcheryTargets = new Map(archeryTargets.map((name) =>
     [normalizedBattleSkillName(name), name]));
+  const sunriseWell = String(learned("발현 : 햇살 가득 안은 터")?.skill_effect ?? "")
+    .match(/\[패시브 효과\s*:\s*해돋이 우물의[^\]]*보스 몬스터 공격 시 데미지[^\]]*\]/u)?.[0];
   const effects = [
+    ["분출 : 해돋이 우물", sunriseWell],
     ["데몬 어웨이크닝", String(learned("데몬 어웨이크닝")?.skill_effect ?? "")
       .match(/^강화 데몬 슬래시\s*:[^\r\n]+/mu)?.[0]],
     [impact?.skill_name, impact?.skill_effect],
@@ -885,7 +940,7 @@ function verifiedAttackBossDamageChannels(skillData) {
   ];
   return effects.flatMap(([source, text]) => {
     const localBossDamage = number(text?.match(
-      /보스 몬스터 공격 시 데미지\s*(\d+(?:\.\d+)?)%\s*증가/u,
+      /보스 몬스터 공격 시 데미지\s*(\d+(?:\.\d+)?)%(?:p)?\s*증가/u,
     )?.[1]);
     return localBossDamage > 0 ? [createDamageChannel({
       source, localBossDamage, metadata: { status: "unweighted" },
@@ -926,6 +981,7 @@ function leveledAttackBossDamageChannels(skillData) {
 }
 
 const BOOST_CORE_ATTACKS = new Map([
+  ["트리니티", ["트리니티", "트리니티 퓨전"]],
   ["비홀더", [
     "비홀더", "비홀더 도미넌트", "비홀더 쇼크", "비홀더스 리벤지",
     "비홀더스 퍼니시먼트", "비홀더 임팩트",
@@ -969,6 +1025,7 @@ export function boostCoreIgnoreDefenseChannels(vMatrixData) {
 
 function normalizedBattleSkillName(value) {
   return withoutSixthMasteryMarker(value)
+    .replace(/^소울 시커 엑스퍼트$/u, "소울 시커")
     // These VI mastery skills use an earlier “Ⅱ” name in the V core.
     .replace(/^((?:크래프트\s*:\s*자벨린|리액션\s*:\s*(?:디스트럭션|도미네이션)))\s*(?:Ⅱ|II)$/u, "$1")
     .normalize("NFKC")
@@ -982,12 +1039,15 @@ function matchingLocalChannel(statisticName, localChannels) {
   if (!key) return null;
   const base = String(statisticName).replace(/\s*\([^()]+\)\s*$/u, "");
   const form = normalizedBattleSkillName(base);
-  return localChannels.get(key) ??
-    localChannels.get(form) ??
-    [...localChannels.entries()]
+  const direct = localChannels.get(key) ?? localChannels.get(form);
+  if (direct) return direct;
+  const inherited = [...localChannels.entries()]
       .filter(([source]) => key.startsWith(`${source}:`) || key.startsWith(`${source}-`))
       .sort(([left], [right]) => right.length - left.length)[0]?.[1] ??
     null;
+  return inherited?.reinforceDamage
+    ? { ...inherited, localBossDamage: inherited.localBossDamage - inherited.reinforceDamage }
+    : inherited;
 }
 
 function mergedLocalIgnoreDefenseChannels(skillData, vMatrixData) {
@@ -1034,6 +1094,20 @@ function mergedLocalIgnoreDefenseChannels(skillData, vMatrixData) {
       channel.ignoreDefenseSources.push(20);
       channel.metadata.sources.push({ coreName, coreLevel, source });
     }
+  }
+  for (const bonus of reinforceAttackBonuses(skillData)) {
+    const key = normalizedBattleSkillName(bonus.source);
+    const inherited = matchingLocalChannel(bonus.source, merged);
+    const current = merged.get(key) ?? {
+      source: bonus.source,
+      ignoreDefenseSources: [...(inherited?.ignoreDefenseSources ?? [])],
+      localBossDamage: number(inherited?.localBossDamage),
+      metadata: { sources: [...(inherited?.metadata.sources ?? [])] },
+    };
+    current.localBossDamage += bonus.damage;
+    current.reinforceDamage = number(current.reinforceDamage) + bonus.damage;
+    current.metadata.sources.push({ source: bonus.source, hyperPassive: bonus.hyperPassive });
+    merged.set(key, current);
   }
   return merged;
 }

@@ -758,6 +758,7 @@ const COMMON_COMBAT_SKILLS = new Set([
   "이계 여신의 축복",
   "그란디스 여신의 축복",
   "오라 웨폰",
+  "오버 드라이브",
   "얼티밋 다크 사이트",
   "얼티밋 다크 사이트 VI",
   "프리드의 가호",
@@ -1839,6 +1840,36 @@ export function calculateActiveSkillCycleBonuses(
 
     if (isBaselineReflectedSkill(skill)) {
       result.baselineReflected.push(name);
+      continue;
+    }
+
+    if (name === "오버 드라이브") {
+      const increase = effect.match(/(\d+(?:\.\d+)?)초 동안 무기 순수 공격력의 (\d+(?:\.\d+)?)%만큼 공격력 증가/u);
+      const decrease = effect.match(/남은 재사용 대기시간 동안 무기 순수 공격력의 (\d+(?:\.\d+)?)%만큼 공격력 감소/u);
+      const duration = number(increase?.[1]);
+      const cooldown = cycleCooldown(skill, duration, skillCooldown(effect));
+      const weaponPower = weaponBasePower(equipmentData);
+      if (!(duration > 0 && cooldown > 0 && weaponPower > 0 && decrease)) continue;
+      const uptime = activeRingUptime(duration, cooldown, combatDuration);
+      addCycleEvent(result, {
+        name,
+        phase: "공격력 증가",
+        duration,
+        cooldown,
+        uptime,
+        modifiers: { flatAttack: Math.floor(weaponPower * number(increase?.[2]) / 100) },
+      }, combatDuration);
+      if (cooldown > duration && uptime < 1) {
+        addCycleEvent(result, {
+          name,
+          phase: "공격력 감소",
+          duration: cooldown - duration,
+          offset: duration,
+          cooldown,
+          uptime: 1 - uptime,
+          modifiers: { flatAttack: -Math.floor(weaponPower * Number(decrease[1]) / 100) },
+        }, combatDuration);
+      }
       continue;
     }
 
