@@ -16,6 +16,7 @@ import {
 } from "./combat-model.js";
 import { classBattlePracticeDamageProfile } from "./class-damage-profiles.js";
 import { effectiveSkillCooldown, skillCooldown } from "./combat-cooldown.js";
+import { soulContractDamageCoverage } from "./soul-contract-damage-profiles.js";
 import {
   calculateCombatReuse,
   expectedReusableBuffCooldown,
@@ -2766,6 +2767,7 @@ export function calculateConditionalLinkCycleBonuses(
     let bossDamage = 0;
     let ignoreDefense = 0;
     let uptime = 1;
+    let coverage = null;
 
     if (name === "무아") {
       const initial = percentFromEffect(effect, /발동 시 데미지\s*(\d+(?:\.\d+)?)%/u);
@@ -2799,19 +2801,27 @@ export function calculateConditionalLinkCycleBonuses(
       const baseCooldown = name === "소울 컨트랙트"
         ? skillCooldown(effect)
         : percentFromEffect(effect, /재(?:발동|사용) 대기시간\s*(\d+(?:\.\d+)?)초/u);
-      const cooldown = baseCooldown;
       // 일반적으로 극딜·준극딜마다 시전한다. 초기화를 활용하는 직업은
       // 연무장에 기록된 반복 시전 시각과 현재 벞지를 결합한다.
-      uptime = name === "소울 컨트랙트"
-        ? observedSoulContractUptime({
+      if (name === "소울 컨트랙트") {
+        const observedUptime = observedSoulContractUptime({
           characterClass, skillData, cooldownReduction, duration, combatDuration,
-        }) ?? activeRingUptime(duration, 60, combatDuration)
-        : cooldown > 0 ? Math.min(1, duration / cooldown) : 0;
-      if (characterClass === "렌" && cooldown > 0) {
+        });
+        uptime = observedUptime ?? activeRingUptime(duration, 60, combatDuration);
+        if (baseCooldown === 60) {
+          coverage = soulContractDamageCoverage({
+            characterClass, duration, combatDuration, timeUptime: uptime,
+            observedReuse: observedUptime !== null,
+          });
+        }
+      } else {
+        uptime = baseCooldown > 0 ? Math.min(1, duration / baseCooldown) : 0;
+      }
+      if (characterClass === "렌" && baseCooldown > 0) {
         const damageCoverage = renConditionalLinkDamageCoverage(name, duration, baseCooldown);
         if (damageCoverage !== null) uptime = Math.min(1, damageCoverage);
       }
-      damage = percentFromEffect(effect, /데미지\s*(\d+(?:\.\d+)?)%\s*증가/u) * uptime;
+      damage = soulDamage(skill) * (coverage?.damageCoverage ?? uptime);
     } else if (name === "인텐시브 인썰트" && targetLevelIsLower) {
       // 상태 이상 대상 수치는 Open API의 `상태이상 추가 데미지`에
       // 반영된다. 보스보다 캐릭터 레벨이 높은 일반적인 상황의 별도
@@ -2826,7 +2836,7 @@ export function calculateConditionalLinkCycleBonuses(
       result.damage += damage;
       result.bossDamage += bossDamage;
       if (ignoreDefense > 0) result.ignoreDefenseSources.push(ignoreDefense);
-      result.applied.push({ name, damage, bossDamage, ignoreDefense, uptime });
+      result.applied.push({ name, damage, bossDamage, ignoreDefense, uptime, ...coverage });
     }
   }
   const covenantDamage = maintainsSummon ? covenantLinkDamage(linkSkillData) : 0;

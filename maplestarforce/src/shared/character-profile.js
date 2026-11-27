@@ -525,6 +525,12 @@ function dynamicCombatSummary(profile) {
       ).toFixed(2)}%`,
     );
   }
+  const soulContract = details.conditionalLinkSources?.find(({ name }) => name === "소울 컨트랙트");
+  if (Number.isFinite(soulContract?.damageCoverage)) {
+    parts.push(
+      `소울 컨트랙트 시간 가동률 ${(soulContract.uptime * 100).toFixed(1)}% · 추정 피해 비중 ${(soulContract.damageCoverage * 100).toFixed(1)}%`,
+    );
+  }
   for (const effect of details.combatModel?.effects ?? []) {
     if (!effect.applied) continue;
     if (effect.kind === "special-core" || effect.sourceKey === "union:wild-hunter") {

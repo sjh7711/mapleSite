@@ -86,8 +86,12 @@ test('전수 소울 컨트랙트에는 벞지를 적용하고 발동형 시프 �
   const parameters = input({ linkSkillData: links, doping: FULL_BOSS_DOPING });
   parameters.statData.final_stat.push({ stat_name: '버프 지속시간', stat_value: '100' });
   const result = calculateCharacterPotentialConversion(parameters);
-  assert.equal(result.details.conditionalLinkDamage, 33.5);
-  assert.equal(result.details.conditionalLinkSources[0].uptime, 1 / 3);
+  const [soul, cunning] = result.details.conditionalLinkSources;
+  assert.equal(soul.uptime, 1 / 3);
+  assert.ok(soul.damageCoverage > soul.uptime);
+  assert.equal(soul.damage, 60 * soul.damageCoverage);
+  assert.equal(cunning.damage, 13.5);
+  assert.equal(result.details.conditionalLinkDamage, soul.damage + cunning.damage);
 });
 
 test('렌의 조건부 링크와 장착 일격필살, 만렙 어센틱심볼을 보스 환산에 포함한다', () => {

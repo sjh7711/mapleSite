@@ -142,7 +142,9 @@ test("observed repeat casts use the selected duration and cooldown and count ove
   const own = evaluate("엔젤릭버스터", nova, 360);
   assert.equal(own.applied.length, 1);
   assert.ok(own.applied[0].uptime > 0.6 && own.applied[0].uptime < 0.75);
-  assert.equal(own.damage, 120 * own.applied[0].uptime);
+  assert.ok(own.applied[0].damageCoverage > own.applied[0].uptime);
+  assert.equal(own.applied[0].damageProfileSamples, 11);
+  assert.equal(own.damage, 120 * own.applied[0].damageCoverage);
   assert.equal(evaluate("엔젤릭버스터", nova, 10).damage, 120);
   assert.ok(evaluate("엔젤릭버스터", nova, 360, 0).damage < own.damage);
   assert.ok(evaluate("엔젤릭버스터", nova, 360, 89, 0).damage < own.damage);
@@ -151,9 +153,27 @@ test("observed repeat casts use the selected duration and cooldown and count ove
   assert.ok(evaluate("제로", rhinne, 360).applied[0].uptime > 0.6);
   const cadenceOnly = evaluate("카데나", nova, 360);
   assert.equal(cadenceOnly.applied[0].uptime, 0.315);
-  assert.equal(cadenceOnly.damage, 18.9);
+  assert.ok(cadenceOnly.applied[0].damageCoverage > cadenceOnly.applied[0].uptime);
+  assert.equal(cadenceOnly.damage, 60 * cadenceOnly.applied[0].damageCoverage);
+  const incomplete = evaluate("엔젤릭버스터", attack("그란디스 여신의 축복"), 360);
+  assert.equal(incomplete.applied[0].damageCoverage, undefined);
+  assert.equal(incomplete.damage, 37.8);
   assert.equal(evaluate("제로", attack("초월자 륀느의 기원"), 360).applied[0].uptime, 0.315);
   assert.equal(calculateActiveSkillCycleBonuses([group("5", rhinne)], "attack", 360).applied[0].duration, 45);
+});
+
+test("Soul Contract weights measured burst classes and preserves the normal cadence", () => {
+  const bundle = { character_link_skill: [link(60)] };
+  const mage = calculateConditionalLinkCycleBonuses(bundle, 80, false, "아크메이지(썬,콜)");
+  assert.equal(mage.applied[0].uptime, 0.3);
+  assert.ok(mage.applied[0].damageCoverage > 0.55 && mage.applied[0].damageCoverage < 0.65);
+  assert.equal(mage.damage, 60 * mage.applied[0].damageCoverage);
+  const short = calculateConditionalLinkCycleBonuses(bundle, 80, false, "아크메이지(썬,콜)", false, 60);
+  assert.equal(short.applied[0].damageCoverage, undefined);
+  assert.equal(short.damage, 18);
+  const sparse = calculateConditionalLinkCycleBonuses(bundle, 80, false, "패스파인더");
+  assert.equal(sparse.applied[0].damageCoverage, undefined);
+  assert.equal(sparse.damage, 18);
 });
 
 test("Shadower's Killing Intent bonus stays off the global buff", () => {
