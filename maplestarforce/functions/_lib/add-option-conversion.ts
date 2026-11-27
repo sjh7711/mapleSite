@@ -684,6 +684,7 @@ function calculateXenon(
     !source?.maintainedCovenantDamage &&
       maintainsBossSummon(snapshot.skillData, text(input.character.character_class)),
     combatDuration,
+    { skillData: snapshot.skillData, cooldownReduction },
   );
   const guildNoblesse = calculateGuildNoblesseBonuses(snapshot.guildData, combatDuration);
   const guildBaseline = object(doping?.guildBaseline) ?? {};

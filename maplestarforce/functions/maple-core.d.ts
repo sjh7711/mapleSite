@@ -273,6 +273,7 @@ declare module "maple-core/stat-efficiency" {
     characterClass?: string,
     maintainsSummon?: boolean,
     combatDuration?: number,
+    timing?: { skillData?: unknown; cooldownReduction?: CombatCooldownReduction },
   ): {
     damage: number;
     bossDamage: number;

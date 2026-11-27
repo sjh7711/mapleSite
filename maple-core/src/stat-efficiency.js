@@ -19,6 +19,7 @@ import { effectiveSkillCooldown, skillCooldown } from "./combat-cooldown.js";
 import {
   calculateCombatReuse,
   expectedReusableBuffCooldown,
+  observedSoulContractUptime,
   reuseEligibleSkills,
 } from "./combat-reuse.js";
 export { calculateCombatReuse } from "./combat-reuse.js";
@@ -1290,6 +1291,18 @@ function specialCycleEvents({
       attackType,
     });
     return event ? [event] : [];
+  }
+
+  if (name === "무아지경") {
+    // 살의를 소모한 공격에 붙는 최종 데미지는 전신 버프가 아니다.
+    const buff = effect.match(/(\d+(?:\.\d+)?)초 동안 데미지\s*(\d+(?:\.\d+)?)%\s*증가/u);
+    if (!buff || !(cooldown > 0)) return [];
+    return [{
+      name,
+      duration: Number(buff[1]),
+      cooldown,
+      modifiers: { damage: Number(buff[2]) },
+    }];
   }
 
   if (name === "프리드의 가호 VI") {
@@ -2717,6 +2730,7 @@ export function calculateConditionalLinkCycleBonuses(
   characterClass,
   maintainsSummon = false,
   combatDuration = 360,
+  { skillData, cooldownReduction } = {},
 ) {
   const result = {
     damage: 0,
@@ -2725,6 +2739,12 @@ export function calculateConditionalLinkCycleBonuses(
     applied: [],
   };
   const links = linkSkills(linkSkillData);
+  const soulDamage = (skill) => percentFromEffect(
+    skill?.skill_effect, /데미지\s*(\d+(?:\.\d+)?)%\s*증가/u,
+  );
+  const soulContractIndex = links.reduce((best, skill, index) =>
+    String(skill.skill_name ?? "").trim() === "소울 컨트랙트" &&
+    (best < 0 || soulDamage(skill) > soulDamage(links[best])) ? index : best, -1);
   const stackedExplorerLinks = new Map();
   for (const skill of links) {
     const name = String(skill.skill_name ?? "").trim().match(
@@ -2736,9 +2756,10 @@ export function calculateConditionalLinkCycleBonuses(
       stackedExplorerLinks.set(name, skill);
     }
   }
-  for (const skill of links) {
+  for (const [index, skill] of links.entries()) {
     const rawName = String(skill.skill_name ?? "").trim();
     const name = rawName.replace(/^(임피리컬 널리지|시프 커닝)\([^()]+\)$/u, "$1");
+    if (name === "소울 컨트랙트" && index !== soulContractIndex) continue;
     if (stackedExplorerLinks.has(name) && stackedExplorerLinks.get(name) !== skill) continue;
     const effect = String(skill?.skill_effect ?? "");
     let damage = 0;
@@ -2779,9 +2800,12 @@ export function calculateConditionalLinkCycleBonuses(
         ? skillCooldown(effect)
         : percentFromEffect(effect, /재(?:발동|사용) 대기시간\s*(\d+(?:\.\d+)?)초/u);
       const cooldown = baseCooldown;
-      // 소울 컨트랙트는 2분 극딜·준극딜 타이밍에 한 번씩 사용한다.
+      // 일반적으로 극딜·준극딜마다 시전한다. 초기화를 활용하는 직업은
+      // 연무장에 기록된 반복 시전 시각과 현재 벞지를 결합한다.
       uptime = name === "소울 컨트랙트"
-        ? activeRingUptime(duration, 60, combatDuration)
+        ? observedSoulContractUptime({
+          characterClass, skillData, cooldownReduction, duration, combatDuration,
+        }) ?? activeRingUptime(duration, 60, combatDuration)
         : cooldown > 0 ? Math.min(1, duration / cooldown) : 0;
       if (characterClass === "렌" && cooldown > 0) {
         const damageCoverage = renConditionalLinkDamageCoverage(name, duration, baseCooldown);
@@ -3752,6 +3776,8 @@ function selectBossLinkPreset(
   buffDurationPercent,
   characterClass,
   maintainsSummon,
+  combatDuration,
+  timing,
 ) {
   return selectScoredPreset(candidates, activePreset, (candidate) => {
     const preset = linkPresetData(linkSkillData, candidate);
@@ -3761,6 +3787,8 @@ function selectBossLinkPreset(
       false,
       characterClass,
       maintainsSummon,
+      combatDuration,
+      timing,
     );
     return presetCombatScore(
       linkSkills(preset).flatMap(linkCombatTexts),
@@ -4194,6 +4222,7 @@ function selectJointBossPreset({
             characterClass,
             maintainsSummon,
             number(doping?.totals?.combatDurationSeconds) || 360,
+            { skillData, cooldownReduction },
           ),
           passiveCombat,
           statusAilmentDamage: selectedStatusAilmentDamage(
@@ -4336,6 +4365,14 @@ export function resolveCharacterPresetSnapshot({
         link: selectBossLinkPreset(
           linkSkillData, available.link, active.link, mainStat, subStats, attackType,
           buffDuration, characterClass, maintainsBossSummon(skillData, characterClass),
+          number(doping?.totals?.combatDurationSeconds) || 360,
+          {
+            skillData,
+            cooldownReduction: resolveCombatCooldownReduction(
+              statData, equipmentPresetData(equipmentData, equipment),
+              unionPresetData(unionRaiderData, union), characterClass,
+            ),
+          },
         ),
         ability,
       };
@@ -5184,6 +5221,7 @@ export function calculateCharacterPotentialConversion({
     !selectedStatSources?.maintainedCovenantDamage &&
       maintainsBossSummon(selectedSkillData, character.character_class),
     combatDurationSeconds,
+    { skillData: selectedSkillData, cooldownReduction },
   );
   const combatReuse = calculateCombatReuse({
     characterClass: character.character_class,
