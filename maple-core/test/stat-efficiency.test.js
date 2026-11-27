@@ -2925,9 +2925,9 @@ test("챔피언의 가호 5레벨은 공통 풀도핑 능력치에 한 번씩 �
   assert.ok(Math.abs(full.dopedBaseSub - base.dopedBaseSub - 138.29) < 1e-9);
   assert.ok(Math.abs(full.combatModel.totals.flatAttack - base.combatModel.totals.flatAttack - 394.3) < 1e-9);
   assert.equal(full.combatModel.totals.attackPercent - base.combatModel.totals.attackPercent, 14);
-  assert.equal(full.combatModel.totals.bossDamage - base.combatModel.totals.bossDamage, 85);
-  assert.equal(full.combatModel.totals.damage - base.combatModel.totals.damage, 31);
-  assert.ok(Math.abs(full.dopedCriticalDamage - base.dopedCriticalDamage - 53.5) < 1e-9);
+  assert.equal(full.combatModel.totals.bossDamage - base.combatModel.totals.bossDamage, 55);
+  assert.equal(full.combatModel.totals.damage - base.combatModel.totals.damage, 1);
+  assert.ok(Math.abs(full.dopedCriticalDamage - base.dopedCriticalDamage - 23.5) < 1e-9);
   assert.deepEqual(full.effectiveDopingTotals.ignoreDefenseSources, [15, 10]);
   assert.ok(Math.abs(full.dopedIgnoreDefense - 23.5) < 1e-9);
 });
@@ -2987,7 +2987,7 @@ test("풀보스 크확은 공용·보스·조건부 보정을 구분하고 100%�
   assert.equal(bowmaster.details.dopedCriticalRate, 105);
   assert.equal(bowmaster.details.sharpEyesHyperCriticalRateBonus, 5);
   assert.equal(bowmaster.details.criticalReinforceAverageCriticalDamage, 13.125);
-  assert.equal(bowmaster.details.dopedCriticalDamage, 146.625);
+  assert.equal(bowmaster.details.dopedCriticalDamage, 116.625);
   assert.equal(hero.statEquivalence.criticalRateToMainPercent, undefined);
   assert.equal(
     bowmaster.statEquivalence.criticalRateToMainPercent,
@@ -3116,8 +3116,8 @@ test("배틀메이지는 배틀 레이지와 다크 오라를 기본 전투 상�
       ],
     },
   ]);
-  assert.equal(fullBoss.details.dopedCriticalDamage, 143.5);
-  assert.equal(fullBoss.details.dopedDamageTotal, 556);
+  assert.equal(fullBoss.details.dopedCriticalDamage, 113.5);
+  assert.equal(fullBoss.details.dopedDamageTotal, 496);
 });
 
 test("심볼·하이퍼·HEXA를 제외한 기본 스탯을 최종 스탯에서 역산한다", () => {
@@ -3291,6 +3291,7 @@ test("레테는 기존 참조 도핑으로 기존 효율 표를 재현한다", (
     attackType: "magic",
     doping: {
       ...FULL_BOSS_DOPING,
+      guildBaseline: {},
       sayramCoverage: 1,
       collectorCoverage: 0,
       totals: {
